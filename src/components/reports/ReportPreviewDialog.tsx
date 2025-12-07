@@ -19,6 +19,8 @@ import { exportToPDF } from '@/lib/reports/pdfGenerator';
 import { ClientDetailsForm, ClientDetails } from './ClientDetailsForm';
 import { CompanyBrandingForm, CompanyBranding } from './CompanyBrandingForm';
 import { useUserOrganization } from '@/hooks/useUserProfile';
+import { Room } from '@/lib/canvas/types';
+import { Material } from '@/hooks/useMaterials';
 
 interface ReportPreviewDialogProps {
   open: boolean;
@@ -26,6 +28,8 @@ interface ReportPreviewDialogProps {
   projectName: string;
   projectAddress?: string;
   report: ReportSummary;
+  rooms?: Room[];
+  materials?: Material[];
 }
 
 const defaultClientDetails: ClientDetails = {
@@ -52,6 +56,8 @@ export function ReportPreviewDialog({
   projectName,
   projectAddress,
   report,
+  rooms = [],
+  materials = [],
 }: ReportPreviewDialogProps) {
   const { data: organization } = useUserOrganization();
   
@@ -83,6 +89,9 @@ export function ReportPreviewDialog({
       clientDetails: clientDetails.clientName ? clientDetails : undefined,
       companyBranding: companyBranding.companyName ? companyBranding : undefined,
       includeSeamDiagrams,
+      includeFinishesSchedule: rooms.some(r => r.materialCode),
+      rooms,
+      materials,
     });
   };
 

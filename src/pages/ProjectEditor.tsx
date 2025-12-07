@@ -28,7 +28,8 @@ import {
   Phone,
   Loader2,
   PanelRightClose,
-  PanelRight
+  PanelRight,
+  ClipboardList
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -65,6 +66,7 @@ export default function ProjectEditor() {
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
+  const [showFinishesLegend, setShowFinishesLegend] = useState(false);
 
   // Sync local data with project data
   useEffect(() => {
@@ -314,20 +316,32 @@ export default function ProjectEditor() {
             </div>
           )}
 
-          {/* Desktop Sidebar Toggle */}
+          {/* Desktop Sidebar Toggle & Legend Toggle */}
           {!isMobile && (
-            <Button
-              variant="secondary"
-              size="icon"
-              className="absolute top-4 right-4 z-10"
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              {sidebarCollapsed ? (
-                <PanelRight className="w-4 h-4" />
-              ) : (
-                <PanelRightClose className="w-4 h-4" />
+            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+              {/* Finishes Legend Toggle */}
+              {rooms.some(r => r.materialCode) && !is3DMode && (
+                <Button
+                  variant={showFinishesLegend ? 'default' : 'secondary'}
+                  size="icon"
+                  onClick={() => setShowFinishesLegend(!showFinishesLegend)}
+                  title="Toggle Finishes Legend"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                </Button>
               )}
-            </Button>
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
+                {sidebarCollapsed ? (
+                  <PanelRight className="w-4 h-4" />
+                ) : (
+                  <PanelRightClose className="w-4 h-4" />
+                )}
+              </Button>
+            </div>
           )}
 
           {/* Canvas or 3D View */}
@@ -342,10 +356,13 @@ export default function ProjectEditor() {
               activeTool={activeTool}
               jsonData={localData}
               onDataChange={handleDataChange}
+              materialTypes={new Map((materials || []).map(m => [m.id, m.type]))}
+              materials={materials || []}
               backgroundImage={backgroundImage}
               onSetBackgroundImage={handleSetBackgroundImage}
               onUpdateBackgroundImage={handleUpdateBackgroundImage}
               onRemoveBackgroundImage={handleRemoveBackgroundImage}
+              showFinishesLegend={showFinishesLegend}
             />
           )}
         </div>
@@ -399,6 +416,8 @@ export default function ProjectEditor() {
         projectName={project.name}
         projectAddress={project.address || undefined}
         report={report}
+        rooms={rooms}
+        materials={materials || []}
       />
     </div>
   );
