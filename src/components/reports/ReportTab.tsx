@@ -20,7 +20,8 @@ import { SeamDiagram } from './SeamDiagram';
 import { CutPlanModal } from './CutPlanModal';
 import { FinishesSchedule } from './FinishesSchedule';
 import { WasteSuggestionCard } from './WasteSuggestionCard';
-import { StripPlanResult } from '@/lib/rollGoods';
+import { CrossRoomOptimizer } from './CrossRoomOptimizer';
+import { StripPlanResult, extractRollMaterialSpecs } from '@/lib/rollGoods';
 
 interface ReportTabProps {
   rooms: Room[];
@@ -211,6 +212,48 @@ export function ReportTab({
               />
             </>
           )}
+
+          {/* Cross-Room Optimization for Roll Goods */}
+          {(() => {
+            // Group rooms by material for cross-room optimization
+            const rollMaterialRooms = new Map<string, { rooms: Room[]; material: Material }>();
+            
+            report.roomCalculations
+              .filter(r => r.stripPlan && r.materialId)
+              .forEach(r => {
+                const material = materials.find(m => m.id === r.materialId);
+                const room = rooms.find(rm => rm.id === r.roomId);
+                if (material && room) {
+                  const existing = rollMaterialRooms.get(material.id);
+                  if (existing) {
+                    existing.rooms.push(room);
+                  } else {
+                    rollMaterialRooms.set(material.id, { rooms: [room], material });
+                  }
+                }
+              });
+
+            // Render optimizer for each material with 2+ rooms
+            const optimizers = Array.from(rollMaterialRooms.entries())
+              .filter(([, { rooms }]) => rooms.length >= 2)
+              .map(([materialId, { rooms: materialRooms, material }]) => (
+                <CrossRoomOptimizer
+                  key={materialId}
+                  rooms={materialRooms}
+                  material={extractRollMaterialSpecs(material.specs as Record<string, unknown>)}
+                  scale={scale}
+                />
+              ));
+
+            return optimizers.length > 0 ? (
+              <>
+                <Separator />
+                <div className="space-y-3">
+                  {optimizers}
+                </div>
+              </>
+            ) : null;
+          })()}
 
           {/* Seam Diagrams for Roll Goods */}
           {report.roomCalculations.some(r => r.stripPlan) && (
