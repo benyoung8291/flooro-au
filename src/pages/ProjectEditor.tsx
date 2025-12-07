@@ -335,7 +335,7 @@ export default function ProjectEditor() {
             <ThreeDViewer
               rooms={rooms}
               scale={scale}
-              materials={materials?.map(m => ({ id: m.id, type: m.type, name: m.name }))}
+              materials={materials}
             />
           ) : (
             <EditorCanvas
