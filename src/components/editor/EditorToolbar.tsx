@@ -13,7 +13,9 @@ import {
   Redo,
   ZoomIn,
   ZoomOut,
-  Maximize2
+  Maximize2,
+  Box,
+  Grid2X2
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -26,6 +28,8 @@ interface EditorToolbarProps {
   onFitView?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  is3DMode?: boolean;
+  onToggle3D?: () => void;
 }
 
 const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut: string }[] = [
@@ -47,9 +51,52 @@ export function EditorToolbar({
   onFitView,
   canUndo = false,
   canRedo = false,
+  is3DMode = false,
+  onToggle3D,
 }: EditorToolbarProps) {
   return (
     <div className="glass-panel flex items-center gap-1 p-1.5">
+      {/* 2D/3D Toggle */}
+      {onToggle3D && (
+        <>
+          <div className="flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`tool-button ${!is3DMode ? 'active' : ''}`}
+                  onClick={() => is3DMode && onToggle3D()}
+                >
+                  <Grid2X2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>2D View <span className="text-muted-foreground ml-1">(2)</span></p>
+              </TooltipContent>
+            </Tooltip>
+            
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`tool-button ${is3DMode ? 'active' : ''}`}
+                  onClick={() => !is3DMode && onToggle3D()}
+                >
+                  <Box className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>3D View <span className="text-muted-foreground ml-1">(3)</span></p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          
+          <Separator orientation="vertical" className="h-6 mx-1" />
+        </>
+      )}
+      
       {/* Main Tools */}
       <div className="flex items-center gap-0.5">
         {tools.map(tool => (
@@ -60,6 +107,7 @@ export function EditorToolbar({
                 size="icon"
                 className={`tool-button ${activeTool === tool.id ? 'active' : ''}`}
                 onClick={() => onToolChange(tool.id)}
+                disabled={is3DMode}
               >
                 <tool.icon className="w-4 h-4" />
               </Button>
