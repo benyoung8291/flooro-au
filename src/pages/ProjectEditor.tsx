@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject, useUpdateProject, useRequestService } from '@/hooks/useProjects';
 import { useHasRole } from '@/hooks/useUserProfile';
 import { useMaterials } from '@/hooks/useMaterials';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { FloorPlanUpload } from '@/components/editor/FloorPlanUpload';
 import { ImageControls } from '@/components/editor/ImageControls';
+import { MobileNav } from '@/components/editor/MobileNav';
+import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
+import { MobileSidebarDrawer } from '@/components/editor/MobileSidebarDrawer';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -44,6 +48,8 @@ export default function ProjectEditor() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const floorPlanInputRef = useRef<HTMLInputElement>(null);
   
   const { data: project, isLoading } = useProject(projectId);
   const { data: materials } = useMaterials();
@@ -53,6 +59,7 @@ export default function ProjectEditor() {
 
   const [activeTool, setActiveTool] = useState<EditorTool>('select');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
@@ -182,28 +189,32 @@ export default function ProjectEditor() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="h-14 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 flex-shrink-0 safe-area-top">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
           
-          <div className="flex items-center gap-2">
-            <h1 className="font-semibold text-foreground">{project.name}</h1>
-            <Badge variant="secondary" className={`text-xs ${status.className}`}>
-              {status.label}
-            </Badge>
-            {hasUnsavedChanges && (
-              <Badge variant="outline" className="text-xs">
-                Unsaved
-              </Badge>
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="font-semibold text-foreground truncate text-sm md:text-base">{project.name}</h1>
+            {!isMobile && (
+              <>
+                <Badge variant="secondary" className={`text-xs ${status.className}`}>
+                  {status.label}
+                </Badge>
+                {hasUnsavedChanges && (
+                  <Badge variant="outline" className="text-xs">
+                    Unsaved
+                  </Badge>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Request Service Button */}
-          {!project.service_requested && (
+        <div className="flex items-center gap-1 md:gap-2">
+          {/* Request Service Button - Hidden on mobile */}
+          {!isMobile && !project.service_requested && (
             <Button 
               variant="outline" 
               size="sm"
@@ -222,20 +233,22 @@ export default function ProjectEditor() {
           {/* Save Button */}
           {!isViewer && (
             <Button 
-              size="sm"
+              size={isMobile ? 'icon' : 'sm'}
               onClick={handleSave}
               disabled={updateProject.isPending || !hasUnsavedChanges}
             >
               {updateProject.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Save className="w-4 h-4 mr-2" />
+                <>
+                  <Save className="w-4 h-4" />
+                  {!isMobile && <span className="ml-2">Save</span>}
+                </>
               )}
-              Save
             </Button>
           )}
 
-          <ThemeToggle />
+          {!isMobile && <ThemeToggle />}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -246,6 +259,11 @@ export default function ProjectEditor() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setReportPreviewOpen(true)}>Export PDF</DropdownMenuItem>
               <DropdownMenuItem>Share Project</DropdownMenuItem>
+              {isMobile && !project.service_requested && (
+                <DropdownMenuItem onClick={handleRequestService}>
+                  Request Measurement Service
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}/settings`)}>
                 Project Settings
@@ -256,26 +274,28 @@ export default function ProjectEditor() {
       </header>
 
       {/* Main Editor Area */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className={`flex-1 flex overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
         {/* Canvas Area */}
         <div className="flex-1 relative">
-          {/* Floating Toolbar */}
-          <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-            <EditorToolbar
-              activeTool={activeTool}
-              onToolChange={setActiveTool}
-            />
-            {!isViewer && (
-              <FloorPlanUpload
-                projectId={projectId!}
-                onImageUploaded={handleSetBackgroundImage}
+          {/* Desktop Floating Toolbar */}
+          {!isMobile && (
+            <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+              <EditorToolbar
+                activeTool={activeTool}
+                onToolChange={setActiveTool}
               />
-            )}
-          </div>
+              {!isViewer && (
+                <FloorPlanUpload
+                  projectId={projectId!}
+                  onImageUploaded={handleSetBackgroundImage}
+                />
+              )}
+            </div>
+          )}
 
-          {/* Image Controls (when background image exists) */}
+          {/* Image Controls (when background image exists) - Responsive */}
           {backgroundImage && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+            <div className={`absolute z-10 ${isMobile ? 'top-2 left-2 right-2' : 'top-4 left-1/2 -translate-x-1/2'}`}>
               <ImageControls
                 image={backgroundImage}
                 onUpdate={handleUpdateBackgroundImage}
@@ -284,19 +304,21 @@ export default function ProjectEditor() {
             </div>
           )}
 
-          {/* Sidebar Toggle (when collapsed) */}
-          <Button
-            variant="secondary"
-            size="icon"
-            className="absolute top-4 right-4 z-10"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          >
-            {sidebarCollapsed ? (
-              <PanelRight className="w-4 h-4" />
-            ) : (
-              <PanelRightClose className="w-4 h-4" />
-            )}
-          </Button>
+          {/* Desktop Sidebar Toggle */}
+          {!isMobile && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="absolute top-4 right-4 z-10"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? (
+                <PanelRight className="w-4 h-4" />
+              ) : (
+                <PanelRightClose className="w-4 h-4" />
+              )}
+            </Button>
+          )}
 
           {/* Canvas */}
           <EditorCanvas
@@ -310,16 +332,47 @@ export default function ProjectEditor() {
           />
         </div>
 
-        {/* Right Sidebar */}
-        <EditorSidebar 
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        {/* Desktop Right Sidebar */}
+        {!isMobile && (
+          <EditorSidebar 
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            rooms={rooms}
+            scale={scale}
+            projectName={project.name}
+            projectAddress={project.address || undefined}
+          />
+        )}
+      </div>
+
+      {/* Mobile Bottom Navigation */}
+      {isMobile && (
+        <MobileNav
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+          onOpenMenu={() => setMobileDrawerOpen(true)}
+        />
+      )}
+
+      {/* Mobile Floating Action Button */}
+      {isMobile && (
+        <MobileToolFAB
+          activeTool={activeTool}
+          onToolChange={setActiveTool}
+        />
+      )}
+
+      {/* Mobile Sidebar Drawer */}
+      {isMobile && (
+        <MobileSidebarDrawer
+          open={mobileDrawerOpen}
+          onOpenChange={setMobileDrawerOpen}
           rooms={rooms}
           scale={scale}
           projectName={project.name}
           projectAddress={project.address || undefined}
         />
-      </div>
+      )}
 
       {/* Report Preview Dialog */}
       <ReportPreviewDialog
