@@ -2,9 +2,16 @@ import { useState, useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Download, AlertCircle, Scissors, Maximize2 } from 'lucide-react';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { FileText, Download, AlertCircle, Scissors, Maximize2, ArrowUpCircle, ArrowDownCircle, Circle } from 'lucide-react';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
-import { Material } from '@/hooks/useMaterials';
+import { Material, QuantityRoundingMode } from '@/hooks/useMaterials';
 import { generateReport } from '@/lib/reports/calculations';
 import { CostSummaryCard } from './CostSummaryCard';
 import { RoomBreakdownList } from './RoomBreakdownList';
@@ -30,6 +37,7 @@ export function ReportTab({
   projectAddress,
 }: ReportTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [roundingMode, setRoundingMode] = useState<QuantityRoundingMode>('up');
   const [cutPlanModal, setCutPlanModal] = useState<{
     open: boolean;
     stripPlan: StripPlanResult | null;
@@ -41,8 +49,14 @@ export function ReportTab({
   }>({ open: false, stripPlan: null });
 
   const report = useMemo(
-    () => generateReport(rooms, materials, scale),
-    [rooms, materials, scale]
+    () => generateReport(rooms, materials, scale, roundingMode),
+    [rooms, materials, scale, roundingMode]
+  );
+
+  // Check if any materials have box quantities
+  const hasBoxQuantities = useMemo(
+    () => report.roomCalculations.some(r => r.boxesNeeded !== undefined),
+    [report.roomCalculations]
   );
 
   const hasRooms = rooms.length > 0;
@@ -98,6 +112,47 @@ export function ReportTab({
           />
 
           <Separator />
+
+          {/* Quantity Rounding Toggle - only show if materials with box quantities */}
+          {hasBoxQuantities && (
+            <div className="bg-muted/50 rounded-lg p-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Box Rounding
+                </div>
+                <Select value={roundingMode} onValueChange={(v) => setRoundingMode(v as QuantityRoundingMode)}>
+                  <SelectTrigger className="w-[140px] h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="up">
+                      <div className="flex items-center gap-2">
+                        <ArrowUpCircle className="w-3 h-3" />
+                        Round Up
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="down">
+                      <div className="flex items-center gap-2">
+                        <ArrowDownCircle className="w-3 h-3" />
+                        Round Down
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="nearest">
+                      <div className="flex items-center gap-2">
+                        <Circle className="w-3 h-3" />
+                        Nearest
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {roundingMode === 'up' && 'Always enough material (recommended)'}
+                {roundingMode === 'down' && 'Economical, may need extra'}
+                {roundingMode === 'nearest' && 'Balanced approach'}
+              </p>
+            </div>
+          )}
 
           {/* Room Breakdown */}
           <div>

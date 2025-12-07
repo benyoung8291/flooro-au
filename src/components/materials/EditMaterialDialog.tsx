@@ -54,6 +54,8 @@ const materialSchema = z.object({
   backing: z.string().optional(),
   widthMm: z.coerce.number().positive().optional().or(z.literal('')),
   lengthMm: z.coerce.number().positive().optional().or(z.literal('')),
+  tilesPerBox: z.coerce.number().positive().optional().or(z.literal('')),
+  pricePerBox: z.coerce.number().min(0).optional().or(z.literal('')),
   rollWidthMm: z.coerce.number().positive().optional().or(z.literal('')),
   rollLengthM: z.coerce.number().positive().optional().or(z.literal('')),
   patternRepeatMm: z.coerce.number().min(0).optional().or(z.literal('')),
@@ -87,6 +89,8 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
       backing: material.specs.backing || '',
       widthMm: material.specs.widthMm || '',
       lengthMm: material.specs.lengthMm || '',
+      tilesPerBox: material.specs.tilesPerBox || '',
+      pricePerBox: material.specs.pricePerBox || '',
       rollWidthMm: material.specs.rollWidthMm || (material.specs.width ? material.specs.width * 1000 : ''),
       rollLengthM: material.specs.rollLengthM || '',
       patternRepeatMm: material.specs.patternRepeatMm || '',
@@ -116,6 +120,17 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
   };
 
   const onSubmit = async (values: MaterialFormValues) => {
+    // Calculate box coverage if tiles per box is provided
+    let boxCoverageM2: number | undefined;
+    const tilesPerBox = typeof values.tilesPerBox === 'number' ? values.tilesPerBox : undefined;
+    const widthMm = typeof values.widthMm === 'number' ? values.widthMm : undefined;
+    const lengthMm = typeof values.lengthMm === 'number' ? values.lengthMm : undefined;
+    
+    if (tilesPerBox && widthMm && lengthMm) {
+      const tileAreaM2 = (widthMm / 1000) * (lengthMm / 1000);
+      boxCoverageM2 = tileAreaM2 * tilesPerBox;
+    }
+
     await updateMaterial.mutateAsync({
       id: material.id,
       name: values.name,
@@ -125,8 +140,11 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
         range: values.range || undefined,
         colour: values.colour || undefined,
         backing: values.backing || undefined,
-        widthMm: typeof values.widthMm === 'number' ? values.widthMm : undefined,
-        lengthMm: typeof values.lengthMm === 'number' ? values.lengthMm : undefined,
+        widthMm,
+        lengthMm,
+        tilesPerBox,
+        boxCoverageM2,
+        pricePerBox: typeof values.pricePerBox === 'number' ? values.pricePerBox : undefined,
         rollWidthMm: typeof values.rollWidthMm === 'number' ? values.rollWidthMm : undefined,
         rollLengthM: typeof values.rollLengthM === 'number' ? values.rollLengthM : undefined,
         patternRepeatMm: typeof values.patternRepeatMm === 'number' ? values.patternRepeatMm : undefined,
@@ -333,6 +351,40 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
                       </FormItem>
                     )}
                   />
+                </div>
+                
+                {/* Packaging - Tiles per box */}
+                <div className="pt-2 border-t border-border/50">
+                  <FormLabel className="text-muted-foreground">Packaging (Optional)</FormLabel>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <FormField
+                      control={form.control}
+                      name="tilesPerBox"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tiles per Box</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="16" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pricePerBox"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Box ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="45.00" {...field} />
+                          </FormControl>
+                          <FormDescription>Optional</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
             )}
