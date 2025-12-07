@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Room, ScaleCalibration, RoomAccessories, CovingConfig, WeldRodConfig, UnderlaymentConfig, AdhesiveConfig, TransitionConfig } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, RoomAccessories, CovingConfig, WeldRodConfig, SmoothEdgeConfig, UnderlaymentConfig, AdhesiveConfig, TransitionConfig } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -19,7 +19,8 @@ import {
   Droplets,
   Grid3X3,
   DoorOpen,
-  Scissors
+  Scissors,
+  Grip
 } from 'lucide-react';
 import { 
   ACCESSORY_TYPES, 
@@ -103,6 +104,12 @@ export function AccessoriesPanel({
     });
   };
   
+  const updateSmoothEdge = (updates: Partial<SmoothEdgeConfig>) => {
+    updateAccessories({
+      smoothEdge: { ...getDefaultSmoothEdge(), ...accessories.smoothEdge, ...updates }
+    });
+  };
+  
   const updateUnderlayment = (updates: Partial<UnderlaymentConfig>) => {
     updateAccessories({
       underlayment: { ...getDefaultUnderlayment(), ...accessories.underlayment, ...updates }
@@ -141,10 +148,11 @@ export function AccessoriesPanel({
     });
   };
   
-  // Check if room has a roll material (for weld rod relevance)
+  // Check material type for conditional accessory display
   const roomMaterial = materials.find(m => m.id === room.materialId);
   const isRollMaterial = roomMaterial?.type === 'roll';
   const isSheetVinyl = roomMaterial?.subtype === 'sheet_vinyl';
+  const isBroadloomCarpet = roomMaterial?.subtype === 'broadloom_carpet';
   
   return (
     <ScrollArea className="h-full">
@@ -168,74 +176,137 @@ export function AccessoriesPanel({
           </div>
         </div>
         
-        {/* Coving Section */}
-        <Collapsible open={expandedSections.has('coving')} onOpenChange={() => toggleSection('coving')}>
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
-              <div className="flex items-center gap-2">
-                <CornerDownRight className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">{ACCESSORY_TYPES.coving.label}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                {accessories.coving?.enabled && (
-                  <Badge variant="secondary" className="text-xs">
-                    {accessoryCalc.coving?.quantity.toFixed(1)}m
-                  </Badge>
-                )}
-                <Switch 
-                  checked={accessories.coving?.enabled || false}
-                  onCheckedChange={(checked) => updateCoving({ enabled: checked })}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                <ChevronDown className={cn(
-                  "w-4 h-4 transition-transform",
-                  expandedSections.has('coving') && "rotate-180"
-                )} />
-              </div>
-            </div>
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
-              <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.coving.description}</p>
-              
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label className="text-xs">Height (mm)</Label>
-                  <Input 
-                    type="number"
-                    value={accessories.coving?.heightMm || 100}
-                    onChange={(e) => updateCoving({ heightMm: parseInt(e.target.value) || 100 })}
-                    className="h-8 text-xs"
-                  />
+        {/* Coving Section - Only for Sheet Vinyl */}
+        {isSheetVinyl && (
+          <Collapsible open={expandedSections.has('coving')} onOpenChange={() => toggleSection('coving')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
+                <div className="flex items-center gap-2">
+                  <CornerDownRight className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{ACCESSORY_TYPES.coving.label}</span>
                 </div>
-                <div>
-                  <Label className="text-xs">Net Length</Label>
-                  <div className="h-8 px-2 flex items-center text-xs font-mono bg-muted rounded-md">
-                    {netPerimeterM.toFixed(2)} m
+                <div className="flex items-center gap-2">
+                  {accessories.coving?.enabled && (
+                    <Badge variant="secondary" className="text-xs">
+                      {accessoryCalc.coving?.quantity.toFixed(1)}m
+                    </Badge>
+                  )}
+                  <Switch 
+                    checked={accessories.coving?.enabled || false}
+                    onCheckedChange={(checked) => updateCoving({ enabled: checked })}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <ChevronDown className={cn(
+                    "w-4 h-4 transition-transform",
+                    expandedSections.has('coving') && "rotate-180"
+                  )} />
+                </div>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
+                <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.coving.description}</p>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Height (mm)</Label>
+                    <Input 
+                      type="number"
+                      value={accessories.coving?.heightMm || 100}
+                      onChange={(e) => updateCoving({ heightMm: parseInt(e.target.value) || 100 })}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Net Length</Label>
+                    <div className="h-8 px-2 flex items-center text-xs font-mono bg-muted rounded-md">
+                      {netPerimeterM.toFixed(2)} m
+                    </div>
                   </div>
                 </div>
+                
+                {accessories.coving?.enabled && accessoryCalc.coving && (
+                  <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
+                    <span>Estimated Cost:</span>
+                    <span className="font-mono font-medium">
+                      ${accessoryCalc.coving.totalCost.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+                
+                {accessories.coving?.enabled && accessoryCalc.coveFilletCorners && (
+                  <div className="flex items-center justify-between p-2 rounded bg-muted text-xs">
+                    <span>Cove Fillet Corners:</span>
+                    <span className="font-mono">
+                      {accessoryCalc.coveFilletCorners.internalCorners} int + {accessoryCalc.coveFilletCorners.externalCorners} ext = ${accessoryCalc.coveFilletCorners.totalCost.toFixed(2)}
+                    </span>
+                  </div>
+                )}
               </div>
-              
-              {accessories.coving?.enabled && accessoryCalc.coving && (
-                <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
-                  <span>Estimated Cost:</span>
-                  <span className="font-mono font-medium">
-                    ${accessoryCalc.coving.totalCost.toFixed(2)}
-                  </span>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+        
+        {/* Smooth Edge / Gripper Section - Only for Broadloom Carpet */}
+        {isBroadloomCarpet && (
+          <Collapsible open={expandedSections.has('smoothEdge')} onOpenChange={() => toggleSection('smoothEdge')}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
+                <div className="flex items-center gap-2">
+                  <Grip className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">{ACCESSORY_TYPES.smooth_edge.label}</span>
                 </div>
-              )}
-              
-              {accessories.coving?.enabled && accessoryCalc.coveFilletCorners && (
-                <div className="flex items-center justify-between p-2 rounded bg-muted text-xs">
-                  <span>Cove Fillet Corners:</span>
-                  <span className="font-mono">
-                    {accessoryCalc.coveFilletCorners.internalCorners} int + {accessoryCalc.coveFilletCorners.externalCorners} ext = ${accessoryCalc.coveFilletCorners.totalCost.toFixed(2)}
-                  </span>
+                <div className="flex items-center gap-2">
+                  {accessories.smoothEdge?.enabled && (
+                    <Badge variant="secondary" className="text-xs">
+                      {accessoryCalc.smoothEdge?.quantity.toFixed(1)}m
+                    </Badge>
+                  )}
+                  <Switch 
+                    checked={accessories.smoothEdge?.enabled || false}
+                    onCheckedChange={(checked) => updateSmoothEdge({ enabled: checked })}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <ChevronDown className={cn(
+                    "w-4 h-4 transition-transform",
+                    expandedSections.has('smoothEdge') && "rotate-180"
+                  )} />
                 </div>
-              )}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
+                <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.smooth_edge.description}</p>
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs">Net Perimeter</Label>
+                    <div className="h-8 px-2 flex items-center text-xs font-mono bg-muted rounded-md">
+                      {netPerimeterM.toFixed(2)} m
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-5">
+                    <Switch 
+                      id="doubleRow"
+                      checked={accessories.smoothEdge?.doubleRow || false}
+                      onCheckedChange={(checked) => updateSmoothEdge({ doubleRow: checked })}
+                    />
+                    <Label htmlFor="doubleRow" className="text-xs">Double row (heavy duty)</Label>
+                  </div>
+                </div>
+                
+                {accessories.smoothEdge?.enabled && accessoryCalc.smoothEdge && (
+                  <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
+                    <span>Estimated Cost{accessoryCalc.smoothEdge.isDoubleRow ? ' (×2)' : ''}:</span>
+                    <span className="font-mono font-medium">
+                      ${accessoryCalc.smoothEdge.totalCost.toFixed(2)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
         
         {/* Weld Rod Section (only for sheet materials) */}
         {isRollMaterial && (
@@ -560,6 +631,10 @@ function getDefaultCoving(): CovingConfig {
 
 function getDefaultWeldRod(): WeldRodConfig {
   return { enabled: false, colorMatch: true };
+}
+
+function getDefaultSmoothEdge(): SmoothEdgeConfig {
+  return { enabled: false, doubleRow: false };
 }
 
 function getDefaultUnderlayment(): UnderlaymentConfig {
