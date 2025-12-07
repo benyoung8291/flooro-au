@@ -14,6 +14,7 @@ export interface RoomCalculation {
   materialId: string | null;
   materialName: string | null;
   materialType: string | null;
+  materialCode?: string; // Project-specific finishes schedule code (e.g., "CP01", "FC07")
   netAreaM2: number;
   grossAreaM2: number;
   wastePercent: number;
@@ -105,6 +106,7 @@ export function calculateRoomCost(
       materialId: null,
       materialName: null,
       materialType: null,
+      materialCode: room.materialCode,
       netAreaM2,
       grossAreaM2: netAreaM2,
       wastePercent: 0,
@@ -145,6 +147,7 @@ export function calculateRoomCost(
         materialId: material.id,
         materialName: material.name,
         materialType: material.type,
+        materialCode: room.materialCode,
         netAreaM2,
         grossAreaM2,
         wastePercent: stripPlan.wastePercent,
@@ -187,6 +190,7 @@ export function calculateRoomCost(
     materialId: material.id,
     materialName: material.name,
     materialType: material.type,
+    materialCode: room.materialCode,
     netAreaM2,
     grossAreaM2,
     wastePercent,
