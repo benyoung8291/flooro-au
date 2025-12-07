@@ -11,6 +11,7 @@ import { RoomBreakdownList } from './RoomBreakdownList';
 import { ReportPreviewDialog } from './ReportPreviewDialog';
 import { SeamDiagram } from './SeamDiagram';
 import { CutPlanModal } from './CutPlanModal';
+import { FinishesSchedule } from './FinishesSchedule';
 import { StripPlanResult } from '@/lib/rollGoods';
 
 interface ReportTabProps {
@@ -110,6 +111,17 @@ export function ReportTab({
             </div>
             <RoomBreakdownList roomCalculations={report.roomCalculations} />
           </div>
+
+          {/* Finishes Schedule */}
+          {report.roomCalculations.some(r => r.materialCode) && (
+            <>
+              <Separator />
+              <FinishesSchedule 
+                roomCalculations={report.roomCalculations}
+                materials={materials}
+              />
+            </>
+          )}
 
           {/* Seam Diagrams for Roll Goods */}
           {report.roomCalculations.some(r => r.stripPlan) && (
