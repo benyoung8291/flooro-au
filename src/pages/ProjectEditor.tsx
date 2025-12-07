@@ -365,30 +365,16 @@ export default function ProjectEditor() {
             </div>
           )}
 
-          {/* Desktop Sidebar Toggle & Legend Toggle */}
-          {!isMobile && (
-            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-              {/* Finishes Legend Toggle */}
-              {rooms.some(r => r.materialCode) && !is3DMode && (
-                <Button
-                  variant={showFinishesLegend ? 'default' : 'secondary'}
-                  size="icon"
-                  onClick={() => setShowFinishesLegend(!showFinishesLegend)}
-                  title="Toggle Finishes Legend"
-                >
-                  <ClipboardList className="w-4 h-4" />
-                </Button>
-              )}
+          {/* Desktop Finishes Legend Toggle - positioned to avoid sidebar overlap */}
+          {!isMobile && rooms.some(r => r.materialCode) && !is3DMode && (
+            <div className={`absolute top-4 z-10 transition-all duration-200 ${sidebarCollapsed ? 'right-16' : 'right-[19rem]'}`}>
               <Button
-                variant="secondary"
+                variant={showFinishesLegend ? 'default' : 'secondary'}
                 size="icon"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                onClick={() => setShowFinishesLegend(!showFinishesLegend)}
+                title="Toggle Finishes Legend"
               >
-                {sidebarCollapsed ? (
-                  <PanelRight className="w-4 h-4" />
-                ) : (
-                  <PanelRightClose className="w-4 h-4" />
-                )}
+                <ClipboardList className="w-4 h-4" />
               </Button>
             </div>
           )}

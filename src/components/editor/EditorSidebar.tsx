@@ -71,8 +71,8 @@ export function EditorSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-12 h-full border-l border-border bg-card flex flex-col items-center py-2 gap-1">
-        <Button variant="ghost" size="icon" onClick={onToggle}>
+      <div className="w-12 h-full border-l border-border bg-card flex flex-col items-center py-2 gap-1 z-20 relative">
+        <Button variant="ghost" size="icon" onClick={onToggle} title="Expand sidebar">
           <ChevronRight className="w-4 h-4" />
         </Button>
         <Separator className="my-2" />
@@ -102,23 +102,28 @@ export function EditorSidebar({
   }
 
   return (
-    <div className="w-72 h-full border-l border-border bg-card flex flex-col">
+    <div className="w-72 h-full border-l border-border bg-card flex flex-col z-20 relative">
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col h-full">
         <div className="px-3 pt-3 pb-2 border-b border-border">
-          <TabsList className="w-full grid grid-cols-3">
-            <TabsTrigger value="materials" className="text-xs">
-              <Package className="w-3 h-3 mr-1" />
-              Materials
-            </TabsTrigger>
-            <TabsTrigger value="layers" className="text-xs">
-              <Layers className="w-3 h-3 mr-1" />
-              Layers
-            </TabsTrigger>
-            <TabsTrigger value="report" className="text-xs">
-              <FileText className="w-3 h-3 mr-1" />
-              Report
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center gap-2 mb-2">
+            <TabsList className="flex-1 grid grid-cols-3">
+              <TabsTrigger value="materials" className="text-xs">
+                <Package className="w-3 h-3 mr-1" />
+                Materials
+              </TabsTrigger>
+              <TabsTrigger value="layers" className="text-xs">
+                <Layers className="w-3 h-3 mr-1" />
+                Layers
+              </TabsTrigger>
+              <TabsTrigger value="report" className="text-xs">
+                <FileText className="w-3 h-3 mr-1" />
+                Report
+              </TabsTrigger>
+            </TabsList>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggle} title="Collapse sidebar">
+              <ChevronRight className="w-4 h-4 rotate-180" />
+            </Button>
+          </div>
         </div>
 
         <TabsContent value="materials" className="flex-1 m-0">
