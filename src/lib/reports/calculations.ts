@@ -1,6 +1,6 @@
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { calculateRoomNetArea, pixelAreaToRealArea, mmSquaredToMSquared, calculatePerimeter } from '@/lib/canvas/geometry';
-import { Material, MaterialSpecs } from '@/hooks/useMaterials';
+import { Material, MaterialSpecs, QuantityRoundingMode } from '@/hooks/useMaterials';
 import { 
   calculateStripPlan, 
   extractRollMaterialSpecs,
@@ -27,6 +27,10 @@ export interface RoomCalculation {
   unit: string;
   // Roll goods specific
   stripPlan?: StripPlanResult;
+  // Box/packaging specific
+  boxesNeeded?: number;
+  tilesPerBox?: number;
+  boxCoverageM2?: number;
 }
 
 export interface ReportSummary {
@@ -81,11 +85,24 @@ function calculateDoorDeductions(room: Room): number {
   return room.doors.reduce((total, door) => total + door.width, 0);
 }
 
+// Helper to round based on rounding mode
+function roundQuantity(value: number, mode: QuantityRoundingMode): number {
+  switch (mode) {
+    case 'up':
+      return Math.ceil(value);
+    case 'down':
+      return Math.floor(value);
+    case 'nearest':
+      return Math.round(value);
+  }
+}
+
 // Calculate cost for a single room based on material type
 export function calculateRoomCost(
   room: Room,
   material: Material | null,
-  scale: ScaleCalibration | null
+  scale: ScaleCalibration | null,
+  roundingMode: QuantityRoundingMode = 'up'
 ): RoomCalculation {
   const netAreaPixels = calculateRoomNetArea(room);
   const netAreaMm2 = pixelAreaToRealArea(netAreaPixels, scale);
@@ -166,7 +183,50 @@ export function calculateRoomCost(
       // Tiles: count = area / tile area, then add waste
       // Use mm dimensions for precision
       const tileAreaM2 = getTileAreaM2(material.specs);
-      const tileCount = Math.ceil((netAreaM2 / tileAreaM2) * wasteFactor);
+      const rawTileCount = (netAreaM2 / tileAreaM2) * wasteFactor;
+      
+      // Check if sold in boxes
+      const tilesPerBox = material.specs.tilesPerBox;
+      if (tilesPerBox && tilesPerBox > 0) {
+        // Calculate box coverage
+        const boxCoverageM2 = material.specs.boxCoverageM2 || (tileAreaM2 * tilesPerBox);
+        const rawBoxCount = rawTileCount / tilesPerBox;
+        const boxCount = roundQuantity(rawBoxCount, roundingMode);
+        
+        const tileCount = boxCount * tilesPerBox;
+        grossAreaM2 = tileCount * tileAreaM2;
+        quantity = boxCount;
+        
+        // Use box price if available, otherwise calculate from m² price
+        const boxPrice = material.specs.pricePerBox || (unitPrice * boxCoverageM2);
+        totalCost = boxCount * boxPrice;
+        unit = 'boxes';
+        
+        return {
+          roomId: room.id,
+          roomName: room.name,
+          materialId: material.id,
+          materialName: material.name,
+          materialType: material.type,
+          materialCode: room.materialCode,
+          netAreaM2,
+          grossAreaM2,
+          wastePercent,
+          perimeterM,
+          doorDeductionM,
+          netPerimeterM,
+          unitPrice: boxPrice,
+          totalCost,
+          quantity,
+          unit,
+          boxesNeeded: boxCount,
+          tilesPerBox,
+          boxCoverageM2,
+        };
+      }
+      
+      // Not sold in boxes - use individual tiles
+      const tileCount = Math.ceil(rawTileCount);
       grossAreaM2 = tileCount * tileAreaM2;
       quantity = tileCount;
       totalCost = tileCount * unitPrice;
@@ -209,13 +269,14 @@ export function calculateRoomCost(
 export function generateReport(
   rooms: Room[],
   materials: Material[],
-  scale: ScaleCalibration | null
+  scale: ScaleCalibration | null,
+  roundingMode: QuantityRoundingMode = 'up'
 ): ReportSummary {
   const materialMap = new Map(materials.map(m => [m.id, m]));
   
   const roomCalculations = rooms.map(room => {
     const material = room.materialId ? materialMap.get(room.materialId) || null : null;
-    return calculateRoomCost(room, material, scale);
+    return calculateRoomCost(room, material, scale, roundingMode);
   });
   
   // Aggregate by material

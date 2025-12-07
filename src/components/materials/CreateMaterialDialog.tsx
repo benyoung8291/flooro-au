@@ -65,6 +65,10 @@ const materialSchema = z.object({
   widthMm: z.coerce.number().positive().optional(),
   lengthMm: z.coerce.number().positive().optional(),
   
+  // Tile packaging
+  tilesPerBox: z.coerce.number().positive().optional(),
+  pricePerBox: z.coerce.number().min(0).optional(),
+  
   // Roll dimensions
   rollWidthMm: z.coerce.number().positive().optional(),
   rollLengthM: z.coerce.number().positive().optional(),
@@ -124,6 +128,13 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
   const backingOptions = selectedSubtype ? BACKING_OPTIONS[selectedSubtype] || [] : [];
 
   const onSubmit = async (values: MaterialFormValues) => {
+    // Calculate box coverage if tiles per box is provided
+    let boxCoverageM2: number | undefined;
+    if (values.tilesPerBox && values.widthMm && values.lengthMm) {
+      const tileAreaM2 = (values.widthMm / 1000) * (values.lengthMm / 1000);
+      boxCoverageM2 = tileAreaM2 * values.tilesPerBox;
+    }
+
     await createMaterial.mutateAsync({
       name: values.name,
       type: values.type,
@@ -134,6 +145,9 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
         backing: values.backing,
         widthMm: values.widthMm,
         lengthMm: values.lengthMm,
+        tilesPerBox: values.tilesPerBox,
+        boxCoverageM2,
+        pricePerBox: values.pricePerBox,
         rollWidthMm: values.rollWidthMm,
         rollLengthM: values.rollLengthM,
         patternRepeatMm: values.patternRepeatMm,
@@ -347,6 +361,40 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
                       </FormItem>
                     )}
                   />
+                </div>
+                
+                {/* Packaging - Tiles per box */}
+                <div className="pt-2 border-t border-border/50">
+                  <FormLabel className="text-muted-foreground">Packaging (Optional)</FormLabel>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <FormField
+                      control={form.control}
+                      name="tilesPerBox"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Tiles per Box</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="16" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="pricePerBox"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price per Box ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="45.00" {...field} />
+                          </FormControl>
+                          <FormDescription>Optional</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
             )}

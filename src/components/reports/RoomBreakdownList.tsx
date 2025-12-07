@@ -1,6 +1,6 @@
 import { RoomCalculation, formatCurrency, formatArea } from '@/lib/reports/calculations';
 import { Badge } from '@/components/ui/badge';
-import { Square, Circle, Minus } from 'lucide-react';
+import { Square, Circle, Minus, Package } from 'lucide-react';
 
 interface RoomBreakdownListProps {
   roomCalculations: RoomCalculation[];
@@ -69,6 +69,20 @@ export function RoomBreakdownList({ roomCalculations }: RoomBreakdownListProps) 
                 </span>
               )}
             </div>
+
+            {/* Box quantity display for tiles sold in boxes */}
+            {room.boxesNeeded !== undefined && room.tilesPerBox !== undefined && (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <Package className="w-3 h-3 text-muted-foreground" />
+                <span className="font-medium text-foreground">
+                  {room.boxesNeeded} box{room.boxesNeeded !== 1 ? 'es' : ''}
+                </span>
+                <span className="text-muted-foreground">
+                  ({room.tilesPerBox} tiles/box
+                  {room.boxCoverageM2 && ` = ${room.boxCoverageM2.toFixed(2)} m²/box`})
+                </span>
+              </div>
+            )}
 
             {/* Roll goods pricing breakdown */}
             {room.stripPlan && room.stripPlan.pricingMethod !== 'per_m2' && (

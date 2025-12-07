@@ -21,6 +21,11 @@ export interface MaterialSpecs {
   pricePerRoll?: number;     // Full roll price
   pricePerLinearM?: number;  // Cut price per linear meter (for partial rolls)
   
+  // Packaging - Tiles
+  tilesPerBox?: number;      // e.g., 16 tiles per box
+  boxCoverageM2?: number;    // Coverage per box in m² (calculated from tile dims + tilesPerBox)
+  pricePerBox?: number;      // Price per box (optional, alternative to pricePerM2 * coverage)
+  
   // Waste factor
   wastePercent?: number;     // Default 10%
   
@@ -42,6 +47,9 @@ export interface MaterialSpecs {
   unit?: string;
   [key: string]: unknown;
 }
+
+// Rounding mode for box/roll quantities
+export type QuantityRoundingMode = 'up' | 'down' | 'nearest';
 
 // Backing type options by material subtype
 export const BACKING_OPTIONS: Record<string, string[]> = {
@@ -275,4 +283,29 @@ export function getMaterialDimensions(material: Material): string {
   }
   
   return '';
+}
+
+// Helper to calculate box coverage from tile dimensions
+export function calculateBoxCoverage(specs: MaterialSpecs): number | undefined {
+  if (!specs.tilesPerBox) return undefined;
+  if (specs.widthMm && specs.lengthMm) {
+    const tileAreaM2 = (specs.widthMm / 1000) * (specs.lengthMm / 1000);
+    return tileAreaM2 * specs.tilesPerBox;
+  }
+  return undefined;
+}
+
+// Helper to get packaging display
+export function getMaterialPackaging(material: Material): string | undefined {
+  const { specs, type } = material;
+  
+  if (type === 'tile' && specs.tilesPerBox) {
+    const coverage = specs.boxCoverageM2 || calculateBoxCoverage(specs);
+    if (coverage) {
+      return `${specs.tilesPerBox} tiles/box (${coverage.toFixed(2)} m²)`;
+    }
+    return `${specs.tilesPerBox} tiles/box`;
+  }
+  
+  return undefined;
 }
