@@ -234,3 +234,106 @@ export function generateHoleId(): string {
 export function generateDoorId(): string {
   return `door_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
+
+/**
+ * Bounding box interface
+ */
+export interface BoundingBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+  width: number;
+  height: number;
+  centerX: number;
+  centerY: number;
+}
+
+/**
+ * Calculate bounding box for all rooms
+ */
+export function calculateBoundingBox(rooms: Room[]): BoundingBox | null {
+  if (rooms.length === 0) return null;
+  
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  
+  for (const room of rooms) {
+    for (const point of room.points) {
+      minX = Math.min(minX, point.x);
+      minY = Math.min(minY, point.y);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, point.y);
+    }
+    
+    // Include holes
+    for (const hole of room.holes) {
+      for (const point of hole.points) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+    }
+    
+    // Include door positions
+    for (const door of room.doors) {
+      minX = Math.min(minX, door.position.x);
+      minY = Math.min(minY, door.position.y);
+      maxX = Math.max(maxX, door.position.x);
+      maxY = Math.max(maxY, door.position.y);
+    }
+  }
+  
+  if (!isFinite(minX)) return null;
+  
+  const width = maxX - minX;
+  const height = maxY - minY;
+  
+  return {
+    minX,
+    minY,
+    maxX,
+    maxY,
+    width,
+    height,
+    centerX: minX + width / 2,
+    centerY: minY + height / 2,
+  };
+}
+
+/**
+ * Calculate view transform to fit rooms in canvas with padding
+ */
+export function calculateZoomToFit(
+  boundingBox: BoundingBox,
+  canvasWidth: number,
+  canvasHeight: number,
+  padding: number = 60
+): { zoom: number; offsetX: number; offsetY: number } {
+  const availableWidth = canvasWidth - padding * 2;
+  const availableHeight = canvasHeight - padding * 2;
+  
+  // Handle edge case of very small or zero-size bounding boxes
+  if (boundingBox.width <= 0 || boundingBox.height <= 0) {
+    return {
+      zoom: 1,
+      offsetX: canvasWidth / 2 - boundingBox.centerX,
+      offsetY: canvasHeight / 2 - boundingBox.centerY,
+    };
+  }
+  
+  const scaleX = availableWidth / boundingBox.width;
+  const scaleY = availableHeight / boundingBox.height;
+  
+  // Use the smaller scale to fit everything, capped between 0.1 and 2.0
+  const zoom = Math.max(0.1, Math.min(2.0, Math.min(scaleX, scaleY)));
+  
+  // Calculate offsets to center the content
+  const offsetX = (canvasWidth / 2) - (boundingBox.centerX * zoom);
+  const offsetY = (canvasHeight / 2) - (boundingBox.centerY * zoom);
+  
+  return { zoom, offsetX, offsetY };
+}
