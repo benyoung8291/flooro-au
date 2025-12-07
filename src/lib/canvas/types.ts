@@ -56,6 +56,7 @@ export interface Room {
   color: string;
   accessories?: RoomAccessories;
   fillDirection?: number; // Lay direction in degrees (0 = horizontal, 90 = vertical)
+  tilePattern?: 'grid' | 'brick' | 'thirds' | 'herringbone' | 'basketweave' | 'diagonal'; // For tile materials
   
   // Seam management options
   seamOptions?: {

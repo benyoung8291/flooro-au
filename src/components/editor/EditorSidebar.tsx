@@ -19,15 +19,18 @@ import {
   Settings2,
   Tag,
   Wrench,
-  Scissors
+  Scissors,
+  LayoutGrid
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { LayersPanel } from './LayersPanel';
 import { AccessoriesPanel } from './AccessoriesPanel';
 import { SeamEditor } from './SeamEditor';
+import { TilePatternViewer } from './TilePatternViewer';
 import { ReportTab } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
+import { TileSpecs, TilePattern } from '@/lib/tiles/types';
 import { cn } from '@/lib/utils';
 
 interface EditorSidebarProps {
@@ -81,7 +84,18 @@ export function EditorSidebar({
   
   // Check if selected room has roll material (for seam editor)
   const hasRollMaterial = selectedRoomMaterial?.type === 'roll';
+  const hasTileMaterial = selectedRoomMaterial?.type === 'tile';
   const selectedRoomStripPlan = selectedRoom ? stripPlans?.get(selectedRoom.id) : undefined;
+  
+  // Extract tile specs for tile pattern viewer
+  const tileSpecs: TileSpecs | null = hasTileMaterial && selectedRoomMaterial?.specs ? {
+    widthMm: (selectedRoomMaterial.specs.widthMm as number) || (selectedRoomMaterial.specs.width as number) || 300,
+    lengthMm: (selectedRoomMaterial.specs.lengthMm as number) || (selectedRoomMaterial.specs.length as number) || 300,
+    groutWidthMm: (selectedRoomMaterial.specs.groutWidthMm as number) || 3,
+    pricePerM2: (selectedRoomMaterial.specs.pricePerM2 as number) || (selectedRoomMaterial.specs.price as number),
+    tilesPerBox: selectedRoomMaterial.specs.tilesPerBox as number | undefined,
+    pricePerBox: selectedRoomMaterial.specs.pricePerBox as number | undefined,
+  } : null;
 
   return (
     <div 
@@ -121,6 +135,14 @@ export function EditorSidebar({
             <Scissors className="w-4 h-4" />
           </Button>
           <Button 
+            variant={selectedTab === 'tiles' ? 'secondary' : 'ghost'} 
+            size="icon"
+            onClick={() => { setSelectedTab('tiles'); onToggle?.(); }}
+            title="Tile Patterns"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </Button>
+          <Button 
             variant={selectedTab === 'layers' ? 'secondary' : 'ghost'} 
             size="icon"
             onClick={() => { setSelectedTab('layers'); onToggle?.(); }}
@@ -140,7 +162,7 @@ export function EditorSidebar({
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col h-full">
           <div className="px-3 pt-3 pb-2 border-b border-border">
             <div className="flex items-center gap-2 mb-2">
-              <TabsList className="flex-1 grid grid-cols-5">
+              <TabsList className="flex-1 grid grid-cols-6">
                 <TabsTrigger value="materials" className="text-xs px-1" title="Materials">
                   <Package className="w-3 h-3" />
                 </TabsTrigger>
@@ -149,6 +171,9 @@ export function EditorSidebar({
                 </TabsTrigger>
                 <TabsTrigger value="seams" className="text-xs px-1" title="Seam Editor">
                   <Scissors className="w-3 h-3" />
+                </TabsTrigger>
+                <TabsTrigger value="tiles" className="text-xs px-1" title="Tile Patterns">
+                  <LayoutGrid className="w-3 h-3" />
                 </TabsTrigger>
                 <TabsTrigger value="layers" className="text-xs px-1" title="Layers">
                   <Layers className="w-3 h-3" />
@@ -354,6 +379,32 @@ export function EditorSidebar({
             ) : (
               <div className="p-3 text-center text-sm text-muted-foreground">
                 Select a room to edit seams
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="tiles" className="flex-1 m-0 overflow-auto">
+            {selectedRoom && hasTileMaterial && tileSpecs ? (
+              <div className="p-3">
+                <TilePatternViewer
+                  room={selectedRoom}
+                  tileSpecs={tileSpecs}
+                  scale={scale}
+                  onPatternChange={(pattern: TilePattern) => {
+                    onUpdateRoom?.(selectedRoom.id, { 
+                      tilePattern: pattern 
+                    } as Partial<Room>);
+                  }}
+                />
+              </div>
+            ) : selectedRoom ? (
+              <div className="p-3 text-center text-sm text-muted-foreground">
+                <p>Tile patterns are for tile materials only.</p>
+                <p className="text-xs mt-1">Assign a tile material to this room.</p>
+              </div>
+            ) : (
+              <div className="p-3 text-center text-sm text-muted-foreground">
+                Select a room to configure tile pattern
               </div>
             )}
           </TabsContent>
