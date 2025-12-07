@@ -32,11 +32,22 @@ export interface ScaleCalibration {
   pixelsPerMm: number;
 }
 
+export interface BackgroundImage {
+  url: string;
+  opacity: number;
+  scale: number;
+  rotation: number;
+  offsetX: number;
+  offsetY: number;
+  locked: boolean;
+}
+
 export interface CanvasState {
   rooms: Room[];
   scale: ScaleCalibration | null;
   selectedRoomId: string | null;
   viewTransform: ViewTransform;
+  backgroundImage: BackgroundImage | null;
 }
 
 export interface ViewTransform {
@@ -55,6 +66,9 @@ export type CanvasAction =
   | { type: 'SET_SCALE'; scale: ScaleCalibration }
   | { type: 'SET_VIEW_TRANSFORM'; transform: Partial<ViewTransform> }
   | { type: 'ASSIGN_MATERIAL'; roomId: string; materialId: string }
+  | { type: 'SET_BACKGROUND_IMAGE'; image: BackgroundImage }
+  | { type: 'UPDATE_BACKGROUND_IMAGE'; updates: Partial<BackgroundImage> }
+  | { type: 'REMOVE_BACKGROUND_IMAGE' }
   | { type: 'LOAD_STATE'; state: CanvasState }
   | { type: 'RESET' };
 

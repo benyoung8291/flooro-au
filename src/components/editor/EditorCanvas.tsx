@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
-import { CanvasPoint, Room, DEFAULT_ROOM_COLOR } from '@/lib/canvas/types';
+import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
 import {
   findSnapPoint,
   applyOrthoLock,
@@ -27,6 +27,10 @@ interface EditorCanvasProps {
   canUndo?: boolean;
   canRedo?: boolean;
   materialTypes?: Map<string, string>;
+  backgroundImage?: BackgroundImage | null;
+  onSetBackgroundImage?: (image: BackgroundImage) => void;
+  onUpdateBackgroundImage?: (updates: Partial<BackgroundImage>) => void;
+  onRemoveBackgroundImage?: () => void;
 }
 
 export function EditorCanvas({
@@ -35,6 +39,10 @@ export function EditorCanvas({
   jsonData,
   onDataChange,
   materialTypes,
+  backgroundImage,
+  onSetBackgroundImage,
+  onUpdateBackgroundImage,
+  onRemoveBackgroundImage,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson } = useCanvasHistory();
@@ -50,6 +58,17 @@ export function EditorCanvas({
   const [scaleStart, setScaleStart] = useState<CanvasPoint | null>(null);
   const [selectedDoorWidth, setSelectedDoorWidth] = useState<number>(DOOR_WIDTHS[1].value);
 
+  // Sync background image from props to internal state
+  useEffect(() => {
+    if (backgroundImage !== undefined) {
+      if (backgroundImage) {
+        dispatch({ type: 'SET_BACKGROUND_IMAGE', image: backgroundImage });
+      } else {
+        dispatch({ type: 'REMOVE_BACKGROUND_IMAGE' });
+      }
+    }
+  }, [backgroundImage, dispatch]);
+
   // Load initial data
   useEffect(() => {
     if (jsonData) {
@@ -58,11 +77,12 @@ export function EditorCanvas({
     onCanvasReady?.();
   }, []);
 
-  // Notify parent of changes
+  // Notify parent of changes (including backgroundImage)
   useEffect(() => {
     const data = exportToJson();
     onDataChange?.(data);
-  }, [state.rooms, state.scale]);
+  }, [state.rooms, state.scale, state.backgroundImage]);
+
 
   // Handle keyboard events
   useEffect(() => {

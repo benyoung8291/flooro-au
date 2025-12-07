@@ -6,6 +6,8 @@ import { useMaterials } from '@/hooks/useMaterials';
 import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
+import { FloorPlanUpload } from '@/components/editor/FloorPlanUpload';
+import { ImageControls } from '@/components/editor/ImageControls';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
 import { generateReport } from '@/lib/reports/calculations';
-import { Room, ScaleCalibration } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, BackgroundImage } from '@/lib/canvas/types';
 import { 
   ArrowLeft, 
   Save, 
@@ -125,14 +127,36 @@ export default function ProjectEditor() {
     }
   };
 
-  // Extract rooms and scale from localData for report generation
+  // Extract rooms, scale, and background image from localData for report generation
   const rooms = (localData.rooms as Room[]) || [];
   const scale = (localData.scale as ScaleCalibration) || null;
+  const backgroundImage = (localData.backgroundImage as BackgroundImage) || null;
   
   const report = useMemo(
     () => generateReport(rooms, materials || [], scale),
     [rooms, materials, scale]
   );
+
+  // Background image handlers
+  const handleSetBackgroundImage = useCallback((image: BackgroundImage) => {
+    setLocalData(prev => ({ ...prev, backgroundImage: image }));
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleUpdateBackgroundImage = useCallback((updates: Partial<BackgroundImage>) => {
+    setLocalData(prev => ({
+      ...prev,
+      backgroundImage: prev.backgroundImage
+        ? { ...(prev.backgroundImage as BackgroundImage), ...updates }
+        : null,
+    }));
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleRemoveBackgroundImage = useCallback(() => {
+    setLocalData(prev => ({ ...prev, backgroundImage: null }));
+    setHasUnsavedChanges(true);
+  }, []);
 
   if (isLoading) {
     return <EditorSkeleton />;
@@ -236,12 +260,29 @@ export default function ProjectEditor() {
         {/* Canvas Area */}
         <div className="flex-1 relative">
           {/* Floating Toolbar */}
-          <div className="absolute top-4 left-4 z-10">
+          <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
             <EditorToolbar
               activeTool={activeTool}
               onToolChange={setActiveTool}
             />
+            {!isViewer && (
+              <FloorPlanUpload
+                projectId={projectId!}
+                onImageUploaded={handleSetBackgroundImage}
+              />
+            )}
           </div>
+
+          {/* Image Controls (when background image exists) */}
+          {backgroundImage && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+              <ImageControls
+                image={backgroundImage}
+                onUpdate={handleUpdateBackgroundImage}
+                onRemove={handleRemoveBackgroundImage}
+              />
+            </div>
+          )}
 
           {/* Sidebar Toggle (when collapsed) */}
           <Button
@@ -262,6 +303,10 @@ export default function ProjectEditor() {
             activeTool={activeTool}
             jsonData={localData}
             onDataChange={handleDataChange}
+            backgroundImage={backgroundImage}
+            onSetBackgroundImage={handleSetBackgroundImage}
+            onUpdateBackgroundImage={handleUpdateBackgroundImage}
+            onRemoveBackgroundImage={handleRemoveBackgroundImage}
           />
         </div>
 
