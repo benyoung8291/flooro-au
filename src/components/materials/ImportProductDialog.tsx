@@ -34,6 +34,9 @@ interface ExtractedProduct {
   name: string;
   type: 'roll' | 'tile' | 'linear';
   subtype?: MaterialSubtype;
+  range?: string;
+  colour?: string;
+  backing?: string;
   widthMm?: number;
   lengthMm?: number;
   rollWidthMm?: number;
@@ -91,6 +94,9 @@ export function ImportProductDialog() {
         type: extractedProduct.type,
         subtype: extractedProduct.subtype,
         specs: {
+          range: extractedProduct.range,
+          colour: extractedProduct.colour,
+          backing: extractedProduct.backing,
           widthMm: extractedProduct.widthMm,
           lengthMm: extractedProduct.lengthMm,
           rollWidthMm: extractedProduct.rollWidthMm,
@@ -199,6 +205,15 @@ export function ImportProductDialog() {
                   </div>
                   
                   <div className="mt-2 text-sm text-muted-foreground space-y-1">
+                    {extractedProduct.range && (
+                      <p>Range: {extractedProduct.range}</p>
+                    )}
+                    {extractedProduct.colour && (
+                      <p>Colour: {extractedProduct.colour}</p>
+                    )}
+                    {extractedProduct.backing && (
+                      <p>Backing: {extractedProduct.backing}</p>
+                    )}
                     {extractedProduct.widthMm && extractedProduct.lengthMm && (
                       <p>Dimensions: {extractedProduct.widthMm} × {extractedProduct.lengthMm}mm</p>
                     )}

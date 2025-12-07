@@ -26,7 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Material, useUpdateMaterial, MaterialSubtype } from '@/hooks/useMaterials';
+import { Material, useUpdateMaterial, MaterialSubtype, BACKING_OPTIONS } from '@/hooks/useMaterials';
 
 // Dimension presets
 const TILE_PRESETS = [
@@ -49,6 +49,9 @@ const materialSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   type: z.enum(['roll', 'tile', 'linear']),
   subtype: z.string().optional(),
+  range: z.string().optional(),
+  colour: z.string().optional(),
+  backing: z.string().optional(),
   widthMm: z.coerce.number().positive().optional().or(z.literal('')),
   lengthMm: z.coerce.number().positive().optional().or(z.literal('')),
   rollWidthMm: z.coerce.number().positive().optional().or(z.literal('')),
@@ -79,6 +82,9 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
       name: material.name,
       type: material.type,
       subtype: material.subtype || '',
+      range: material.specs.range || '',
+      colour: material.specs.colour || '',
+      backing: material.specs.backing || '',
       widthMm: material.specs.widthMm || '',
       lengthMm: material.specs.lengthMm || '',
       rollWidthMm: material.specs.rollWidthMm || (material.specs.width ? material.specs.width * 1000 : ''),
@@ -94,6 +100,11 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
   });
 
   const selectedType = form.watch('type');
+  const selectedSubtype = form.watch('subtype');
+  
+  // Check if backing should be shown for this subtype
+  const showBacking = selectedSubtype && Object.keys(BACKING_OPTIONS).includes(selectedSubtype);
+  const backingOptions = selectedSubtype ? BACKING_OPTIONS[selectedSubtype] || [] : [];
 
   const applyTilePreset = (preset: typeof TILE_PRESETS[0]) => {
     form.setValue('widthMm', preset.widthMm);
@@ -111,6 +122,9 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
       type: values.type,
       subtype: values.subtype as MaterialSubtype | undefined,
       specs: {
+        range: values.range || undefined,
+        colour: values.colour || undefined,
+        backing: values.backing || undefined,
         widthMm: typeof values.widthMm === 'number' ? values.widthMm : undefined,
         lengthMm: typeof values.lengthMm === 'number' ? values.lengthMm : undefined,
         rollWidthMm: typeof values.rollWidthMm === 'number' ? values.rollWidthMm : undefined,
@@ -146,12 +160,42 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Premium Carpet Tile - Gray" {...field} />
+                    <Input placeholder="e.g., Urban Retreat UR101" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            
+            {/* Range and Colour */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="range"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Range / Collection</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Urban Retreat" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="colour"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Colour</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Ash Grey" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -217,6 +261,34 @@ export function EditMaterialDialog({ material, open, onOpenChange }: EditMateria
                 )}
               />
             </div>
+            
+            {/* Backing - shown for relevant subtypes */}
+            {showBacking && backingOptions.length > 0 && (
+              <FormField
+                control={form.control}
+                name="backing"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Backing</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select backing type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {backingOptions.map((backing) => (
+                          <SelectItem key={backing} value={backing}>
+                            {backing}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             
             {/* Tile Dimensions */}
             {selectedType === 'tile' && (

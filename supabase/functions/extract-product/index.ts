@@ -62,6 +62,9 @@ Return a JSON object with these fields (use null for unknown values):
 - name: Product name (string)
 - type: "tile", "roll", or "linear" 
 - subtype: one of "carpet_tile", "ceramic_tile", "vinyl_plank", "lvt", "broadloom_carpet", "sheet_vinyl", "baseboard", "transition_strip"
+- range: Product line/collection name (string, e.g., "Urban Retreat", "Human Nature")
+- colour: Color/colorway (string, e.g., "Ash Grey", "Flax")
+- backing: Backing type if applicable (string, e.g., "Graphlex", "CushionBac", "Rigid Core")
 - widthMm: Tile/plank width in millimeters (number)
 - lengthMm: Tile/plank length in millimeters (number)  
 - rollWidthMm: Roll width in millimeters (number, for roll goods)
@@ -79,6 +82,11 @@ Common flooring dimensions to consider:
 - LVT/Vinyl planks: various sizes like 152x914mm, 178x1219mm
 - Sheet vinyl: 2m, 3m, or 4m wide rolls
 - Broadloom carpet: typically 3.66m (12ft) or 4m wide
+
+Common backing types:
+- Carpet tiles: Graphlex, CushionBac, TractionBac, Modular, Hardback, Felt
+- LVT/Vinyl: Rigid Core, WPC, SPC, Loose-lay, Dry-back
+- Sheet vinyl: Fibreglass, Foam, Compact
 
 Only return valid JSON, no other text.`
           },
@@ -102,6 +110,9 @@ Only return valid JSON, no other text.`
                     type: 'string', 
                     enum: ['carpet_tile', 'ceramic_tile', 'vinyl_plank', 'lvt', 'broadloom_carpet', 'sheet_vinyl', 'baseboard', 'transition_strip']
                   },
+                  range: { type: 'string', description: 'Product line/collection name' },
+                  colour: { type: 'string', description: 'Color/colorway' },
+                  backing: { type: 'string', description: 'Backing type' },
                   widthMm: { type: 'number', description: 'Width in mm for tiles' },
                   lengthMm: { type: 'number', description: 'Length in mm for tiles' },
                   rollWidthMm: { type: 'number', description: 'Roll width in mm' },
