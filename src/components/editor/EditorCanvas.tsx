@@ -2,6 +2,7 @@ import { useEffect, useCallback, useState, useRef } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
+import { useTouchGestures } from '@/hooks/useTouchGestures';
 import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
 import {
   findSnapPoint,
@@ -58,6 +59,7 @@ export function EditorCanvas({
   const [panStart, setPanStart] = useState<CanvasPoint | null>(null);
   const [scaleStart, setScaleStart] = useState<CanvasPoint | null>(null);
   const [selectedDoorWidth, setSelectedDoorWidth] = useState<number>(DOOR_WIDTHS[1].value);
+  const [isTouchGesture, setIsTouchGesture] = useState(false);
 
   // Canvas editing hook for vertex and wall dragging
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
@@ -77,6 +79,23 @@ export function EditorCanvas({
     rooms: state.rooms,
     zoom: state.viewTransform.zoom,
     onUpdateRoom: handleUpdateRoom,
+  });
+
+  // Touch gestures hook for pinch-to-zoom and two-finger pan
+  const handleTransformChange = useCallback((transform: { zoom?: number; offsetX?: number; offsetY?: number }) => {
+    dispatch({ type: 'SET_VIEW_TRANSFORM', transform });
+  }, [dispatch]);
+
+  const {
+    handleTouchStart: touchStart,
+    handleTouchMove: touchMove,
+    handleTouchEnd: touchEnd,
+    isTwoFingerGesture,
+  } = useTouchGestures({
+    zoom: state.viewTransform.zoom,
+    offsetX: state.viewTransform.offsetX,
+    offsetY: state.viewTransform.offsetY,
+    onTransformChange: handleTransformChange,
   });
 
   // Sync background image from props to internal state
@@ -158,6 +177,9 @@ export function EditorCanvas({
 
   // Handle pointer down
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    // Ignore during touch gestures
+    if (isTouchGesture || isTwoFingerGesture()) return;
+    
     const point = getEventPoint(e);
 
     // Middle mouse or space + click for pan
@@ -324,10 +346,13 @@ export function EditorCanvas({
         break;
       }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag]);
 
   // Handle pointer move
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    // Ignore during touch gestures
+    if (isTouchGesture || isTwoFingerGesture()) return;
+    
     const point = getEventPoint(e);
 
     if (isPanning && panStart) {
@@ -383,7 +408,7 @@ export function EditorCanvas({
     }
 
     setCursorPosition(finalPoint);
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover]);
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
@@ -464,10 +489,40 @@ export function EditorCanvas({
     }
   }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart]);
 
+  // Touch event handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    if (e.touches.length >= 2) {
+      setIsTouchGesture(true);
+      touchStart(e, rect);
+    }
+  }, [touchStart]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    if (e.touches.length >= 2) {
+      const handled = touchMove(e, rect);
+      if (handled) {
+        setIsTouchGesture(true);
+      }
+    }
+  }, [touchMove]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    touchEnd(e);
+    if (e.touches.length < 2) {
+      setIsTouchGesture(false);
+    }
+  }, [touchEnd]);
+
   return (
     <div
       ref={containerRef}
-      className="w-full h-full relative overflow-hidden"
+      className="w-full h-full relative overflow-hidden touch-none"
       style={{ cursor: getCursor() }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -476,6 +531,9 @@ export function EditorCanvas({
       onWheel={handleWheel}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       <CanvasRenderer
         state={state}
