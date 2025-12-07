@@ -124,9 +124,37 @@ export function EditorSidebar({
         <TabsContent value="materials" className="flex-1 m-0">
           <ScrollArea className="h-full">
             <div className="p-3 space-y-2">
+              {/* Selected Room Indicator */}
+              {selectedRoom ? (
+                <div className="mb-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-sm flex-shrink-0"
+                      style={{ backgroundColor: selectedRoom.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{selectedRoom.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {selectedRoomMaterial ? selectedRoomMaterial.name : 'No material assigned'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-primary mt-2">Tap a material below to assign</p>
+                </div>
+              ) : (
+                <div className="mb-3 p-3 rounded-lg border border-border bg-muted/50">
+                  <p className="text-sm text-muted-foreground text-center">
+                    No room selected
+                  </p>
+                  <p className="text-xs text-muted-foreground text-center mt-1">
+                    Select a room on canvas or from Layers tab
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs text-muted-foreground">
-                  Click to assign to selected room
+                  Available materials
                 </p>
                 <Button 
                   variant="ghost" 
