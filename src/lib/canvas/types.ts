@@ -3,6 +3,48 @@ export interface CanvasPoint {
   y: number;
 }
 
+// Room-level accessory configurations
+export interface CovingConfig {
+  enabled: boolean;
+  heightMm: number;           // Typically 100mm (4")
+  materialId?: string;        // Linked coving material
+  excludeWalls?: number[];    // Wall indices to exclude (e.g., external walls)
+}
+
+export interface WeldRodConfig {
+  enabled: boolean;
+  colorMatch: boolean;
+  materialId?: string;        // Linked weld rod material
+}
+
+export interface TransitionConfig {
+  id: string;
+  type: 'reducer' | 'threshold' | 't-molding' | 'end-cap' | 'stair-nose';
+  doorId: string;             // Reference to which door this is for
+  materialId?: string;        // Linked transition material
+}
+
+export interface UnderlaymentConfig {
+  enabled: boolean;
+  type: 'foam' | 'cork' | 'rubber' | 'plywood' | 'self-leveler' | 'none';
+  materialId?: string;        // Linked underlayment material
+}
+
+export interface AdhesiveConfig {
+  enabled: boolean;
+  type: 'pressure-sensitive' | 'full-spread' | 'perimeter' | 'spray' | 'none';
+  coverageRateM2PerUnit: number;  // m² per unit (e.g., 30 m²/bucket)
+  materialId?: string;        // Linked adhesive material
+}
+
+export interface RoomAccessories {
+  coving?: CovingConfig;
+  weldRod?: WeldRodConfig;
+  transitions?: TransitionConfig[];
+  underlayment?: UnderlaymentConfig;
+  adhesive?: AdhesiveConfig;
+}
+
 export interface Room {
   id: string;
   name: string;
@@ -12,6 +54,8 @@ export interface Room {
   materialId: string | null;
   materialCode?: string; // Project-specific reference code (e.g., "CP01", "FC07") for finishes schedules
   color: string;
+  accessories?: RoomAccessories;
+  fillDirection?: number; // Lay direction in degrees (0 = horizontal, 90 = vertical)
 }
 
 export interface Hole {

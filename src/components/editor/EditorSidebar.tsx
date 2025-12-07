@@ -17,12 +17,14 @@ import {
   Circle,
   Minus,
   Settings2,
-  Tag
+  Tag,
+  Wrench
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { LayersPanel } from './LayersPanel';
+import { AccessoriesPanel } from './AccessoriesPanel';
 import { ReportTab } from '@/components/reports/ReportTab';
-import { Room, ScaleCalibration } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
 import { cn } from '@/lib/utils';
 
 interface EditorSidebarProps {
@@ -92,6 +94,14 @@ export function EditorSidebar({
             <Package className="w-4 h-4" />
           </Button>
           <Button 
+            variant={selectedTab === 'accessories' ? 'secondary' : 'ghost'} 
+            size="icon"
+            onClick={() => { setSelectedTab('accessories'); onToggle?.(); }}
+            title="Accessories"
+          >
+            <Wrench className="w-4 h-4" />
+          </Button>
+          <Button 
             variant={selectedTab === 'layers' ? 'secondary' : 'ghost'} 
             size="icon"
             onClick={() => { setSelectedTab('layers'); onToggle?.(); }}
@@ -111,18 +121,18 @@ export function EditorSidebar({
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col h-full">
           <div className="px-3 pt-3 pb-2 border-b border-border">
             <div className="flex items-center gap-2 mb-2">
-              <TabsList className="flex-1 grid grid-cols-3">
-                <TabsTrigger value="materials" className="text-xs">
-                  <Package className="w-3 h-3 mr-1" />
-                  Materials
+              <TabsList className="flex-1 grid grid-cols-4">
+                <TabsTrigger value="materials" className="text-xs px-1">
+                  <Package className="w-3 h-3" />
                 </TabsTrigger>
-                <TabsTrigger value="layers" className="text-xs">
-                  <Layers className="w-3 h-3 mr-1" />
-                  Layers
+                <TabsTrigger value="accessories" className="text-xs px-1">
+                  <Wrench className="w-3 h-3" />
                 </TabsTrigger>
-                <TabsTrigger value="report" className="text-xs">
-                  <FileText className="w-3 h-3 mr-1" />
-                  Report
+                <TabsTrigger value="layers" className="text-xs px-1">
+                  <Layers className="w-3 h-3" />
+                </TabsTrigger>
+                <TabsTrigger value="report" className="text-xs px-1">
+                  <FileText className="w-3 h-3" />
                 </TabsTrigger>
               </TabsList>
               <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggle} title="Collapse sidebar">
@@ -251,6 +261,23 @@ export function EditorSidebar({
                 )}
               </div>
             </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="accessories" className="flex-1 m-0">
+            {selectedRoom ? (
+              <AccessoriesPanel
+                room={selectedRoom}
+                scale={scale}
+                materials={materials || []}
+                onUpdateAccessories={(accessories: RoomAccessories) => {
+                  onUpdateRoom?.(selectedRoom.id, { accessories });
+                }}
+              />
+            ) : (
+              <div className="p-3 text-center text-sm text-muted-foreground">
+                Select a room to configure accessories
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="layers" className="flex-1 m-0">
