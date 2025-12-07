@@ -424,6 +424,11 @@ export function CutPlanModal({
                   <div className="flex items-center gap-2">
                     <Recycle className="w-4 h-4 text-green-500" />
                     <span className="font-medium text-sm">Available Drops ({availableDrops.length})</span>
+                    {availableDrops.filter(d => d.usable).length > 0 && (
+                      <Badge variant="outline" className="text-[10px] bg-green-500/20 text-green-700 border-green-500/30">
+                        {availableDrops.filter(d => d.usable).length} usable
+                      </Badge>
+                    )}
                   </div>
                   <ChevronDown className={`w-4 h-4 transition-transform ${showDropReuse ? 'rotate-180' : ''}`} />
                 </Button>
@@ -431,15 +436,17 @@ export function CutPlanModal({
               <CollapsibleContent className="pt-2">
                 <div className="bg-muted/30 rounded-lg p-4 border space-y-3">
                   <p className="text-xs text-muted-foreground">
-                    Leftover pieces from this cut plan that can be reused in other rooms
+                    Leftover pieces from this cut plan that can be reused in other rooms with the same material.
                   </p>
+                  
+                  {/* Drop visualization */}
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     {availableDrops.map((drop) => (
                       <div
                         key={drop.id}
-                        className={`p-2 rounded border text-center ${
+                        className={`p-2 rounded border text-center transition-colors ${
                           drop.usable 
-                            ? 'bg-green-500/10 border-green-500/30' 
+                            ? 'bg-green-500/10 border-green-500/30 hover:bg-green-500/20' 
                             : 'bg-amber-500/10 border-amber-500/30'
                         }`}
                       >
@@ -453,14 +460,43 @@ export function CutPlanModal({
                               : 'bg-amber-500/20 text-amber-700 border-amber-500/30'
                           }`}
                         >
-                          {drop.usable ? 'Usable' : 'Short'}
+                          {drop.usable ? 'Usable' : 'Too Short'}
                         </Badge>
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    💡 Use Cross-Room Optimizer to allocate drops to other rooms
-                  </p>
+
+                  {/* Summary and guidance */}
+                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 space-y-2">
+                    <div className="flex items-start gap-2">
+                      <Lightbulb className="w-4 h-4 text-blue-500 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                          Cross-Room Optimization Available
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          When you have 2+ rooms using the same material, the Cross-Room Optimizer 
+                          (in the Report tab) will automatically allocate these drops to minimize waste.
+                        </p>
+                      </div>
+                    </div>
+                    {availableDrops.filter(d => d.usable).length > 0 && (
+                      <div className="pt-2 border-t border-blue-500/20">
+                        <p className="text-[10px] text-muted-foreground">
+                          <strong>Total usable material:</strong>{' '}
+                          <span className="font-mono">
+                            {(availableDrops.filter(d => d.usable).reduce((sum, d) => sum + d.length, 0) / 1000).toFixed(2)}m
+                          </span>
+                          {' '}×{' '}
+                          <span className="font-mono">{(rollWidth / 1000).toFixed(2)}m</span>
+                          {' '}={' '}
+                          <span className="font-mono font-medium">
+                            {(availableDrops.filter(d => d.usable).reduce((sum, d) => sum + d.length, 0) * rollWidth / 1_000_000).toFixed(2)} m²
+                          </span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </CollapsibleContent>
             </Collapsible>
