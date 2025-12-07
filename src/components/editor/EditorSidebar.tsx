@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Layers, 
   Package, 
@@ -11,22 +13,16 @@ import {
   ChevronRight,
   Square,
   Circle,
-  Minus
+  Minus,
+  Settings2
 } from 'lucide-react';
+import { useMaterials, Material } from '@/hooks/useMaterials';
 
 interface EditorSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
+  onMaterialSelect?: (material: Material) => void;
 }
-
-// Placeholder material data
-const materials = [
-  { id: '1', name: 'Berber Carpet - Gray', type: 'roll', specs: { width: 3.66, price: 45 } },
-  { id: '2', name: 'Luxury Vinyl Plank - Oak', type: 'roll', specs: { width: 1.22, price: 65 } },
-  { id: '3', name: 'Porcelain Tile 12x24', type: 'tile', specs: { width: 0.3, height: 0.6, price: 8 } },
-  { id: '4', name: 'Hardwood - Walnut', type: 'roll', specs: { width: 0.15, price: 120 } },
-  { id: '5', name: 'Rubber Baseboard', type: 'linear', specs: { price: 12 } },
-];
 
 const typeIcons: Record<string, React.ElementType> = {
   roll: Square,
@@ -34,8 +30,10 @@ const typeIcons: Record<string, React.ElementType> = {
   linear: Minus,
 };
 
-export function EditorSidebar({ collapsed, onToggle }: EditorSidebarProps) {
+export function EditorSidebar({ collapsed, onToggle, onMaterialSelect }: EditorSidebarProps) {
   const [selectedTab, setSelectedTab] = useState('materials');
+  const { data: materials, isLoading } = useMaterials();
+  const navigate = useNavigate();
 
   if (collapsed) {
     return (
@@ -92,36 +90,66 @@ export function EditorSidebar({ collapsed, onToggle }: EditorSidebarProps) {
         <TabsContent value="materials" className="flex-1 m-0">
           <ScrollArea className="h-full">
             <div className="p-3 space-y-2">
-              <p className="text-xs text-muted-foreground mb-3">
-                Drag materials onto rooms to apply
-              </p>
-              {materials.map(material => {
-                const Icon = typeIcons[material.type] || Square;
-                return (
-                  <div
-                    key={material.id}
-                    className="p-3 rounded-lg border border-border bg-background hover:bg-accent/50 cursor-grab transition-colors"
-                    draggable
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-4 h-4 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{material.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="text-xs capitalize">
-                            {material.type}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            ${material.specs.price}/m²
-                          </span>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-muted-foreground">
+                  Click materials to apply to rooms
+                </p>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6"
+                  onClick={() => navigate('/materials')}
+                >
+                  <Settings2 className="w-3 h-3" />
+                </Button>
+              </div>
+              
+              {isLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : materials && materials.length > 0 ? (
+                materials.map(material => {
+                  const Icon = typeIcons[material.type] || Square;
+                  return (
+                    <div
+                      key={material.id}
+                      className="p-3 rounded-lg border border-border bg-background hover:bg-accent/50 cursor-pointer transition-colors"
+                      onClick={() => onMaterialSelect?.(material)}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('material', JSON.stringify(material));
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Icon className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{material.name}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs capitalize">
+                              {material.type}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground font-mono">
+                              ${material.specs.price}/m²
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-sm text-muted-foreground mb-2">No materials available</p>
+                  <Button variant="outline" size="sm" onClick={() => navigate('/materials')}>
+                    Add Materials
+                  </Button>
+                </div>
+              )}
             </div>
           </ScrollArea>
         </TabsContent>
