@@ -7,6 +7,13 @@ import {
   StripPlanResult,
   MultiRoomStripPlan 
 } from '@/lib/rollGoods';
+import { 
+  analyzeRoomComplexity, 
+  suggestWastePercent, 
+  WastageSuggestion, 
+  WasteOverrides,
+  ComplexityMetrics 
+} from './wasteCalculator';
 
 export interface RoomCalculation {
   roomId: string;
@@ -42,6 +49,8 @@ export interface ReportSummary {
   materialSummary: MaterialSummaryItem[];
   // Roll goods aggregation
   rollGoodsPlans: Map<string, MultiRoomStripPlan>;
+  // Wastage suggestions per material
+  wasteSuggestions: Map<string, WastageSuggestion & { metrics: ComplexityMetrics }>;
 }
 
 export interface MaterialSummaryItem {
@@ -102,7 +111,8 @@ export function calculateRoomCost(
   room: Room,
   material: Material | null,
   scale: ScaleCalibration | null,
-  roundingMode: QuantityRoundingMode = 'up'
+  roundingMode: QuantityRoundingMode = 'up',
+  wasteOverride?: number // Optional override for waste percentage
 ): RoomCalculation {
   const netAreaPixels = calculateRoomNetArea(room);
   const netAreaMm2 = pixelAreaToRealArea(netAreaPixels, scale);
@@ -137,7 +147,8 @@ export function calculateRoomCost(
     };
   }
   
-  const wastePercent = getWastePercent(material.specs);
+  // Use override if provided, otherwise use material default
+  const wastePercent = wasteOverride !== undefined ? wasteOverride : getWastePercent(material.specs);
   const wasteFactor = 1 + wastePercent / 100;
   const unitPrice = getPrimaryPrice(material.specs);
   
@@ -265,18 +276,45 @@ export function calculateRoomCost(
   };
 }
 
+// Helper function to get room area in m² for wastage calculations
+function getRoomAreaM2(room: Room, scale: ScaleCalibration | null): number {
+  const netAreaPixels = calculateRoomNetArea(room);
+  const netAreaMm2 = pixelAreaToRealArea(netAreaPixels, scale);
+  return mmSquaredToMSquared(netAreaMm2);
+}
+
 // Generate full report for all rooms
 export function generateReport(
   rooms: Room[],
   materials: Material[],
   scale: ScaleCalibration | null,
-  roundingMode: QuantityRoundingMode = 'up'
+  roundingMode: QuantityRoundingMode = 'up',
+  wasteOverrides?: WasteOverrides
 ): ReportSummary {
   const materialMap = new Map(materials.map(m => [m.id, m]));
   
+  // Calculate wastage suggestions for each material
+  const wasteSuggestions = new Map<string, WastageSuggestion & { metrics: ComplexityMetrics }>();
+  const uniqueMaterialIds = [...new Set(rooms.map(r => r.materialId).filter(Boolean))] as string[];
+  
+  for (const materialId of uniqueMaterialIds) {
+    const metrics = analyzeRoomComplexity(rooms, materialId, (room) => getRoomAreaM2(room, scale));
+    const suggestion = suggestWastePercent({
+      totalAreaM2: metrics.totalAreaM2,
+      roomCount: metrics.roomCount,
+      averageRoomAreaM2: metrics.averageRoomAreaM2,
+      totalVertices: metrics.totalVertices,
+      totalHoles: metrics.totalHoles,
+      totalDoors: metrics.totalDoors,
+    });
+    wasteSuggestions.set(materialId, { ...suggestion, metrics });
+  }
+  
   const roomCalculations = rooms.map(room => {
     const material = room.materialId ? materialMap.get(room.materialId) || null : null;
-    return calculateRoomCost(room, material, scale, roundingMode);
+    // Get waste override for this material if set
+    const wasteOverride = room.materialId && wasteOverrides ? wasteOverrides[room.materialId] : undefined;
+    return calculateRoomCost(room, material, scale, roundingMode, wasteOverride);
   });
   
   // Aggregate by material
@@ -329,8 +367,13 @@ export function generateReport(
     roomCalculations,
     materialSummary: Array.from(materialAggregates.values()),
     rollGoodsPlans,
+    wasteSuggestions,
   };
 }
+
+// Re-export for convenience
+export { analyzeRoomComplexity, suggestWastePercent };
+export type { WastageSuggestion, WasteOverrides, ComplexityMetrics };
 
 // Format currency
 export function formatCurrency(value: number): string {
