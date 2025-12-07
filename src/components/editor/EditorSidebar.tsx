@@ -17,11 +17,19 @@ import {
   Settings2
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
+import { LayersPanel } from './LayersPanel';
+import { Room, ScaleCalibration } from '@/lib/canvas/types';
 
 interface EditorSidebarProps {
   collapsed?: boolean;
   onToggle?: () => void;
   onMaterialSelect?: (material: Material) => void;
+  rooms?: Room[];
+  selectedRoomId?: string | null;
+  scale?: ScaleCalibration | null;
+  onSelectRoom?: (roomId: string | null) => void;
+  onDeleteRoom?: (roomId: string) => void;
+  onRenameRoom?: (roomId: string, name: string) => void;
 }
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -30,7 +38,17 @@ const typeIcons: Record<string, React.ElementType> = {
   linear: Minus,
 };
 
-export function EditorSidebar({ collapsed, onToggle, onMaterialSelect }: EditorSidebarProps) {
+export function EditorSidebar({ 
+  collapsed, 
+  onToggle, 
+  onMaterialSelect,
+  rooms = [],
+  selectedRoomId = null,
+  scale = null,
+  onSelectRoom,
+  onDeleteRoom,
+  onRenameRoom,
+}: EditorSidebarProps) {
   const [selectedTab, setSelectedTab] = useState('materials');
   const { data: materials, isLoading } = useMaterials();
   const navigate = useNavigate();
@@ -92,7 +110,7 @@ export function EditorSidebar({ collapsed, onToggle, onMaterialSelect }: EditorS
             <div className="p-3 space-y-2">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs text-muted-foreground">
-                  Click materials to apply to rooms
+                  Drag materials onto rooms
                 </p>
                 <Button 
                   variant="ghost" 
@@ -116,11 +134,13 @@ export function EditorSidebar({ collapsed, onToggle, onMaterialSelect }: EditorS
                   return (
                     <div
                       key={material.id}
-                      className="p-3 rounded-lg border border-border bg-background hover:bg-accent/50 cursor-pointer transition-colors"
+                      className="p-3 rounded-lg border border-border bg-background hover:bg-accent/50 cursor-grab active:cursor-grabbing transition-colors"
                       onClick={() => onMaterialSelect?.(material)}
                       draggable
                       onDragStart={(e) => {
-                        e.dataTransfer.setData('material', JSON.stringify(material));
+                        e.dataTransfer.setData('materialId', material.id);
+                        e.dataTransfer.setData('materialType', material.type);
+                        e.dataTransfer.effectAllowed = 'copy';
                       }}
                     >
                       <div className="flex items-start gap-2">
@@ -155,13 +175,19 @@ export function EditorSidebar({ collapsed, onToggle, onMaterialSelect }: EditorS
         </TabsContent>
 
         <TabsContent value="layers" className="flex-1 m-0">
-          <ScrollArea className="h-full">
-            <div className="p-3">
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Draw rooms to see layers here
-              </p>
-            </div>
-          </ScrollArea>
+          <div className="p-3">
+            <p className="text-xs text-muted-foreground mb-3">
+              {rooms.length} room{rooms.length !== 1 ? 's' : ''} • Click to select
+            </p>
+            <LayersPanel
+              rooms={rooms}
+              selectedRoomId={selectedRoomId}
+              scale={scale}
+              onSelectRoom={onSelectRoom || (() => {})}
+              onDeleteRoom={onDeleteRoom || (() => {})}
+              onRenameRoom={onRenameRoom || (() => {})}
+            />
+          </div>
         </TabsContent>
 
         <TabsContent value="report" className="flex-1 m-0">
