@@ -5,6 +5,7 @@ import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
 import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
+import { Material } from '@/hooks/useMaterials';
 import {
   findSnapPoint,
   applyOrthoLock,
@@ -17,6 +18,7 @@ import {
   angleBetweenPoints,
 } from '@/lib/canvas/geometry';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
+import { FinishesLegend } from '@/components/reports/FinishesLegend';
 
 export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan';
 
@@ -30,10 +32,12 @@ interface EditorCanvasProps {
   canUndo?: boolean;
   canRedo?: boolean;
   materialTypes?: Map<string, string>;
+  materials?: Material[];
   backgroundImage?: BackgroundImage | null;
   onSetBackgroundImage?: (image: BackgroundImage) => void;
   onUpdateBackgroundImage?: (updates: Partial<BackgroundImage>) => void;
   onRemoveBackgroundImage?: () => void;
+  showFinishesLegend?: boolean;
 }
 
 export function EditorCanvas({
@@ -42,10 +46,12 @@ export function EditorCanvas({
   jsonData,
   onDataChange,
   materialTypes,
+  materials = [],
   backgroundImage,
   onSetBackgroundImage,
   onUpdateBackgroundImage,
   onRemoveBackgroundImage,
+  showFinishesLegend = false,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -616,6 +622,17 @@ export function EditorCanvas({
           });
         }}
       />
+
+      {/* Finishes Legend */}
+      {showFinishesLegend && state.rooms.some(r => r.materialCode) && (
+        <div className="absolute top-4 right-4 z-10">
+          <FinishesLegend 
+            rooms={state.rooms}
+            materials={materials}
+            compact
+          />
+        </div>
+      )}
     </div>
   );
 }

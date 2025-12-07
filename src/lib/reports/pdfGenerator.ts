@@ -2,6 +2,8 @@ import { ReportSummary, formatCurrency, formatArea, formatLength } from './calcu
 import { generateSeamDiagramSvg, svgToDataUrl } from './seamDiagramSvg';
 import { ClientDetails } from '@/components/reports/ClientDetailsForm';
 import { CompanyBranding } from '@/components/reports/CompanyBrandingForm';
+import { Material } from '@/hooks/useMaterials';
+import { Room } from '@/lib/canvas/types';
 
 export interface PDFGeneratorOptions {
   projectName: string;
@@ -10,7 +12,10 @@ export interface PDFGeneratorOptions {
   clientDetails?: ClientDetails;
   companyBranding?: CompanyBranding;
   includeSeamDiagrams?: boolean;
+  includeFinishesSchedule?: boolean;
   quoteValidityDays?: number;
+  rooms?: Room[];
+  materials?: Material[];
 }
 
 // Generate HTML content for the PDF
@@ -22,7 +27,10 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
     clientDetails,
     companyBranding,
     includeSeamDiagrams = true,
-    quoteValidityDays = 30
+    includeFinishesSchedule = true,
+    quoteValidityDays = 30,
+    rooms = [],
+    materials = []
   } = options;
   
   const date = new Date().toLocaleDateString('en-US', {
@@ -382,6 +390,8 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
         </table>
       ` : ''}
 
+      ${includeFinishesSchedule ? generateFinishesScheduleHTML(rooms, materials) : ''}
+
       <div class="summary-box">
         <h3>Total Estimate</h3>
         <div class="total">${formatCurrency(report.totalCost)}</div>
@@ -467,4 +477,81 @@ export function exportToPDF(options: PDFGeneratorOptions): void {
     printWindow.focus();
     printWindow.print();
   };
+}
+
+// Generate finishes schedule HTML for PDF
+function generateFinishesScheduleHTML(rooms: Room[], materials: Material[]): string {
+  const materialMap = new Map(materials.map(m => [m.id, m]));
+  const entriesMap = new Map<string, {
+    code: string;
+    materialName: string;
+    range?: string;
+    colour?: string;
+    backing?: string;
+    type: string;
+    rooms: string[];
+    totalArea: number;
+  }>();
+
+  // Build entries from room calculations
+  for (const room of rooms) {
+    if (!room.materialCode || !room.materialId) continue;
+
+    const material = materialMap.get(room.materialId);
+    if (!material) continue;
+
+    const key = room.materialCode;
+    const existing = entriesMap.get(key);
+
+    if (existing) {
+      existing.rooms.push(room.name);
+    } else {
+      entriesMap.set(key, {
+        code: room.materialCode,
+        materialName: material.name,
+        range: material.specs.range,
+        colour: material.specs.colour,
+        backing: material.specs.backing,
+        type: material.type,
+        rooms: [room.name],
+        totalArea: 0,
+      });
+    }
+  }
+
+  const entries = Array.from(entriesMap.values()).sort((a, b) => a.code.localeCompare(b.code));
+
+  if (entries.length === 0) return '';
+
+  return `
+    <h2>Finishes Schedule</h2>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 60px;">Code</th>
+          <th>Material</th>
+          <th>Details</th>
+          <th>Rooms</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map(entry => `
+          <tr>
+            <td style="font-family: 'SF Mono', Monaco, monospace; font-weight: 600; color: #0066cc;">${entry.code}</td>
+            <td>
+              <div style="font-weight: 500;">${entry.materialName}</div>
+              ${entry.range ? `<div style="font-size: 10px; color: #666;">${entry.range}</div>` : ''}
+            </td>
+            <td style="font-size: 11px; color: #666;">
+              ${[
+                entry.colour ? `Colour: ${entry.colour}` : '',
+                entry.backing ? `Backing: ${entry.backing}` : ''
+              ].filter(Boolean).join('<br>') || '—'}
+            </td>
+            <td style="font-size: 11px;">${entry.rooms.join(', ')}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 }
