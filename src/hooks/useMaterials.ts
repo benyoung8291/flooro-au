@@ -3,18 +3,57 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Json } from '@/integrations/supabase/types';
 
+// Enhanced material specifications with mm dimensions and dual pricing
 export interface MaterialSpecs {
+  // Tile/Plank dimensions (in mm for precision)
+  widthMm?: number;          // e.g., 500mm for carpet tile
+  lengthMm?: number;         // e.g., 500mm (square) or 250mm (plank)
+  
+  // Roll dimensions
+  rollWidthMm?: number;      // e.g., 2000mm for vinyl, 3660mm for broadloom
+  rollLengthM?: number;      // e.g., 25m, 30m
+  
+  // Pattern matching
+  patternRepeatMm?: number;  // For pattern matching during installation
+  
+  // Pricing (flexible model)
+  pricePerM2?: number;       // Standard per m² pricing
+  pricePerRoll?: number;     // Full roll price
+  pricePerLinearM?: number;  // Cut price per linear meter (for partial rolls)
+  
+  // Waste factor
+  wastePercent?: number;     // Default 10%
+  
+  // Product metadata
+  imageUrl?: string;         // Product image
+  manufacturerUrl?: string;  // Source URL
+  sku?: string;              // Product SKU/code
+  manufacturer?: string;     // Brand name
+  
+  // Legacy fields for backwards compatibility
+  price?: number;
   width?: number;
   height?: number;
-  price: number;
   unit?: string;
   [key: string]: unknown;
 }
+
+// Material subtypes for more granular categorization
+export type MaterialSubtype = 
+  | 'broadloom_carpet' 
+  | 'sheet_vinyl' 
+  | 'carpet_tile' 
+  | 'ceramic_tile' 
+  | 'vinyl_plank' 
+  | 'lvt'
+  | 'baseboard'
+  | 'transition_strip';
 
 export interface Material {
   id: string;
   name: string;
   type: 'roll' | 'tile' | 'linear';
+  subtype?: MaterialSubtype;
   specs: MaterialSpecs;
   organization_id: string | null;
   is_global: boolean;
@@ -25,6 +64,7 @@ export interface Material {
 export interface CreateMaterialInput {
   name: string;
   type: 'roll' | 'tile' | 'linear';
+  subtype?: MaterialSubtype;
   specs: MaterialSpecs;
 }
 
@@ -32,6 +72,7 @@ export interface UpdateMaterialInput {
   id: string;
   name?: string;
   type?: 'roll' | 'tile' | 'linear';
+  subtype?: MaterialSubtype;
   specs?: MaterialSpecs;
 }
 
@@ -45,11 +86,13 @@ function parseMaterial(data: {
   created_at: string;
   updated_at: string;
 }): Material {
+  const specs = data.specs as MaterialSpecs;
   return {
     id: data.id,
     name: data.name,
     type: data.type as 'roll' | 'tile' | 'linear',
-    specs: data.specs as MaterialSpecs,
+    subtype: specs.subtype as MaterialSubtype | undefined,
+    specs: specs,
     organization_id: data.organization_id,
     is_global: data.is_global,
     created_at: data.created_at,
@@ -116,7 +159,7 @@ export function useCreateMaterial() {
         .insert({
           name: input.name,
           type: input.type,
-          specs: input.specs as unknown as Json,
+          specs: { ...input.specs, subtype: input.subtype } as unknown as Json,
           organization_id: profile.organization_id,
           is_global: false,
         })
@@ -146,7 +189,7 @@ export function useUpdateMaterial() {
       const updateData: Record<string, unknown> = {};
       if (updates.name) updateData.name = updates.name;
       if (updates.type) updateData.type = updates.type;
-      if (updates.specs) updateData.specs = updates.specs as unknown as Json;
+      if (updates.specs) updateData.specs = { ...updates.specs, subtype: updates.subtype } as unknown as Json;
       
       const { data, error } = await supabase
         .from('materials')
@@ -188,4 +231,35 @@ export function useDeleteMaterial() {
       toast.error(`Failed to delete material: ${error.message}`);
     },
   });
+}
+
+// Helper to get primary price from specs
+export function getMaterialPrice(specs: MaterialSpecs): number {
+  return specs.pricePerM2 || specs.price || 0;
+}
+
+// Helper to get display dimensions
+export function getMaterialDimensions(material: Material): string {
+  const { specs, type } = material;
+  
+  if (type === 'tile') {
+    if (specs.widthMm && specs.lengthMm) {
+      return `${specs.widthMm} × ${specs.lengthMm}mm`;
+    }
+  }
+  
+  if (type === 'roll') {
+    if (specs.rollWidthMm) {
+      const widthM = (specs.rollWidthMm / 1000).toFixed(2);
+      if (specs.rollLengthM) {
+        return `${widthM}m × ${specs.rollLengthM}m roll`;
+      }
+      return `${widthM}m wide`;
+    }
+    if (specs.width) {
+      return `${specs.width}m wide`;
+    }
+  }
+  
+  return '';
 }
