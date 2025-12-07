@@ -208,6 +208,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_organization_for_user: {
+        Args: { _name: string }
+        Returns: {
+          address: string | null
+          created_at: string
+          id: string
+          logo_url: string | null
+          name: string
+          subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "organizations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
