@@ -23,6 +23,8 @@ import { WasteSuggestionCard } from './WasteSuggestionCard';
 import { CrossRoomOptimizer } from './CrossRoomOptimizer';
 import { LaborCostPanel } from './LaborCostPanel';
 import { StripPlanResult, extractRollMaterialSpecs } from '@/lib/rollGoods';
+import { OptimizedCutPlan } from '@/lib/rollGoods/cutOptimizer';
+import { toast } from 'sonner';
 
 interface ReportTabProps {
   rooms: Room[];
@@ -237,14 +239,27 @@ export function ReportTab({
             // Render optimizer for each material with 2+ rooms
             const optimizers = Array.from(rollMaterialRooms.entries())
               .filter(([, { rooms }]) => rooms.length >= 2)
-              .map(([materialId, { rooms: materialRooms, material }]) => (
-                <CrossRoomOptimizer
-                  key={materialId}
-                  rooms={materialRooms}
-                  material={extractRollMaterialSpecs(material.specs as Record<string, unknown>)}
-                  scale={scale}
-                />
-              ));
+              .map(([materialId, { rooms: materialRooms, material }]) => {
+                const handleApplyOptimization = (plan: OptimizedCutPlan) => {
+                  // Log optimization results for now
+                  console.log('Applied optimization:', plan);
+                  toast.success('Cross-room optimization applied', {
+                    description: `Saved ${plan.rollsSaved} roll${plan.rollsSaved !== 1 ? 's' : ''} and ${plan.wasteSavedM2.toFixed(2)} m² of waste`,
+                  });
+                };
+
+                return (
+                  <CrossRoomOptimizer
+                    key={materialId}
+                    rooms={materialRooms}
+                    material={extractRollMaterialSpecs(material.specs as Record<string, unknown>)}
+                    materialName={material.name}
+                    scale={scale}
+                    onApplyOptimization={handleApplyOptimization}
+                    showDetailedDrops
+                  />
+                );
+              });
 
             return optimizers.length > 0 ? (
               <>

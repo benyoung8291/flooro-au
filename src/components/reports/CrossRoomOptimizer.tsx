@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
   Scissors,
   TrendingDown,
   Package,
@@ -25,6 +30,9 @@ import {
   Sparkles,
   DollarSign,
   Ruler,
+  CheckCircle2,
+  XCircle,
+  Info,
 } from 'lucide-react';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { RollMaterialSpecs } from '@/lib/rollGoods/types';
@@ -33,23 +41,32 @@ import {
   getOptimizationSummary,
   OptimizedCutPlan,
   OptimizationOptions,
+  DropPiece,
 } from '@/lib/rollGoods/cutOptimizer';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface CrossRoomOptimizerProps {
   rooms: Room[];
   material: RollMaterialSpecs;
+  materialName?: string;
   scale: ScaleCalibration | null;
   onApplyOptimization?: (plan: OptimizedCutPlan) => void;
+  onAllocateDrop?: (drop: DropPiece, targetRoomId: string) => void;
+  showDetailedDrops?: boolean;
 }
 
 export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
   rooms,
   material,
+  materialName,
   scale,
   onApplyOptimization,
+  onAllocateDrop,
+  showDetailedDrops = false,
 }) => {
   const [showSettings, setShowSettings] = useState(false);
+  const [showDropDetails, setShowDropDetails] = useState(showDetailedDrops);
   const [options, setOptions] = useState<OptimizationOptions>({
     minDropLength: 500,
     allowPatternMismatch: false,
@@ -64,6 +81,44 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
     if (!optimizedPlan) return null;
     return getOptimizationSummary(optimizedPlan);
   }, [optimizedPlan]);
+
+  // Categorize drops by usability
+  const categorizedDrops = useMemo(() => {
+    if (!optimizedPlan) return { usable: [], short: [], allocated: [] };
+    
+    const usable: DropPiece[] = [];
+    const short: DropPiece[] = [];
+    const allocated: DropPiece[] = [];
+    
+    optimizedPlan.drops.forEach(drop => {
+      if (drop.isUsed) {
+        allocated.push(drop);
+      } else if (drop.length >= (options.minDropLength || 500)) {
+        usable.push(drop);
+      } else {
+        short.push(drop);
+      }
+    });
+    
+    return { usable, short, allocated };
+  }, [optimizedPlan, options.minDropLength]);
+
+  // Handle auto-allocate all usable drops
+  const handleAutoAllocate = useCallback(() => {
+    if (!optimizedPlan || !onApplyOptimization) return;
+    
+    onApplyOptimization(optimizedPlan);
+    toast.success('Optimization applied', {
+      description: `${optimizedPlan.reusedPieces.length} drops allocated across rooms`,
+    });
+  }, [optimizedPlan, onApplyOptimization]);
+
+  // Get drop color based on length
+  const getDropColor = (length: number) => {
+    if (length >= 1000) return 'bg-green-500/20 border-green-500/40 text-green-700 dark:text-green-400';
+    if (length >= 500) return 'bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-400';
+    return 'bg-muted border-border text-muted-foreground';
+  };
 
   if (rooms.length < 2) {
     return (
@@ -229,6 +284,132 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
           </div>
         )}
 
+        {/* Detailed Drop Inventory */}
+        <Collapsible open={showDropDetails} onOpenChange={setShowDropDetails}>
+          <CollapsibleTrigger asChild>
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between p-3 h-auto bg-muted/30 border hover:bg-muted/50"
+            >
+              <div className="flex items-center gap-2">
+                <Scissors className="w-4 h-4 text-primary" />
+                <span className="font-medium text-sm">Drop Inventory</span>
+                <Badge variant="outline" className="text-xs">
+                  {categorizedDrops.usable.length} usable
+                </Badge>
+              </div>
+              <ChevronDown className={`w-4 h-4 transition-transform ${showDropDetails ? 'rotate-180' : ''}`} />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <div className="bg-muted/30 rounded-lg p-4 border space-y-4">
+              {/* Usable Drops */}
+              {categorizedDrops.usable.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3 h-3 text-green-500" />
+                    <Label className="text-xs font-medium text-green-700 dark:text-green-400">
+                      Usable Drops ({categorizedDrops.usable.length})
+                    </Label>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {categorizedDrops.usable.map((drop) => (
+                      <div
+                        key={drop.id}
+                        className={cn(
+                          "p-2 rounded border text-center",
+                          getDropColor(drop.length)
+                        )}
+                      >
+                        <p className="text-xs text-muted-foreground truncate">
+                          From: {drop.sourceRoomName}
+                        </p>
+                        <p className="font-mono font-semibold text-sm">
+                          {(drop.length / 1000).toFixed(2)}m
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {(drop.width / 1000).toFixed(2)}m wide
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Allocated Drops */}
+              {categorizedDrops.allocated.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Recycle className="w-3 h-3 text-blue-500" />
+                    <Label className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                      Allocated ({categorizedDrops.allocated.length})
+                    </Label>
+                  </div>
+                  <div className="space-y-1">
+                    {categorizedDrops.allocated.map((drop) => {
+                      const reuse = optimizedPlan.reusedPieces.find(r => r.pieceId === drop.id);
+                      return (
+                        <div
+                          key={drop.id}
+                          className="flex items-center gap-2 p-2 rounded bg-blue-500/10 border border-blue-500/20 text-xs"
+                        >
+                          <Badge variant="outline" className="shrink-0 bg-blue-500/20">
+                            {(drop.length / 1000).toFixed(2)}m
+                          </Badge>
+                          <span className="truncate text-muted-foreground">
+                            {drop.sourceRoomName}
+                          </span>
+                          <ArrowRight className="w-3 h-3 shrink-0 text-blue-500" />
+                          <span className="truncate font-medium">
+                            {reuse?.toRoomName || 'Allocated'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Short Drops (waste) */}
+              {categorizedDrops.short.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-3 h-3 text-muted-foreground" />
+                    <Label className="text-xs font-medium text-muted-foreground">
+                      Too Short ({categorizedDrops.short.length})
+                    </Label>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {categorizedDrops.short.slice(0, 6).map((drop) => (
+                      <Badge 
+                        key={drop.id} 
+                        variant="outline" 
+                        className="text-[10px] bg-muted"
+                      >
+                        {(drop.length / 1000).toFixed(2)}m
+                      </Badge>
+                    ))}
+                    {categorizedDrops.short.length > 6 && (
+                      <Badge variant="outline" className="text-[10px]">
+                        +{categorizedDrops.short.length - 6} more
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Info note */}
+              <div className="flex items-start gap-2 pt-2 border-t">
+                <Info className="w-3 h-3 text-muted-foreground mt-0.5 shrink-0" />
+                <p className="text-[10px] text-muted-foreground">
+                  Drops ≥{(options.minDropLength || 500) / 1000}m are considered usable. 
+                  Adjust minimum length in settings above.
+                </p>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Roll Bins Visualization */}
         <div className="space-y-2">
           <Label className="text-sm font-medium">Roll Layout</Label>
@@ -261,13 +442,29 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                           />
                         );
                       })}
+                      {/* Drop indicator */}
+                      {bin.remainingMm >= (options.minDropLength || 500) && (
+                        <div
+                          className="absolute inset-y-0 right-0 bg-green-500/30 flex items-center justify-end"
+                          style={{
+                            width: `${(bin.remainingMm / bin.rollLengthMm) * 100}%`,
+                          }}
+                        >
+                          <span className="text-[9px] text-green-700 dark:text-green-400 px-1">
+                            Drop
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </TooltipTrigger>
                   <TooltipContent>
                     <div className="text-xs space-y-1">
                       <div className="font-medium">Roll {index + 1}</div>
                       <div>Used: {(bin.usedLengthMm / 1000).toFixed(2)}m</div>
-                      <div>Remaining: {(bin.remainingMm / 1000).toFixed(2)}m</div>
+                      <div className={bin.remainingMm >= (options.minDropLength || 500) ? 'text-green-500' : ''}>
+                        Remaining: {(bin.remainingMm / 1000).toFixed(2)}m
+                        {bin.remainingMm >= (options.minDropLength || 500) && ' (usable drop)'}
+                      </div>
                       <div className="pt-1 border-t mt-1">
                         {bin.cuts.map(cut => (
                           <div key={cut.id}>
@@ -329,16 +526,28 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
         </div>
 
         {/* Apply Button */}
-        {onApplyOptimization && hasSavings && (
-          <Button
-            className="w-full"
-            onClick={() => onApplyOptimization(optimizedPlan)}
-          >
-            <Scissors className="h-4 w-4 mr-2" />
-            Apply Optimized Cut Plan
-          </Button>
+        {hasSavings && (
+          <div className="space-y-2">
+            {onApplyOptimization && (
+              <Button
+                className="w-full"
+                onClick={handleAutoAllocate}
+              >
+                <Scissors className="h-4 w-4 mr-2" />
+                Apply Optimized Cut Plan
+              </Button>
+            )}
+            {categorizedDrops.usable.length > 0 && !onApplyOptimization && (
+              <p className="text-xs text-center text-muted-foreground">
+                {categorizedDrops.usable.length} drop{categorizedDrops.usable.length !== 1 ? 's' : ''} available for reuse
+              </p>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>
   );
 };
+
+// Export types for use in other components
+export type { DropPiece } from '@/lib/rollGoods/cutOptimizer';
