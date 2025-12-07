@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { 
   Lightbulb, 
@@ -11,7 +10,10 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  TrendingDown,
+  TrendingUp,
+  ArrowRight
 } from 'lucide-react';
 import {
   Collapsible,
@@ -24,7 +26,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { WastageSuggestion, ComplexityMetrics, WasteOverrides } from '@/lib/reports/calculations';
+import { WastageSuggestion, ComplexityMetrics, WasteOverrides, formatCurrency } from '@/lib/reports/calculations';
 import { Material } from '@/hooks/useMaterials';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +35,18 @@ interface WasteSuggestionCardProps {
   wasteSuggestions: Map<string, WastageSuggestion & { metrics: ComplexityMetrics }>;
   wasteOverrides: WasteOverrides;
   onOverrideChange: (materialId: string, value: number | undefined) => void;
+}
+
+// Calculate estimated cost for a material with given waste percentage
+function calculateMaterialCost(
+  material: Material,
+  totalAreaM2: number,
+  wastePercent: number
+): number {
+  const wasteFactor = 1 + wastePercent / 100;
+  const grossAreaM2 = totalAreaM2 * wasteFactor;
+  const unitPrice = material.specs.pricePerM2 || material.specs.price || 0;
+  return grossAreaM2 * unitPrice;
 }
 
 export function WasteSuggestionCard({
@@ -106,11 +120,16 @@ export function WasteSuggestionCard({
 
           const isExpanded = expandedMaterials.has(materialId);
           const hasOverride = wasteOverrides[materialId] !== undefined;
-          const currentWaste = hasOverride 
-            ? wasteOverrides[materialId] 
-            : (material.specs.wastePercent || material.specs.waste_percent as number || 10);
+          const defaultWaste = material.specs.wastePercent || material.specs.waste_percent as number || 10;
+          const currentWaste = hasOverride ? wasteOverrides[materialId] : defaultWaste;
           const isEditing = editingMaterial === materialId;
           const isSuggestionApplied = currentWaste === suggestion.suggestedPercent;
+          
+          // Calculate cost comparison
+          const currentCost = calculateMaterialCost(material, suggestion.metrics.totalAreaM2, currentWaste);
+          const suggestedCost = calculateMaterialCost(material, suggestion.metrics.totalAreaM2, suggestion.suggestedPercent);
+          const costDifference = suggestedCost - currentCost;
+          const hasPricing = (material.specs.pricePerM2 || material.specs.price || 0) > 0;
 
           return (
             <Collapsible key={materialId} open={isExpanded} onOpenChange={() => toggleExpanded(materialId)}>
@@ -187,24 +206,52 @@ export function WasteSuggestionCard({
                     </div>
                   </div>
                   
-                  {/* Quick suggestion badge */}
+                  {/* Quick suggestion badge with cost comparison */}
                   {!isSuggestionApplied && !isEditing && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <Badge 
-                        variant="outline" 
-                        className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 text-xs"
-                      >
-                        <Lightbulb className="w-2.5 h-2.5 mr-1" />
-                        Suggested: {suggestion.suggestedPercent}%
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 text-xs px-2"
-                        onClick={() => handleUseSuggested(materialId, suggestion.suggestedPercent)}
-                      >
-                        Apply
-                      </Button>
+                    <div className="mt-2 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant="outline" 
+                          className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 text-xs"
+                        >
+                          <Lightbulb className="w-2.5 h-2.5 mr-1" />
+                          Suggested: {suggestion.suggestedPercent}%
+                        </Badge>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 text-xs px-2"
+                          onClick={() => handleUseSuggested(materialId, suggestion.suggestedPercent)}
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                      
+                      {/* Cost impact preview */}
+                      {hasPricing && costDifference !== 0 && (
+                        <div className={cn(
+                          "flex items-center gap-1.5 text-xs px-2 py-1 rounded-md",
+                          costDifference < 0 
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" 
+                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        )}>
+                          {costDifference < 0 ? (
+                            <TrendingDown className="w-3 h-3" />
+                          ) : (
+                            <TrendingUp className="w-3 h-3" />
+                          )}
+                          <span className="font-mono">
+                            {formatCurrency(currentCost)}
+                          </span>
+                          <ArrowRight className="w-3 h-3" />
+                          <span className="font-mono font-medium">
+                            {formatCurrency(suggestedCost)}
+                          </span>
+                          <span className="text-muted-foreground">
+                            ({costDifference < 0 ? '' : '+'}{formatCurrency(costDifference)})
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -221,25 +268,35 @@ export function WasteSuggestionCard({
                         <span className="text-xs text-muted-foreground">{suggestion.reasoning}</span>
                       </div>
                       
-                      {/* Metrics breakdown */}
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground mt-2">
-                        <div className="flex justify-between">
-                          <span>Avg room size:</span>
-                          <span className="font-mono">{suggestion.metrics.averageRoomAreaM2.toFixed(1)} m²</span>
+                      {/* Cost comparison in expanded view */}
+                      {hasPricing && !isSuggestionApplied && (
+                        <div className="bg-muted/50 rounded-md p-2 mt-2">
+                          <p className="text-xs font-medium mb-1.5">Cost Comparison</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-background rounded p-1.5 text-center">
+                              <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Current ({currentWaste}%)</p>
+                              <p className="font-mono font-medium">{formatCurrency(currentCost)}</p>
+                            </div>
+                            <div className={cn(
+                              "rounded p-1.5 text-center",
+                              costDifference < 0 
+                                ? "bg-emerald-500/10" 
+                                : "bg-amber-500/10"
+                            )}>
+                              <p className="text-muted-foreground text-[10px] uppercase tracking-wide">Suggested ({suggestion.suggestedPercent}%)</p>
+                              <p className="font-mono font-medium">{formatCurrency(suggestedCost)}</p>
+                            </div>
+                          </div>
+                          {costDifference !== 0 && (
+                            <p className={cn(
+                              "text-xs text-center mt-1.5 font-medium",
+                              costDifference < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"
+                            )}>
+                              {costDifference < 0 ? 'Save' : 'Additional'} {formatCurrency(Math.abs(costDifference))} per project
+                            </p>
+                          )}
                         </div>
-                        <div className="flex justify-between">
-                          <span>Avg vertices:</span>
-                          <span className="font-mono">{suggestion.metrics.averageVerticesPerRoom.toFixed(1)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Holes:</span>
-                          <span className="font-mono">{suggestion.metrics.totalHoles}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Doors:</span>
-                          <span className="font-mono">{suggestion.metrics.totalDoors}</span>
-                        </div>
-                      </div>
+                      )}
                       
                       {/* Actions */}
                       <div className="flex items-center gap-2 pt-2">
