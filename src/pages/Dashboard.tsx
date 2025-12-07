@@ -15,7 +15,8 @@ import {
   CheckCircle2, 
   Settings,
   LogOut,
-  Shield
+  Shield,
+  Package
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -70,6 +71,10 @@ export default function Dashboard() {
                 Service Bureau
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={() => navigate('/materials')}>
+              <Package className="w-4 h-4 mr-2" />
+              Materials
+            </Button>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
               <Settings className="w-4 h-4" />
