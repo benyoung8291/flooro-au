@@ -17,6 +17,13 @@ export interface WeldRodConfig {
   materialId?: string;        // Linked weld rod material
 }
 
+export interface SmoothEdgeConfig {
+  enabled: boolean;
+  materialId?: string;        // Linked smooth edge/gripper material
+  excludeWalls?: number[];    // Wall indices to exclude
+  doubleRow?: boolean;        // Double row for heavy carpet or high traffic
+}
+
 export interface TransitionConfig {
   id: string;
   type: 'reducer' | 'threshold' | 't-molding' | 'end-cap' | 'stair-nose';
@@ -40,6 +47,7 @@ export interface AdhesiveConfig {
 export interface RoomAccessories {
   coving?: CovingConfig;
   weldRod?: WeldRodConfig;
+  smoothEdge?: SmoothEdgeConfig;
   transitions?: TransitionConfig[];
   underlayment?: UnderlaymentConfig;
   adhesive?: AdhesiveConfig;

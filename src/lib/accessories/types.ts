@@ -3,6 +3,8 @@ export type AccessorySubtype =
   | 'coving_strip'
   | 'cove_fillet'
   | 'weld_rod'
+  | 'smooth_edge'
+  | 'gripper_strip'
   | 'transition_reducer'
   | 'transition_threshold'
   | 'transition_t_molding'
@@ -48,7 +50,7 @@ export interface AccessorySpecs {
 
 // Calculation result for a single accessory
 export interface AccessoryCalculation {
-  accessoryType: 'coving' | 'cove_fillet' | 'weld_rod' | 'transition' | 'underlayment' | 'adhesive';
+  accessoryType: 'coving' | 'cove_fillet' | 'weld_rod' | 'smooth_edge' | 'transition' | 'underlayment' | 'adhesive';
   materialId?: string;
   materialName?: string;
   quantity: number;
@@ -75,6 +77,11 @@ export interface RoomAccessoriesCalculation {
   weldRod?: AccessoryCalculation & {
     totalSeamLengthM: number;
   };
+  smoothEdge?: AccessoryCalculation & {
+    wallPerimeterM: number;
+    excludedLengthM: number;
+    isDoubleRow: boolean;
+  };
   transitions?: AccessoryCalculation[];
   underlayment?: AccessoryCalculation & {
     areaM2: number;
@@ -92,7 +99,7 @@ export interface RoomAccessoriesCalculation {
 export const ACCESSORY_TYPES = {
   coving: {
     label: 'Wall Coving',
-    description: 'Vinyl coving strip for wall/floor junction',
+    description: 'Vinyl coving strip for wall/floor junction (sheet vinyl only)',
     unit: 'm',
     defaultHeightMm: 100,
   },
@@ -105,6 +112,12 @@ export const ACCESSORY_TYPES = {
     label: 'Weld Rod',
     description: 'Heat-welded seam sealer for sheet vinyl',
     unit: 'm',
+  },
+  smooth_edge: {
+    label: 'Smooth Edge / Gripper',
+    description: 'Tack strip for stretched broadloom carpet installation',
+    unit: 'm',
+    defaultPricePerM: 3.50,
   },
   transition: {
     label: 'Transitions',

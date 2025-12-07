@@ -186,6 +186,72 @@ export function calculateWeldRod(
 }
 
 /**
+ * Calculate smooth edge / gripper requirements for broadloom carpet
+ */
+export function calculateSmoothEdge(
+  room: Room,
+  scale: ScaleCalibration | null,
+  smoothEdgeMaterial?: Material
+): AccessoryCalculation & { wallPerimeterM: number; excludedLengthM: number; isDoubleRow: boolean } | undefined {
+  const accessories = room.accessories;
+  if (!accessories?.smoothEdge?.enabled) return undefined;
+  
+  // Calculate total perimeter in pixels
+  const perimeterPixels = calculatePerimeter(room.points);
+  
+  // Convert to meters using scale
+  const pixelsPerMm = scale?.pixelsPerMm || 1;
+  const perimeterM = perimeterPixels / pixelsPerMm / 1000;
+  
+  // Calculate door widths to subtract
+  const doorWidthsM = room.doors.reduce((total, door) => total + door.width / 1000, 0);
+  
+  // Calculate excluded walls length (if any walls are excluded)
+  let excludedLengthM = 0;
+  if (accessories.smoothEdge.excludeWalls && accessories.smoothEdge.excludeWalls.length > 0) {
+    const points = room.points;
+    for (const wallIndex of accessories.smoothEdge.excludeWalls) {
+      if (wallIndex >= 0 && wallIndex < points.length) {
+        const start = points[wallIndex];
+        const end = points[(wallIndex + 1) % points.length];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const wallLengthPixels = Math.sqrt(dx * dx + dy * dy);
+        excludedLengthM += wallLengthPixels / pixelsPerMm / 1000;
+      }
+    }
+  }
+  
+  let netSmoothEdgeM = Math.max(0, perimeterM - doorWidthsM - excludedLengthM);
+  
+  // Double row for heavy duty installations
+  const isDoubleRow = accessories.smoothEdge.doubleRow || false;
+  if (isDoubleRow) {
+    netSmoothEdgeM *= 2;
+  }
+  
+  // Get price from material or default
+  const unitPrice = smoothEdgeMaterial?.specs?.pricePerLinearM || 
+                    smoothEdgeMaterial?.specs?.pricePerM2 || 
+                    smoothEdgeMaterial?.specs?.price || 
+                    3.50; // Default $3.50/m
+  
+  return {
+    accessoryType: 'smooth_edge',
+    materialId: accessories.smoothEdge.materialId,
+    materialName: smoothEdgeMaterial?.name || 'Smooth Edge / Gripper',
+    quantity: netSmoothEdgeM,
+    unit: 'm',
+    unitPrice,
+    totalCost: netSmoothEdgeM * unitPrice,
+    wallPerimeterM: perimeterM,
+    excludedLengthM: excludedLengthM + doorWidthsM,
+    isDoubleRow,
+    details: `${netSmoothEdgeM.toFixed(2)}m${isDoubleRow ? ' (double row)' : ''}`,
+  };
+}
+
+/**
  * Calculate transition requirements for doors
  */
 export function calculateTransitions(
@@ -317,6 +383,7 @@ export function calculateRoomAccessories(
     ? calculateCoveFilletCorners(room, findMaterial(accessories?.coving?.materialId))
     : undefined;
   const weldRod = calculateWeldRod(room, stripPlan, findMaterial(accessories?.weldRod?.materialId));
+  const smoothEdge = calculateSmoothEdge(room, scale, findMaterial(accessories?.smoothEdge?.materialId));
   const transitions = calculateTransitions(room, materials);
   const underlayment = calculateUnderlayment(room, areaM2, findMaterial(accessories?.underlayment?.materialId));
   const adhesive = calculateAdhesive(room, areaM2, findMaterial(accessories?.adhesive?.materialId));
@@ -326,6 +393,7 @@ export function calculateRoomAccessories(
   if (coving) totalAccessoryCost += coving.totalCost;
   if (coveFilletCorners) totalAccessoryCost += coveFilletCorners.totalCost;
   if (weldRod) totalAccessoryCost += weldRod.totalCost;
+  if (smoothEdge) totalAccessoryCost += smoothEdge.totalCost;
   if (transitions) totalAccessoryCost += transitions.reduce((sum, t) => sum + t.totalCost, 0);
   if (underlayment) totalAccessoryCost += underlayment.totalCost;
   if (adhesive) totalAccessoryCost += adhesive.totalCost;
@@ -336,6 +404,7 @@ export function calculateRoomAccessories(
     coving,
     coveFilletCorners,
     weldRod,
+    smoothEdge,
     transitions,
     underlayment,
     adhesive,
@@ -355,6 +424,8 @@ export function aggregateAccessoriesCosts(
   totalCoveFilletCount: number;
   totalWeldRodCost: number;
   totalWeldRodM: number;
+  totalSmoothEdgeCost: number;
+  totalSmoothEdgeM: number;
   totalTransitionsCost: number;
   totalTransitionsCount: number;
   totalUnderlaymentCost: number;
@@ -369,6 +440,8 @@ export function aggregateAccessoriesCosts(
   let totalCoveFilletCount = 0;
   let totalWeldRodCost = 0;
   let totalWeldRodM = 0;
+  let totalSmoothEdgeCost = 0;
+  let totalSmoothEdgeM = 0;
   let totalTransitionsCost = 0;
   let totalTransitionsCount = 0;
   let totalUnderlaymentCost = 0;
@@ -389,6 +462,10 @@ export function aggregateAccessoriesCosts(
       totalWeldRodCost += room.weldRod.totalCost;
       totalWeldRodM += room.weldRod.totalSeamLengthM;
     }
+    if (room.smoothEdge) {
+      totalSmoothEdgeCost += room.smoothEdge.totalCost;
+      totalSmoothEdgeM += room.smoothEdge.quantity;
+    }
     if (room.transitions) {
       totalTransitionsCost += room.transitions.reduce((sum, t) => sum + t.totalCost, 0);
       totalTransitionsCount += room.transitions.length;
@@ -404,7 +481,7 @@ export function aggregateAccessoriesCosts(
   }
   
   const grandTotal = totalCovingCost + totalCoveFilletCost + totalWeldRodCost + 
-                     totalTransitionsCost + totalUnderlaymentCost + totalAdhesiveCost;
+                     totalSmoothEdgeCost + totalTransitionsCost + totalUnderlaymentCost + totalAdhesiveCost;
   
   return {
     totalCovingCost,
@@ -413,6 +490,8 @@ export function aggregateAccessoriesCosts(
     totalCoveFilletCount,
     totalWeldRodCost,
     totalWeldRodM,
+    totalSmoothEdgeCost,
+    totalSmoothEdgeM,
     totalTransitionsCost,
     totalTransitionsCount,
     totalUnderlaymentCost,
