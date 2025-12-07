@@ -5,7 +5,7 @@ import { ArrowLeft, Square } from 'lucide-react';
 import { MaterialsList } from '@/components/materials/MaterialsList';
 import { CreateMaterialDialog } from '@/components/materials/CreateMaterialDialog';
 import { ImportProductDialog } from '@/components/materials/ImportProductDialog';
-
+import { MaterialPresets } from '@/components/materials/MaterialPresets';
 export default function Materials() {
   const navigate = useNavigate();
 
@@ -25,6 +25,7 @@ export default function Materials() {
           </div>
           
           <div className="flex items-center gap-2">
+            <MaterialPresets />
             <ImportProductDialog />
             <CreateMaterialDialog />
             <ThemeToggle />
