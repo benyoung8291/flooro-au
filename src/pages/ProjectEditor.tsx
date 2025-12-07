@@ -148,6 +148,55 @@ export default function ProjectEditor() {
   const rooms = (localData.rooms as Room[]) || [];
   const scale = (localData.scale as ScaleCalibration) || null;
   const backgroundImage = (localData.backgroundImage as BackgroundImage) || null;
+  const selectedRoomId = (localData.selectedRoomId as string | null) || null;
+
+  // Room management handlers
+  const handleSelectRoom = useCallback((roomId: string | null) => {
+    setLocalData(prev => ({ ...prev, selectedRoomId: roomId }));
+  }, []);
+
+  const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
+    setLocalData(prev => {
+      const currentRooms = (prev.rooms as Room[]) || [];
+      const updatedRooms = currentRooms.map(room => 
+        room.id === roomId ? { ...room, ...updates } : room
+      );
+      return { ...prev, rooms: updatedRooms };
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleDeleteRoom = useCallback((roomId: string) => {
+    setLocalData(prev => {
+      const currentRooms = (prev.rooms as Room[]) || [];
+      return { 
+        ...prev, 
+        rooms: currentRooms.filter(room => room.id !== roomId),
+        selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
+      };
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleRenameRoom = useCallback((roomId: string, name: string) => {
+    handleUpdateRoom(roomId, { name });
+  }, [handleUpdateRoom]);
+
+  const handleMaterialSelect = useCallback((material: { id: string }) => {
+    if (!selectedRoomId) {
+      toast({
+        title: "Select a room first",
+        description: "Tap on a room in the canvas or select one from the Layers tab.",
+        variant: "default",
+      });
+      return;
+    }
+    handleUpdateRoom(selectedRoomId, { materialId: material.id });
+    toast({
+      title: "Material assigned",
+      description: `Material applied to ${rooms.find(r => r.id === selectedRoomId)?.name || 'room'}`,
+    });
+  }, [selectedRoomId, handleUpdateRoom, toast, rooms]);
   
   const report = useMemo(
     () => generateReport(rooms, materials || [], scale),
@@ -373,7 +422,13 @@ export default function ProjectEditor() {
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             rooms={rooms}
+            selectedRoomId={selectedRoomId}
             scale={scale}
+            onSelectRoom={handleSelectRoom}
+            onDeleteRoom={handleDeleteRoom}
+            onRenameRoom={handleRenameRoom}
+            onUpdateRoom={handleUpdateRoom}
+            onMaterialSelect={handleMaterialSelect}
             projectName={project.name}
             projectAddress={project.address || undefined}
           />
@@ -403,7 +458,13 @@ export default function ProjectEditor() {
           open={mobileDrawerOpen}
           onOpenChange={setMobileDrawerOpen}
           rooms={rooms}
+          selectedRoomId={selectedRoomId}
           scale={scale}
+          onSelectRoom={handleSelectRoom}
+          onDeleteRoom={handleDeleteRoom}
+          onRenameRoom={handleRenameRoom}
+          onUpdateRoom={handleUpdateRoom}
+          onMaterialSelect={handleMaterialSelect}
           projectName={project.name}
           projectAddress={project.address || undefined}
         />
