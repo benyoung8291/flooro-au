@@ -101,6 +101,9 @@ export interface StripPlanOptions {
   // Force a specific layout direction
   forcedDirection?: 'horizontal' | 'vertical';
   
+  // Fill direction in degrees (0 = horizontal, 90 = vertical)
+  fillDirection?: number;
+  
   // Minimum overlap for pattern matching (mm)
   patternMatchOverlap?: number;
   
@@ -109,6 +112,68 @@ export interface StripPlanOptions {
   
   // Whether to optimize for minimal seams vs minimal waste
   optimizeFor?: 'seams' | 'waste';
+  
+  // Advanced seam control options
+  seamOffset?: number;           // Minimum distance from walls (mm)
+  avoidSeamZones?: AvoidZone[];  // Areas to avoid seams
+  manualSeams?: SeamOverride[];  // User-defined seam positions
+  
+  // First seam position offset from starting edge (mm)
+  firstSeamOffset?: number;
+}
+
+/**
+ * Zone to avoid placing seams
+ */
+export interface AvoidZone {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  priority: 'hard' | 'soft';  // Hard = never place seam, Soft = avoid if possible
+}
+
+/**
+ * Manual seam override
+ */
+export interface SeamOverride {
+  id: string;
+  position: number;      // Position in mm from left/top edge
+  type: 'add' | 'lock';  // Add = force seam here, Lock = prevent moving this seam
+}
+
+/**
+ * Enhanced seam line with draggable support
+ */
+export interface SeamLine {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  type: 'primary' | 'cross';
+  
+  // Enhanced properties for interactive editing
+  position?: number;      // Position along perpendicular axis (for dragging)
+  isLocked?: boolean;     // Whether this seam is locked in place
+  isManual?: boolean;     // Whether this was manually placed
+  inAvoidZone?: boolean;  // Warning: seam is in an avoid zone
+}
+
+/**
+ * Seam placement analysis result
+ */
+export interface SeamAnalysis {
+  seamId: string;
+  position: number;
+  inDoorway: boolean;
+  nearDoorway: boolean;
+  doorwayDistance?: number;
+  inAvoidZone: boolean;
+  avoidZoneId?: string;
+  recommendation: 'optimal' | 'acceptable' | 'warning' | 'critical';
+  message?: string;
 }
 
 /**

@@ -56,6 +56,24 @@ export interface Room {
   color: string;
   accessories?: RoomAccessories;
   fillDirection?: number; // Lay direction in degrees (0 = horizontal, 90 = vertical)
+  
+  // Seam management options
+  seamOptions?: {
+    firstSeamOffset?: number;      // Offset from starting edge (mm)
+    manualSeams?: Array<{
+      id: string;
+      position: number;
+      type: 'add' | 'lock';
+    }>;
+    avoidZones?: Array<{
+      id: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      priority: 'hard' | 'soft';
+    }>;
+  };
 }
 
 export interface Hole {

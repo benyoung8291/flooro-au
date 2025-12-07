@@ -18,13 +18,16 @@ import {
   Minus,
   Settings2,
   Tag,
-  Wrench
+  Wrench,
+  Scissors
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { LayersPanel } from './LayersPanel';
 import { AccessoriesPanel } from './AccessoriesPanel';
+import { SeamEditor } from './SeamEditor';
 import { ReportTab } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
+import { StripPlanResult } from '@/lib/rollGoods/types';
 import { cn } from '@/lib/utils';
 
 interface EditorSidebarProps {
@@ -40,6 +43,8 @@ interface EditorSidebarProps {
   onUpdateRoom?: (roomId: string, updates: Partial<Room>) => void;
   projectName?: string;
   projectAddress?: string;
+  stripPlans?: Map<string, StripPlanResult>;
+  onRecalculateStripPlan?: (roomId: string) => void;
 }
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -61,6 +66,8 @@ export function EditorSidebar({
   onUpdateRoom,
   projectName,
   projectAddress,
+  stripPlans,
+  onRecalculateStripPlan,
 }: EditorSidebarProps) {
   const [selectedTab, setSelectedTab] = useState('materials');
   const { data: materials, isLoading } = useMaterials();
@@ -71,6 +78,10 @@ export function EditorSidebar({
   const selectedRoomMaterial = selectedRoom?.materialId 
     ? materials?.find(m => m.id === selectedRoom.materialId) 
     : null;
+  
+  // Check if selected room has roll material (for seam editor)
+  const hasRollMaterial = selectedRoomMaterial?.type === 'roll';
+  const selectedRoomStripPlan = selectedRoom ? stripPlans?.get(selectedRoom.id) : undefined;
 
   return (
     <div 
@@ -102,6 +113,14 @@ export function EditorSidebar({
             <Wrench className="w-4 h-4" />
           </Button>
           <Button 
+            variant={selectedTab === 'seams' ? 'secondary' : 'ghost'} 
+            size="icon"
+            onClick={() => { setSelectedTab('seams'); onToggle?.(); }}
+            title="Seam Editor"
+          >
+            <Scissors className="w-4 h-4" />
+          </Button>
+          <Button 
             variant={selectedTab === 'layers' ? 'secondary' : 'ghost'} 
             size="icon"
             onClick={() => { setSelectedTab('layers'); onToggle?.(); }}
@@ -121,17 +140,20 @@ export function EditorSidebar({
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col h-full">
           <div className="px-3 pt-3 pb-2 border-b border-border">
             <div className="flex items-center gap-2 mb-2">
-              <TabsList className="flex-1 grid grid-cols-4">
-                <TabsTrigger value="materials" className="text-xs px-1">
+              <TabsList className="flex-1 grid grid-cols-5">
+                <TabsTrigger value="materials" className="text-xs px-1" title="Materials">
                   <Package className="w-3 h-3" />
                 </TabsTrigger>
-                <TabsTrigger value="accessories" className="text-xs px-1">
+                <TabsTrigger value="accessories" className="text-xs px-1" title="Accessories">
                   <Wrench className="w-3 h-3" />
                 </TabsTrigger>
-                <TabsTrigger value="layers" className="text-xs px-1">
+                <TabsTrigger value="seams" className="text-xs px-1" title="Seam Editor">
+                  <Scissors className="w-3 h-3" />
+                </TabsTrigger>
+                <TabsTrigger value="layers" className="text-xs px-1" title="Layers">
                   <Layers className="w-3 h-3" />
                 </TabsTrigger>
-                <TabsTrigger value="report" className="text-xs px-1">
+                <TabsTrigger value="report" className="text-xs px-1" title="Report">
                   <FileText className="w-3 h-3" />
                 </TabsTrigger>
               </TabsList>
@@ -276,6 +298,62 @@ export function EditorSidebar({
             ) : (
               <div className="p-3 text-center text-sm text-muted-foreground">
                 Select a room to configure accessories
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="seams" className="flex-1 m-0">
+            {selectedRoom && hasRollMaterial ? (
+              <SeamEditor
+                room={selectedRoom}
+                scale={scale}
+                stripPlan={selectedRoomStripPlan || null}
+                fillDirection={selectedRoom.fillDirection || 0}
+                onFillDirectionChange={(direction) => {
+                  onUpdateRoom?.(selectedRoom.id, { fillDirection: direction });
+                }}
+                manualSeams={selectedRoom.seamOptions?.manualSeams || []}
+                onManualSeamsChange={(seams) => {
+                  onUpdateRoom?.(selectedRoom.id, { 
+                    seamOptions: { 
+                      ...selectedRoom.seamOptions, 
+                      manualSeams: seams 
+                    } 
+                  });
+                }}
+                avoidZones={selectedRoom.seamOptions?.avoidZones || []}
+                onAvoidZonesChange={(zones) => {
+                  onUpdateRoom?.(selectedRoom.id, { 
+                    seamOptions: { 
+                      ...selectedRoom.seamOptions, 
+                      avoidZones: zones 
+                    } 
+                  });
+                }}
+                firstSeamOffset={selectedRoom.seamOptions?.firstSeamOffset || 0}
+                onFirstSeamOffsetChange={(offset) => {
+                  onUpdateRoom?.(selectedRoom.id, { 
+                    seamOptions: { 
+                      ...selectedRoom.seamOptions, 
+                      firstSeamOffset: offset 
+                    } 
+                  });
+                }}
+                materialWidth={selectedRoomMaterial?.specs?.rollWidthMm || 3660}
+                onRecalculate={() => {
+                  if (selectedRoom) {
+                    onRecalculateStripPlan?.(selectedRoom.id);
+                  }
+                }}
+              />
+            ) : selectedRoom ? (
+              <div className="p-3 text-center text-sm text-muted-foreground">
+                <p>Seam editing is for roll materials only.</p>
+                <p className="text-xs mt-1">Assign a carpet or vinyl material to this room.</p>
+              </div>
+            ) : (
+              <div className="p-3 text-center text-sm text-muted-foreground">
+                Select a room to edit seams
               </div>
             )}
           </TabsContent>
