@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, DragEvent } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,8 @@ import {
   CheckCircle2,
   XCircle,
   Info,
+  GripVertical,
+  Target,
 } from 'lucide-react';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { RollMaterialSpecs } from '@/lib/rollGoods/types';
@@ -67,6 +69,10 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
 }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [showDropDetails, setShowDropDetails] = useState(showDetailedDrops);
+  const [showManualAllocation, setShowManualAllocation] = useState(false);
+  const [draggedDrop, setDraggedDrop] = useState<DropPiece | null>(null);
+  const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
+  const [manualAllocations, setManualAllocations] = useState<Map<string, { drop: DropPiece; targetRoomId: string; targetRoomName: string }>>(new Map());
   const [options, setOptions] = useState<OptimizationOptions>({
     minDropLength: 500,
     allowPatternMismatch: false,
@@ -112,6 +118,77 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
       description: `${optimizedPlan.reusedPieces.length} drops allocated across rooms`,
     });
   }, [optimizedPlan, onApplyOptimization]);
+
+  // Drag-and-drop handlers
+  const handleDragStart = useCallback((e: DragEvent<HTMLDivElement>, drop: DropPiece) => {
+    setDraggedDrop(drop);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', drop.id);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedDrop(null);
+    setDragOverRoomId(null);
+  }, []);
+
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>, roomId: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverRoomId(roomId);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOverRoomId(null);
+  }, []);
+
+  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>, targetRoom: Room) => {
+    e.preventDefault();
+    setDragOverRoomId(null);
+
+    if (!draggedDrop) return;
+    
+    // Don't allow dropping on source room
+    if (draggedDrop.sourceRoomId === targetRoom.id) {
+      toast.error('Cannot allocate drop to its source room');
+      return;
+    }
+
+    // Add to manual allocations
+    setManualAllocations(prev => {
+      const newMap = new Map(prev);
+      newMap.set(draggedDrop.id, {
+        drop: draggedDrop,
+        targetRoomId: targetRoom.id,
+        targetRoomName: targetRoom.name,
+      });
+      return newMap;
+    });
+
+    // Notify parent if callback provided
+    if (onAllocateDrop) {
+      onAllocateDrop(draggedDrop, targetRoom.id);
+    }
+
+    toast.success('Drop allocated', {
+      description: `${(draggedDrop.length / 1000).toFixed(2)}m drop → ${targetRoom.name}`,
+    });
+
+    setDraggedDrop(null);
+  }, [draggedDrop, onAllocateDrop]);
+
+  const handleRemoveAllocation = useCallback((dropId: string) => {
+    setManualAllocations(prev => {
+      const newMap = new Map(prev);
+      newMap.delete(dropId);
+      return newMap;
+    });
+    toast.info('Allocation removed');
+  }, []);
+
+  // Get unallocated usable drops (excluding manual allocations)
+  const unallocatedDrops = useMemo(() => {
+    return categorizedDrops.usable.filter(drop => !manualAllocations.has(drop.id));
+  }, [categorizedDrops.usable, manualAllocations]);
 
   // Get drop color based on length
   const getDropColor = (length: number) => {
@@ -284,6 +361,180 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
           </div>
         )}
 
+        {/* Manual Drop Allocation */}
+        {categorizedDrops.usable.length > 0 && (
+          <Collapsible open={showManualAllocation} onOpenChange={setShowManualAllocation}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="w-full justify-between p-3 h-auto bg-primary/5 border border-primary/20 hover:bg-primary/10"
+              >
+                <div className="flex items-center gap-2">
+                  <GripVertical className="w-4 h-4 text-primary" />
+                  <span className="font-medium text-sm">Manual Drop Allocation</span>
+                  <Badge variant="secondary" className="text-xs">
+                    Drag & Drop
+                  </Badge>
+                </div>
+                <ChevronDown className={`w-4 h-4 transition-transform ${showManualAllocation ? 'rotate-180' : ''}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <div className="bg-muted/30 rounded-lg p-4 border space-y-4">
+                {/* Instructions */}
+                <div className="flex items-start gap-2 p-2 rounded bg-primary/5 border border-primary/10">
+                  <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                  <p className="text-xs text-muted-foreground">
+                    Drag drops from the left panel and drop them onto target rooms on the right to manually allocate material.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Draggable Drops */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium flex items-center gap-1.5">
+                      <Package className="w-3 h-3" />
+                      Available Drops ({unallocatedDrops.length})
+                    </Label>
+                    <ScrollArea className="h-[180px]">
+                      <div className="space-y-2 pr-2">
+                        {unallocatedDrops.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-4">
+                            All drops have been allocated
+                          </p>
+                        ) : (
+                          unallocatedDrops.map((drop) => (
+                            <div
+                              key={drop.id}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, drop)}
+                              onDragEnd={handleDragEnd}
+                              className={cn(
+                                "p-2 rounded border cursor-grab active:cursor-grabbing transition-all",
+                                getDropColor(drop.length),
+                                draggedDrop?.id === drop.id && "opacity-50 ring-2 ring-primary"
+                              )}
+                            >
+                              <div className="flex items-center gap-2">
+                                <GripVertical className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    From: {drop.sourceRoomName}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-semibold text-sm">
+                                      {(drop.length / 1000).toFixed(2)}m
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      × {(drop.width / 1000).toFixed(2)}m
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+
+                  {/* Droppable Room Targets */}
+                  <div className="space-y-2">
+                    <Label className="text-xs font-medium flex items-center gap-1.5">
+                      <Target className="w-3 h-3" />
+                      Target Rooms ({rooms.length})
+                    </Label>
+                    <ScrollArea className="h-[180px]">
+                      <div className="space-y-2 pr-2">
+                        {rooms.map((room) => {
+                          const isDropTarget = dragOverRoomId === room.id;
+                          const roomAllocations = Array.from(manualAllocations.values()).filter(
+                            a => a.targetRoomId === room.id
+                          );
+                          
+                          return (
+                            <div
+                              key={room.id}
+                              onDragOver={(e) => handleDragOver(e, room.id)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, room)}
+                              className={cn(
+                                "p-2 rounded border transition-all",
+                                isDropTarget 
+                                  ? "bg-primary/20 border-primary border-dashed ring-2 ring-primary/50" 
+                                  : "bg-muted/50 border-border hover:bg-muted",
+                                draggedDrop && draggedDrop.sourceRoomId === room.id && "opacity-40"
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm font-medium truncate">{room.name}</span>
+                                {isDropTarget && (
+                                  <Badge variant="secondary" className="text-[10px] shrink-0">
+                                    Drop here
+                                  </Badge>
+                                )}
+                              </div>
+                              
+                              {/* Show allocations for this room */}
+                              {roomAllocations.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {roomAllocations.map(allocation => (
+                                    <div 
+                                      key={allocation.drop.id}
+                                      className="flex items-center justify-between gap-1 p-1.5 rounded bg-green-500/10 border border-green-500/20"
+                                    >
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <Recycle className="w-3 h-3 text-green-500 shrink-0" />
+                                        <span className="text-[10px] font-mono truncate">
+                                          {(allocation.drop.length / 1000).toFixed(2)}m from {allocation.drop.sourceRoomName}
+                                        </span>
+                                      </div>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-5 w-5 shrink-0"
+                                        onClick={() => handleRemoveAllocation(allocation.drop.id)}
+                                      >
+                                        <XCircle className="w-3 h-3 text-muted-foreground hover:text-destructive" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                </div>
+
+                {/* Manual Allocation Summary */}
+                {manualAllocations.size > 0 && (
+                  <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                          {manualAllocations.size} drop{manualAllocations.size !== 1 ? 's' : ''} manually allocated
+                        </span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setManualAllocations(new Map())}
+                        className="text-xs h-7"
+                      >
+                        Clear All
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+
         {/* Detailed Drop Inventory */}
         <Collapsible open={showDropDetails} onOpenChange={setShowDropDetails}>
           <CollapsibleTrigger asChild>
@@ -313,25 +564,40 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                     </Label>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {categorizedDrops.usable.map((drop) => (
-                      <div
-                        key={drop.id}
-                        className={cn(
-                          "p-2 rounded border text-center",
-                          getDropColor(drop.length)
-                        )}
-                      >
-                        <p className="text-xs text-muted-foreground truncate">
-                          From: {drop.sourceRoomName}
-                        </p>
-                        <p className="font-mono font-semibold text-sm">
-                          {(drop.length / 1000).toFixed(2)}m
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {(drop.width / 1000).toFixed(2)}m wide
-                        </p>
-                      </div>
-                    ))}
+                    {categorizedDrops.usable.map((drop) => {
+                      const isAllocated = manualAllocations.has(drop.id);
+                      const allocation = manualAllocations.get(drop.id);
+                      
+                      return (
+                        <div
+                          key={drop.id}
+                          className={cn(
+                            "p-2 rounded border text-center relative",
+                            isAllocated 
+                              ? "bg-green-500/10 border-green-500/30" 
+                              : getDropColor(drop.length)
+                          )}
+                        >
+                          {isAllocated && (
+                            <Badge 
+                              variant="secondary" 
+                              className="absolute -top-2 -right-2 text-[9px] bg-green-500 text-white"
+                            >
+                              → {allocation?.targetRoomName}
+                            </Badge>
+                          )}
+                          <p className="text-xs text-muted-foreground truncate">
+                            From: {drop.sourceRoomName}
+                          </p>
+                          <p className="font-mono font-semibold text-sm">
+                            {(drop.length / 1000).toFixed(2)}m
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {(drop.width / 1000).toFixed(2)}m wide
+                          </p>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
