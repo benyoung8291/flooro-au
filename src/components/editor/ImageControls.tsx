@@ -1,0 +1,125 @@
+import { Slider } from '@/components/ui/slider';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { 
+  RotateCcw, 
+  RotateCw, 
+  Lock, 
+  Unlock, 
+  Trash2,
+  Eye
+} from 'lucide-react';
+import { BackgroundImage } from '@/lib/canvas/types';
+
+interface ImageControlsProps {
+  image: BackgroundImage;
+  onUpdate: (updates: Partial<BackgroundImage>) => void;
+  onRemove: () => void;
+}
+
+export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps) {
+  const handleRotate = (delta: number) => {
+    const newRotation = (image.rotation + delta + 360) % 360;
+    onUpdate({ rotation: newRotation });
+  };
+
+  return (
+    <div className="glass-panel p-3 space-y-4 min-w-[200px]">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">Floor Plan</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-destructive hover:text-destructive"
+          onClick={onRemove}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Opacity Slider */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <Eye className="w-3 h-3" />
+            Opacity
+          </Label>
+          <span className="text-xs tabular-nums">
+            {Math.round(image.opacity * 100)}%
+          </span>
+        </div>
+        <Slider
+          value={[image.opacity * 100]}
+          min={10}
+          max={100}
+          step={5}
+          onValueChange={([value]) => onUpdate({ opacity: value / 100 })}
+          className="w-full"
+        />
+      </div>
+
+      {/* Scale Slider */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label className="text-xs text-muted-foreground">Scale</Label>
+          <span className="text-xs tabular-nums">
+            {Math.round(image.scale * 100)}%
+          </span>
+        </div>
+        <Slider
+          value={[image.scale * 100]}
+          min={10}
+          max={300}
+          step={5}
+          onValueChange={([value]) => onUpdate({ scale: value / 100 })}
+          className="w-full"
+        />
+      </div>
+
+      {/* Rotation Controls */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Rotation</Label>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 h-8"
+            onClick={() => handleRotate(-90)}
+          >
+            <RotateCcw className="w-3 h-3 mr-1" />
+            -90°
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1 h-8"
+            onClick={() => handleRotate(90)}
+          >
+            <RotateCw className="w-3 h-3 mr-1" />
+            +90°
+          </Button>
+        </div>
+      </div>
+
+      {/* Lock Toggle */}
+      <Button
+        variant={image.locked ? 'secondary' : 'outline'}
+        size="sm"
+        className="w-full"
+        onClick={() => onUpdate({ locked: !image.locked })}
+      >
+        {image.locked ? (
+          <>
+            <Lock className="w-3 h-3 mr-2" />
+            Locked
+          </>
+        ) : (
+          <>
+            <Unlock className="w-3 h-3 mr-2" />
+            Lock Position
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}

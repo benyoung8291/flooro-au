@@ -1,5 +1,5 @@
 import { useReducer, useCallback, useRef } from 'react';
-import { CanvasState, CanvasAction, Room, Hole, Door, ScaleCalibration, ViewTransform } from '@/lib/canvas/types';
+import { CanvasState, CanvasAction, Room, Hole, Door, ScaleCalibration, ViewTransform, BackgroundImage } from '@/lib/canvas/types';
 
 const INITIAL_STATE: CanvasState = {
   rooms: [],
@@ -10,6 +10,7 @@ const INITIAL_STATE: CanvasState = {
     offsetY: 0,
     zoom: 1,
   },
+  backgroundImage: null,
 };
 
 function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
@@ -73,6 +74,20 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
             : room
         ),
       };
+    
+    case 'SET_BACKGROUND_IMAGE':
+      return { ...state, backgroundImage: action.image };
+    
+    case 'UPDATE_BACKGROUND_IMAGE':
+      return {
+        ...state,
+        backgroundImage: state.backgroundImage
+          ? { ...state.backgroundImage, ...action.updates }
+          : null,
+      };
+    
+    case 'REMOVE_BACKGROUND_IMAGE':
+      return { ...state, backgroundImage: null };
     
     case 'LOAD_STATE':
       return action.state;
@@ -157,11 +172,14 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
       
       const scale = jsonData.scale as ScaleCalibration | null;
       
+      const backgroundImage = jsonData.backgroundImage as BackgroundImage | null;
+      
       const newState: CanvasState = {
         rooms,
         scale: scale || null,
         selectedRoomId: null,
         viewTransform: (jsonData.viewTransform as ViewTransform) || INITIAL_STATE.viewTransform,
+        backgroundImage: backgroundImage || null,
       };
       
       dispatch({ type: 'LOAD_STATE', state: newState });
@@ -176,6 +194,7 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
       rooms: state.rooms,
       scale: state.scale,
       viewTransform: state.viewTransform,
+      backgroundImage: state.backgroundImage,
     };
   }, [state]);
   

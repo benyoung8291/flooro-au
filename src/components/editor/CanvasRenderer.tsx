@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR } from '@/lib/canvas/types';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
 import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea } from '@/lib/canvas/geometry';
 
 interface CanvasRendererProps {
@@ -13,6 +13,9 @@ interface CanvasRendererProps {
   materialTypes?: Map<string, string>;
 }
 
+// Cache for loaded images
+const imageCache = new Map<string, HTMLImageElement>();
+
 export function CanvasRenderer({
   state,
   drawingPoints,
@@ -25,6 +28,34 @@ export function CanvasRenderer({
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
+
+  // Load background image when URL changes
+  useEffect(() => {
+    const bgImage = state.backgroundImage;
+    if (!bgImage?.url) {
+      setLoadedImage(null);
+      return;
+    }
+
+    // Check cache first
+    if (imageCache.has(bgImage.url)) {
+      setLoadedImage(imageCache.get(bgImage.url)!);
+      return;
+    }
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      imageCache.set(bgImage.url, img);
+      setLoadedImage(img);
+    };
+    img.onerror = () => {
+      console.error('Failed to load background image');
+      setLoadedImage(null);
+    };
+    img.src = bgImage.url;
+  }, [state.backgroundImage?.url]);
 
   const getRoomColor = useCallback((room: Room): string => {
     if (room.materialId && materialTypes.has(room.materialId)) {
@@ -63,6 +94,11 @@ export function CanvasRenderer({
 
     // Draw grid
     drawGrid(ctx, width, height, zoom, offsetX, offsetY);
+
+    // Draw background image (below everything else)
+    if (loadedImage && state.backgroundImage) {
+      drawBackgroundImage(ctx, loadedImage, state.backgroundImage, zoom);
+    }
 
     // Draw axis snap lines
     if (axisSnapLines.horizontal !== null) {
@@ -138,7 +174,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage]);
 
   useEffect(() => {
     render();
@@ -161,6 +197,26 @@ export function CanvasRenderer({
       <canvas ref={canvasRef} className="block" />
     </div>
   );
+}
+
+function drawBackgroundImage(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  bgImage: BackgroundImage,
+  zoom: number
+) {
+  ctx.save();
+  
+  // Apply image transformations
+  ctx.globalAlpha = bgImage.opacity;
+  ctx.translate(bgImage.offsetX, bgImage.offsetY);
+  ctx.rotate((bgImage.rotation * Math.PI) / 180);
+  ctx.scale(bgImage.scale, bgImage.scale);
+  
+  // Draw image centered at origin
+  ctx.drawImage(img, -img.width / 2, -img.height / 2);
+  
+  ctx.restore();
 }
 
 function drawGrid(
