@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Download, AlertCircle, Scissors } from 'lucide-react';
+import { FileText, Download, AlertCircle, Scissors, Maximize2 } from 'lucide-react';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { generateReport } from '@/lib/reports/calculations';
@@ -10,6 +10,8 @@ import { CostSummaryCard } from './CostSummaryCard';
 import { RoomBreakdownList } from './RoomBreakdownList';
 import { ReportPreviewDialog } from './ReportPreviewDialog';
 import { SeamDiagram } from './SeamDiagram';
+import { CutPlanModal } from './CutPlanModal';
+import { StripPlanResult } from '@/lib/rollGoods';
 
 interface ReportTabProps {
   rooms: Room[];
@@ -27,6 +29,12 @@ export function ReportTab({
   projectAddress,
 }: ReportTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [cutPlanModal, setCutPlanModal] = useState<{
+    open: boolean;
+    stripPlan: StripPlanResult | null;
+    materialName?: string;
+    rollWidth?: number;
+  }>({ open: false, stripPlan: null });
 
   const report = useMemo(
     () => generateReport(rooms, materials, scale),
@@ -114,14 +122,33 @@ export function ReportTab({
                 <div className="space-y-3">
                   {report.roomCalculations
                     .filter(r => r.stripPlan)
-                    .map(r => (
-                      <SeamDiagram 
-                        key={r.roomId} 
-                        stripPlan={r.stripPlan!}
-                        width={320}
-                        height={200}
-                      />
-                    ))}
+                    .map(r => {
+                      const material = materials.find(m => m.id === r.materialId);
+                      const rollWidth = material?.specs?.width as number || 4000;
+                      return (
+                        <div key={r.roomId} className="relative group">
+                          <SeamDiagram 
+                            stripPlan={r.stripPlan!}
+                            width={320}
+                            height={200}
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setCutPlanModal({
+                              open: true,
+                              stripPlan: r.stripPlan!,
+                              materialName: material?.name,
+                              rollWidth,
+                            })}
+                          >
+                            <Maximize2 className="w-3 h-3 mr-1" />
+                            Details
+                          </Button>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
             </>
@@ -148,6 +175,16 @@ export function ReportTab({
         projectAddress={projectAddress}
         report={report}
       />
+
+      {cutPlanModal.stripPlan && (
+        <CutPlanModal
+          open={cutPlanModal.open}
+          onOpenChange={(open) => setCutPlanModal(prev => ({ ...prev, open }))}
+          stripPlan={cutPlanModal.stripPlan}
+          materialName={cutPlanModal.materialName}
+          rollWidth={cutPlanModal.rollWidth}
+        />
+      )}
     </>
   );
 }
