@@ -108,30 +108,11 @@ export function useCreateOrganization() {
     mutationFn: async (name: string) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Create organization
-      const { data: org, error: orgError } = await supabase
-        .from('organizations')
-        .insert({ name })
-        .select()
-        .single();
+      // Use atomic RPC function to create org, update profile, and assign role
+      const { data: org, error } = await supabase
+        .rpc('create_organization_for_user', { _name: name });
       
-      if (orgError) throw orgError;
-
-      // Update profile with organization_id
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ organization_id: org.id })
-        .eq('id', user.id);
-      
-      if (profileError) throw profileError;
-
-      // Add admin role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: user.id, role: 'admin' });
-      
-      if (roleError) throw roleError;
-
+      if (error) throw error;
       return org;
     },
     onSuccess: () => {
