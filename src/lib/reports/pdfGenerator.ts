@@ -1,22 +1,47 @@
 import { ReportSummary, formatCurrency, formatArea, formatLength } from './calculations';
+import { generateSeamDiagramSvg, svgToDataUrl } from './seamDiagramSvg';
+import { ClientDetails } from '@/components/reports/ClientDetailsForm';
+import { CompanyBranding } from '@/components/reports/CompanyBrandingForm';
 
-interface PDFGeneratorOptions {
+export interface PDFGeneratorOptions {
   projectName: string;
   projectAddress?: string;
-  clientName?: string;
   report: ReportSummary;
-  companyName?: string;
-  companyLogo?: string;
+  clientDetails?: ClientDetails;
+  companyBranding?: CompanyBranding;
+  includeSeamDiagrams?: boolean;
+  quoteValidityDays?: number;
 }
 
 // Generate HTML content for the PDF
 export function generateReportHTML(options: PDFGeneratorOptions): string {
-  const { projectName, projectAddress, clientName, report, companyName } = options;
+  const { 
+    projectName, 
+    projectAddress, 
+    report, 
+    clientDetails,
+    companyBranding,
+    includeSeamDiagrams = true,
+    quoteValidityDays = 30
+  } = options;
+  
   const date = new Date().toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
+
+  const quoteNumber = `Q-${Date.now().toString(36).toUpperCase()}`;
+
+  // Generate seam diagrams for rooms with strip plans
+  const seamDiagrams = includeSeamDiagrams 
+    ? report.roomCalculations
+        .filter(room => room.stripPlan)
+        .map(room => ({
+          roomName: room.roomName,
+          svg: svgToDataUrl(generateSeamDiagramSvg(room.stripPlan!, 280, 180))
+        }))
+    : [];
 
   return `
     <!DOCTYPE html>
@@ -37,50 +62,96 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
           padding: 40px;
           max-width: 800px;
           margin: 0 auto;
+          font-size: 13px;
         }
         .header {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 40px;
+          margin-bottom: 30px;
           padding-bottom: 20px;
-          border-bottom: 2px solid #e5e5e5;
+          border-bottom: 3px solid #0066cc;
+        }
+        .company-info {
+          flex: 1;
+        }
+        .company-logo {
+          max-width: 120px;
+          max-height: 60px;
+          margin-bottom: 8px;
         }
         .company-name {
+          font-size: 22px;
+          font-weight: 700;
+          color: #0066cc;
+          margin-bottom: 4px;
+        }
+        .company-details {
+          font-size: 11px;
+          color: #666;
+          line-height: 1.4;
+        }
+        .quote-info {
+          text-align: right;
+          min-width: 180px;
+        }
+        .quote-title {
           font-size: 24px;
           font-weight: 700;
           color: #0066cc;
-        }
-        .report-date {
-          text-align: right;
-          color: #666;
-        }
-        .project-info {
-          background: #f8f9fa;
-          padding: 20px;
-          border-radius: 8px;
-          margin-bottom: 30px;
-        }
-        .project-info h1 {
-          font-size: 20px;
           margin-bottom: 8px;
         }
-        .project-info p {
+        .quote-number {
+          font-size: 12px;
           color: #666;
-          font-size: 14px;
+        }
+        .quote-date {
+          font-size: 12px;
+          color: #666;
+          margin-top: 4px;
+        }
+        .info-grid {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+        .info-box {
+          background: #f8f9fa;
+          padding: 16px;
+          border-radius: 8px;
+          border-left: 4px solid #0066cc;
+        }
+        .info-box h3 {
+          font-size: 11px;
+          text-transform: uppercase;
+          color: #666;
+          margin-bottom: 8px;
+          letter-spacing: 0.5px;
+        }
+        .info-box p {
+          font-size: 13px;
+          margin: 2px 0;
+        }
+        .info-box .name {
+          font-weight: 600;
+          font-size: 15px;
+          margin-bottom: 4px;
         }
         h2 {
-          font-size: 16px;
+          font-size: 14px;
           color: #333;
           margin: 24px 0 12px;
           padding-bottom: 8px;
           border-bottom: 1px solid #e5e5e5;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
         table {
           width: 100%;
           border-collapse: collapse;
           margin-bottom: 20px;
-          font-size: 13px;
+          font-size: 12px;
         }
         th, td {
           padding: 10px 12px;
@@ -91,6 +162,8 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
           background: #f8f9fa;
           font-weight: 600;
           color: #333;
+          font-size: 11px;
+          text-transform: uppercase;
         }
         td.number {
           text-align: right;
@@ -104,12 +177,14 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
           margin-top: 30px;
         }
         .summary-box h3 {
-          font-size: 14px;
+          font-size: 12px;
           opacity: 0.9;
           margin-bottom: 8px;
+          text-transform: uppercase;
+          letter-spacing: 1px;
         }
         .summary-box .total {
-          font-size: 32px;
+          font-size: 36px;
           font-weight: 700;
         }
         .summary-grid {
@@ -124,20 +199,80 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
           text-align: center;
         }
         .summary-item .label {
-          font-size: 12px;
+          font-size: 11px;
           opacity: 0.8;
         }
         .summary-item .value {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 600;
+        }
+        .seam-diagrams {
+          margin-top: 30px;
+          page-break-before: auto;
+        }
+        .seam-diagram-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 16px;
+        }
+        .seam-diagram-item {
+          background: #f8f9fa;
+          border-radius: 8px;
+          padding: 12px;
+          text-align: center;
+        }
+        .seam-diagram-item h4 {
+          font-size: 12px;
+          font-weight: 600;
+          margin-bottom: 8px;
+          color: #333;
+        }
+        .seam-diagram-item img {
+          max-width: 100%;
+          border-radius: 4px;
+        }
+        .terms-section {
+          margin-top: 30px;
+          padding: 16px;
+          background: #fffbeb;
+          border-radius: 8px;
+          border-left: 4px solid #f59e0b;
+        }
+        .terms-section h3 {
+          font-size: 12px;
+          font-weight: 600;
+          color: #92400e;
+          margin-bottom: 8px;
+        }
+        .terms-section p {
+          font-size: 11px;
+          color: #78350f;
+          line-height: 1.5;
         }
         .footer {
           margin-top: 40px;
           padding-top: 20px;
           border-top: 1px solid #e5e5e5;
-          font-size: 12px;
+          font-size: 11px;
           color: #666;
           text-align: center;
+        }
+        .signature-section {
+          margin-top: 40px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 40px;
+        }
+        .signature-box {
+          border-top: 1px solid #333;
+          padding-top: 8px;
+        }
+        .signature-box .label {
+          font-size: 11px;
+          color: #666;
+        }
+        .signature-box .line {
+          height: 40px;
         }
         @media print {
           body {
@@ -147,22 +282,50 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
+          .info-box {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .seam-diagrams {
+            page-break-inside: avoid;
+          }
         }
       </style>
     </head>
     <body>
       <div class="header">
-        <div class="company-name">${companyName || 'Flooro'}</div>
-        <div class="report-date">
-          <strong>Estimate Report</strong><br>
-          ${date}
+        <div class="company-info">
+          ${companyBranding?.logoUrl ? `<img src="${companyBranding.logoUrl}" alt="Logo" class="company-logo">` : ''}
+          <div class="company-name">${companyBranding?.companyName || 'Flooro'}</div>
+          <div class="company-details">
+            ${companyBranding?.companyAddress ? `${companyBranding.companyAddress}<br>` : ''}
+            ${companyBranding?.companyPhone ? `📞 ${companyBranding.companyPhone}` : ''}
+            ${companyBranding?.companyEmail ? ` • ✉ ${companyBranding.companyEmail}` : ''}
+            ${companyBranding?.companyWebsite ? `<br>🌐 ${companyBranding.companyWebsite}` : ''}
+          </div>
+        </div>
+        <div class="quote-info">
+          <div class="quote-title">ESTIMATE</div>
+          <div class="quote-number">${quoteNumber}</div>
+          <div class="quote-date">${date}</div>
         </div>
       </div>
 
-      <div class="project-info">
-        <h1>${projectName}</h1>
-        ${projectAddress ? `<p>📍 ${projectAddress}</p>` : ''}
-        ${clientName ? `<p>👤 ${clientName}</p>` : ''}
+      <div class="info-grid">
+        <div class="info-box">
+          <h3>Project Details</h3>
+          <p class="name">${projectName}</p>
+          ${projectAddress ? `<p>📍 ${projectAddress}</p>` : ''}
+        </div>
+        ${clientDetails?.clientName ? `
+          <div class="info-box">
+            <h3>Bill To</h3>
+            <p class="name">${clientDetails.clientName}</p>
+            ${clientDetails.clientAddress ? `<p>${clientDetails.clientAddress}</p>` : ''}
+            ${clientDetails.clientPhone ? `<p>📞 ${clientDetails.clientPhone}</p>` : ''}
+            ${clientDetails.clientEmail ? `<p>✉ ${clientDetails.clientEmail}</p>` : ''}
+          </div>
+        ` : ''}
       </div>
 
       <h2>Room Breakdown</h2>
@@ -218,7 +381,7 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
       ` : ''}
 
       <div class="summary-box">
-        <h3>TOTAL ESTIMATE</h3>
+        <h3>Total Estimate</h3>
         <div class="total">${formatCurrency(report.totalCost)}</div>
         <div class="summary-grid">
           <div class="summary-item">
@@ -236,9 +399,48 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
         </div>
       </div>
 
+      ${seamDiagrams.length > 0 ? `
+        <div class="seam-diagrams">
+          <h2>Seam & Cut Diagrams</h2>
+          <div class="seam-diagram-grid">
+            ${seamDiagrams.map(diagram => `
+              <div class="seam-diagram-item">
+                <h4>${diagram.roomName}</h4>
+                <img src="${diagram.svg}" alt="${diagram.roomName} seam diagram">
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      ${companyBranding?.termsAndConditions ? `
+        <div class="terms-section">
+          <h3>Terms & Conditions</h3>
+          <p>${companyBranding.termsAndConditions.replace(/\n/g, '<br>')}</p>
+        </div>
+      ` : ''}
+
+      ${clientDetails?.notes ? `
+        <div style="margin-top: 20px; padding: 12px; background: #f0f9ff; border-radius: 8px; border-left: 4px solid #0ea5e9;">
+          <h3 style="font-size: 12px; font-weight: 600; color: #0369a1; margin-bottom: 4px;">Notes</h3>
+          <p style="font-size: 11px; color: #0c4a6e;">${clientDetails.notes.replace(/\n/g, '<br>')}</p>
+        </div>
+      ` : ''}
+
+      <div class="signature-section">
+        <div class="signature-box">
+          <div class="line"></div>
+          <div class="label">Customer Signature / Date</div>
+        </div>
+        <div class="signature-box">
+          <div class="line"></div>
+          <div class="label">Company Representative / Date</div>
+        </div>
+      </div>
+
       <div class="footer">
-        <p>This estimate is valid for 30 days. Prices may vary based on material availability.</p>
-        <p>Generated by Flooro • ${date}</p>
+        <p>This estimate is valid for ${quoteValidityDays} days from the date of issue. Prices may vary based on material availability.</p>
+        <p style="margin-top: 8px;">Generated by ${companyBranding?.companyName || 'Flooro'} • ${date}</p>
       </div>
     </body>
     </html>
