@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, Pencil, Trash2, Square, Circle, Minus, Globe, Ruler, DollarSign } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, Square, Circle, Minus, Globe, Ruler, DollarSign, Palette } from 'lucide-react';
 import { Material, useDeleteMaterial, getMaterialDimensions, getMaterialPrice } from '@/hooks/useMaterials';
 import { EditMaterialDialog } from './EditMaterialDialog';
 
@@ -105,6 +105,19 @@ export function MaterialCard({ material }: MaterialCardProps) {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-medium truncate">{material.name}</p>
+                  {/* Range and Colour display */}
+                  {(material.specs.range || material.specs.colour) && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {material.specs.range}
+                      {material.specs.range && material.specs.colour && ' • '}
+                      {material.specs.colour && (
+                        <span className="inline-flex items-center gap-1">
+                          <Palette className="w-3 h-3 inline" />
+                          {material.specs.colour}
+                        </span>
+                      )}
+                    </p>
+                  )}
                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                     <Badge variant="secondary" className="text-xs capitalize">
                       {material.type}
@@ -112,6 +125,11 @@ export function MaterialCard({ material }: MaterialCardProps) {
                     {material.subtype && subtypeLabels[material.subtype] && (
                       <Badge variant="outline" className="text-xs">
                         {subtypeLabels[material.subtype]}
+                      </Badge>
+                    )}
+                    {material.specs.backing && (
+                      <Badge variant="outline" className="text-xs">
+                        {material.specs.backing}
                       </Badge>
                     )}
                     {material.is_global && (

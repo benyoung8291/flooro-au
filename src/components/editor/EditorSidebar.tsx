@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   Layers, 
   Package, 
@@ -14,7 +16,8 @@ import {
   Square,
   Circle,
   Minus,
-  Settings2
+  Settings2,
+  Tag
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { LayersPanel } from './LayersPanel';
@@ -31,6 +34,7 @@ interface EditorSidebarProps {
   onSelectRoom?: (roomId: string | null) => void;
   onDeleteRoom?: (roomId: string) => void;
   onRenameRoom?: (roomId: string, name: string) => void;
+  onUpdateRoom?: (roomId: string, updates: Partial<Room>) => void;
   projectName?: string;
   projectAddress?: string;
 }
@@ -51,12 +55,19 @@ export function EditorSidebar({
   onSelectRoom,
   onDeleteRoom,
   onRenameRoom,
+  onUpdateRoom,
   projectName,
   projectAddress,
 }: EditorSidebarProps) {
   const [selectedTab, setSelectedTab] = useState('materials');
   const { data: materials, isLoading } = useMaterials();
   const navigate = useNavigate();
+  
+  // Get selected room for material code editing
+  const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+  const selectedRoomMaterial = selectedRoom?.materialId 
+    ? materials?.find(m => m.id === selectedRoom.materialId) 
+    : null;
 
   if (collapsed) {
     return (
@@ -115,7 +126,7 @@ export function EditorSidebar({
             <div className="p-3 space-y-2">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs text-muted-foreground">
-                  Drag materials onto rooms
+                  Click to assign to selected room
                 </p>
                 <Button 
                   variant="ghost" 
@@ -127,6 +138,26 @@ export function EditorSidebar({
                 </Button>
               </div>
               
+              {/* Selected Room Material Code */}
+              {selectedRoom && selectedRoomMaterial && (
+                <div className="mb-4 p-3 rounded-lg border border-border bg-muted/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Tag className="w-3.5 h-3.5 text-muted-foreground" />
+                    <Label className="text-xs">Finishes Schedule Code</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      value={selectedRoom.materialCode || ''}
+                      onChange={(e) => onUpdateRoom?.(selectedRoom.id, { materialCode: e.target.value.toUpperCase() })}
+                      placeholder="e.g., CP01"
+                      className="h-8 text-xs font-mono uppercase"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {selectedRoom.name}: {selectedRoomMaterial.name}
+                  </p>
+                </div>
+              )}
               {isLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map(i => (
@@ -154,12 +185,17 @@ export function EditorSidebar({
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">{material.name}</p>
+                          {(material.specs.range || material.specs.colour) && (
+                            <p className="text-xs text-muted-foreground truncate">
+                              {material.specs.range}{material.specs.range && material.specs.colour && ' • '}{material.specs.colour}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="secondary" className="text-xs capitalize">
                               {material.type}
                             </Badge>
                             <span className="text-xs text-muted-foreground font-mono">
-                              ${material.specs.price}/m²
+                              ${(material.specs.pricePerM2 || material.specs.price || 0).toFixed(2)}/m²
                             </span>
                           </div>
                         </div>

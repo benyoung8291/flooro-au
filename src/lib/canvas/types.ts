@@ -10,6 +10,7 @@ export interface Room {
   holes: Hole[];
   doors: Door[];
   materialId: string | null;
+  materialCode?: string; // Project-specific reference code (e.g., "CP01", "FC07") for finishes schedules
   color: string;
 }
 

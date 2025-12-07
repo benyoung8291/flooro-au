@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
-import { useCreateMaterial, Material, MaterialSubtype } from '@/hooks/useMaterials';
+import { useCreateMaterial, Material, MaterialSubtype, BACKING_OPTIONS } from '@/hooks/useMaterials';
 
 // Dimension presets
 const TILE_PRESETS = [
@@ -55,6 +55,11 @@ const materialSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   type: z.enum(['roll', 'tile', 'linear']),
   subtype: z.string().optional(),
+  
+  // Product identification
+  range: z.string().optional(),
+  colour: z.string().optional(),
+  backing: z.string().optional(),
   
   // Tile dimensions (mm)
   widthMm: z.coerce.number().positive().optional(),
@@ -114,12 +119,19 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
     }
   };
 
+  // Check if backing should be shown for this subtype
+  const showBacking = selectedSubtype && Object.keys(BACKING_OPTIONS).includes(selectedSubtype);
+  const backingOptions = selectedSubtype ? BACKING_OPTIONS[selectedSubtype] || [] : [];
+
   const onSubmit = async (values: MaterialFormValues) => {
     await createMaterial.mutateAsync({
       name: values.name,
       type: values.type,
       subtype: values.subtype as MaterialSubtype | undefined,
       specs: {
+        range: values.range,
+        colour: values.colour,
+        backing: values.backing,
         widthMm: values.widthMm,
         lengthMm: values.lengthMm,
         rollWidthMm: values.rollWidthMm,
@@ -162,12 +174,42 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Premium Carpet Tile - Gray" {...field} />
+                    <Input placeholder="e.g., Urban Retreat UR101" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            
+            {/* Range and Colour */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="range"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Range / Collection</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Urban Retreat" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="colour"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Colour</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Ash Grey" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -233,6 +275,34 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
                 )}
               />
             </div>
+            
+            {/* Backing - shown for relevant subtypes */}
+            {showBacking && backingOptions.length > 0 && (
+              <FormField
+                control={form.control}
+                name="backing"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Backing</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select backing type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {backingOptions.map((backing) => (
+                          <SelectItem key={backing} value={backing}>
+                            {backing}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             
             {/* Tile Dimensions */}
             {selectedType === 'tile' && (

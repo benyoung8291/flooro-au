@@ -24,6 +24,11 @@ export interface MaterialSpecs {
   // Waste factor
   wastePercent?: number;     // Default 10%
   
+  // Product identification
+  range?: string;            // Product line/collection (e.g., "Urban Retreat")
+  colour?: string;           // Color/colorway (e.g., "Ash Grey")
+  backing?: string;          // Backing type (e.g., "Graphlex", "CushionBac")
+  
   // Product metadata
   imageUrl?: string;         // Product image
   manufacturerUrl?: string;  // Source URL
@@ -37,6 +42,14 @@ export interface MaterialSpecs {
   unit?: string;
   [key: string]: unknown;
 }
+
+// Backing type options by material subtype
+export const BACKING_OPTIONS: Record<string, string[]> = {
+  carpet_tile: ['Graphlex', 'CushionBac', 'TractionBac', 'Modular', 'Hardback', 'Felt', 'EcoBase'],
+  sheet_vinyl: ['Fibreglass', 'Foam', 'Compact', 'Loose-lay', 'Felt'],
+  lvt: ['Rigid Core', 'WPC', 'SPC', 'Loose-lay', 'Dry-back'],
+  vinyl_plank: ['Rigid Core', 'WPC', 'SPC', 'Loose-lay', 'Dry-back'],
+};
 
 // Material subtypes for more granular categorization
 export type MaterialSubtype = 
