@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { LayersPanel } from './LayersPanel';
+import { ReportTab } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 
 interface EditorSidebarProps {
@@ -30,6 +31,8 @@ interface EditorSidebarProps {
   onSelectRoom?: (roomId: string | null) => void;
   onDeleteRoom?: (roomId: string) => void;
   onRenameRoom?: (roomId: string, name: string) => void;
+  projectName?: string;
+  projectAddress?: string;
 }
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -48,6 +51,8 @@ export function EditorSidebar({
   onSelectRoom,
   onDeleteRoom,
   onRenameRoom,
+  projectName,
+  projectAddress,
 }: EditorSidebarProps) {
   const [selectedTab, setSelectedTab] = useState('materials');
   const { data: materials, isLoading } = useMaterials();
@@ -190,14 +195,14 @@ export function EditorSidebar({
           </div>
         </TabsContent>
 
-        <TabsContent value="report" className="flex-1 m-0">
-          <ScrollArea className="h-full">
-            <div className="p-3">
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Add rooms and materials to generate a report
-              </p>
-            </div>
-          </ScrollArea>
+        <TabsContent value="report" className="flex-1 m-0 overflow-hidden">
+          <ReportTab
+            rooms={rooms}
+            materials={materials || []}
+            scale={scale}
+            projectName={projectName}
+            projectAddress={projectAddress}
+          />
         </TabsContent>
       </Tabs>
     </div>
