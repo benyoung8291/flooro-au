@@ -11,6 +11,9 @@ interface CanvasRendererProps {
   snapPoint: CanvasPoint | null;
   axisSnapLines: { horizontal: number | null; vertical: number | null };
   materialTypes?: Map<string, string>;
+  hoveredVertex?: { roomId: string; index: number } | null;
+  hoveredWall?: { roomId: string; index: number } | null;
+  isDragging?: boolean;
 }
 
 // Cache for loaded images
@@ -25,6 +28,9 @@ export function CanvasRenderer({
   snapPoint,
   axisSnapLines,
   materialTypes = new Map(),
+  hoveredVertex,
+  hoveredWall,
+  isDragging,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -124,7 +130,9 @@ export function CanvasRenderer({
 
     // Draw existing rooms
     state.rooms.forEach(room => {
-      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale);
+      const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
+      const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
+      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging);
     });
 
     // Draw current drawing in progress
@@ -174,7 +182,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, isDragging]);
 
   useEffect(() => {
     render();
@@ -267,7 +275,10 @@ function drawRoom(
   isSelected: boolean,
   fillColor: string,
   zoom: number,
-  scale: CanvasState['scale']
+  scale: CanvasState['scale'],
+  hoveredVertexIndex: number | null = null,
+  hoveredWallIndex: number | null = null,
+  isDragging: boolean = false
 ) {
   if (room.points.length < 3) return;
 
@@ -298,16 +309,26 @@ function drawRoom(
     }
   });
 
-  // Draw outline
-  ctx.strokeStyle = isSelected ? 'hsl(142 71% 45%)' : 'hsl(217 91% 50%)';
-  ctx.lineWidth = (isSelected ? 3 : 2) / zoom;
-  ctx.beginPath();
-  ctx.moveTo(room.points[0].x, room.points[0].y);
-  room.points.slice(1).forEach(point => {
-    ctx.lineTo(point.x, point.y);
-  });
-  ctx.closePath();
-  ctx.stroke();
+  // Draw outline with wall highlighting
+  for (let i = 0; i < room.points.length; i++) {
+    const j = (i + 1) % room.points.length;
+    const p1 = room.points[i];
+    const p2 = room.points[j];
+    
+    const isWallHovered = hoveredWallIndex === i && !isDragging;
+    
+    ctx.strokeStyle = isWallHovered 
+      ? 'hsl(45 93% 47%)' 
+      : isSelected 
+        ? 'hsl(142 71% 45%)' 
+        : 'hsl(217 91% 50%)';
+    ctx.lineWidth = (isWallHovered ? 4 : isSelected ? 3 : 2) / zoom;
+    
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.stroke();
+  }
 
   // Draw hole outlines
   room.holes.forEach(hole => {
@@ -343,13 +364,20 @@ function drawRoom(
     ctx.restore();
   });
 
-  // Draw vertices
-  room.points.forEach(point => {
-    ctx.fillStyle = 'white';
-    ctx.strokeStyle = isSelected ? 'hsl(142 71% 45%)' : 'hsl(217 91% 50%)';
-    ctx.lineWidth = 2 / zoom;
+  // Draw vertices with hover highlighting
+  room.points.forEach((point, index) => {
+    const isVertexHovered = hoveredVertexIndex === index && !isDragging;
+    
+    ctx.fillStyle = isVertexHovered ? 'hsl(45 93% 47%)' : 'white';
+    ctx.strokeStyle = isVertexHovered 
+      ? 'hsl(45 93% 35%)' 
+      : isSelected 
+        ? 'hsl(142 71% 45%)' 
+        : 'hsl(217 91% 50%)';
+    ctx.lineWidth = (isVertexHovered ? 3 : 2) / zoom;
+    
     ctx.beginPath();
-    ctx.arc(point.x, point.y, 5 / zoom, 0, Math.PI * 2);
+    ctx.arc(point.x, point.y, (isVertexHovered ? 8 : 5) / zoom, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   });

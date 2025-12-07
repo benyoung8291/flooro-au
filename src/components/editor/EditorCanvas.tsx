@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
+import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
 import {
   findSnapPoint,
@@ -57,6 +58,26 @@ export function EditorCanvas({
   const [panStart, setPanStart] = useState<CanvasPoint | null>(null);
   const [scaleStart, setScaleStart] = useState<CanvasPoint | null>(null);
   const [selectedDoorWidth, setSelectedDoorWidth] = useState<number>(DOOR_WIDTHS[1].value);
+
+  // Canvas editing hook for vertex and wall dragging
+  const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
+    dispatch({ type: 'UPDATE_ROOM', roomId, updates });
+  }, [dispatch]);
+
+  const {
+    hoveredVertex,
+    hoveredWall,
+    handleHover,
+    startDrag,
+    updateDrag,
+    endDrag,
+    getEditCursor,
+    isDragging,
+  } = useCanvasEditing({
+    rooms: state.rooms,
+    zoom: state.viewTransform.zoom,
+    onUpdateRoom: handleUpdateRoom,
+  });
 
   // Sync background image from props to internal state
   useEffect(() => {
@@ -150,6 +171,11 @@ export function EditorCanvas({
 
     switch (activeTool) {
       case 'select': {
+        // Try to start dragging vertex or wall first
+        if (startDrag(point)) {
+          return;
+        }
+        
         // Find clicked room
         let clickedRoom: Room | null = null;
         for (const room of state.rooms) {
@@ -318,6 +344,18 @@ export function EditorCanvas({
       return;
     }
 
+    // Handle dragging in select mode
+    if (activeTool === 'select' && isDragging) {
+      updateDrag(point, orthoLocked);
+      setCursorPosition(point);
+      return;
+    }
+
+    // Handle hover for select mode (visual feedback)
+    if (activeTool === 'select') {
+      handleHover(point);
+    }
+
     // Update cursor position
     let finalPoint = point;
     
@@ -345,13 +383,18 @@ export function EditorCanvas({
     }
 
     setCursorPosition(finalPoint);
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch]);
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
     setIsPanning(false);
     setPanStart(null);
-  }, []);
+    
+    // End any dragging operation
+    if (isDragging) {
+      endDrag();
+    }
+  }, [isDragging, endDrag]);
 
   // Handle wheel for zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -396,8 +439,16 @@ export function EditorCanvas({
     e.preventDefault();
   }, []);
 
-  const getCursor = (): string => {
+  const getCursor = useCallback((): string => {
     if (isPanning) return 'grabbing';
+    if (isDragging) return 'grabbing';
+    
+    // Check for edit cursor in select mode
+    if (activeTool === 'select' && cursorPosition) {
+      const editCursor = getEditCursor(cursorPosition);
+      if (editCursor) return editCursor;
+    }
+    
     switch (activeTool) {
       case 'draw':
       case 'hole':
@@ -411,7 +462,7 @@ export function EditorCanvas({
       default:
         return 'default';
     }
-  };
+  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart]);
 
   return (
     <div
@@ -435,6 +486,9 @@ export function EditorCanvas({
         snapPoint={snapPoint}
         axisSnapLines={axisSnapLines}
         materialTypes={materialTypes}
+        hoveredVertex={hoveredVertex}
+        hoveredWall={hoveredWall}
+        isDragging={isDragging}
       />
 
       {/* Drawing indicator */}
