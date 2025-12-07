@@ -2,6 +2,9 @@ import { useReducer, useCallback, useRef } from 'react';
 import { CanvasState, CanvasAction, Room, Hole, Door, ScaleCalibration, ViewTransform, BackgroundImage } from '@/lib/canvas/types';
 import { calculateBoundingBox, calculateZoomToFit } from '@/lib/canvas/geometry';
 
+// Smooth easing function (ease-out cubic)
+const easeOutCubic = (t: number): number => 1 - Math.pow(1 - t, 3);
+
 const INITIAL_STATE: CanvasState = {
   rooms: [],
   scale: null,
@@ -110,6 +113,7 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
   });
   
   const historyRef = useRef<CanvasState[]>([{ ...INITIAL_STATE, ...initialState }]);
+  const animationFrameRef = useRef<number | null>(null);
   const historyIndexRef = useRef(0);
   
   const dispatchWithHistory = useCallback((action: CanvasAction) => {
@@ -198,16 +202,64 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
     }
   }, []);
   
-  // Fit view to show all rooms centered
-  const fitToView = useCallback((canvasWidth: number, canvasHeight: number) => {
+  // Cancel any running animation
+  const cancelAnimation = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }, []);
+
+  // Animate view transform smoothly
+  const animateViewTransform = useCallback((
+    from: ViewTransform,
+    to: ViewTransform,
+    duration: number = 400
+  ) => {
+    cancelAnimation();
+    
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const easedProgress = easeOutCubic(progress);
+
+      const currentTransform: ViewTransform = {
+        offsetX: from.offsetX + (to.offsetX - from.offsetX) * easedProgress,
+        offsetY: from.offsetY + (to.offsetY - from.offsetY) * easedProgress,
+        zoom: from.zoom + (to.zoom - from.zoom) * easedProgress,
+      };
+
+      dispatch({ type: 'SET_VIEW_TRANSFORM', transform: currentTransform });
+
+      if (progress < 1) {
+        animationFrameRef.current = requestAnimationFrame(animate);
+      } else {
+        // Ensure we end exactly at the target
+        dispatch({ type: 'SET_VIEW_TRANSFORM', transform: to });
+        animationFrameRef.current = null;
+      }
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+  }, [cancelAnimation]);
+
+  // Fit view to show all rooms centered with smooth animation
+  const fitToView = useCallback((canvasWidth: number, canvasHeight: number, animated: boolean = true) => {
     if (state.rooms.length === 0) return;
     
     const boundingBox = calculateBoundingBox(state.rooms);
     if (!boundingBox) return;
     
     const newTransform = calculateZoomToFit(boundingBox, canvasWidth, canvasHeight);
-    dispatch({ type: 'SET_VIEW_TRANSFORM', transform: newTransform });
-  }, [state.rooms]);
+    
+    if (animated) {
+      animateViewTransform(state.viewTransform, newTransform);
+    } else {
+      dispatch({ type: 'SET_VIEW_TRANSFORM', transform: newTransform });
+    }
+  }, [state.rooms, state.viewTransform, animateViewTransform]);
   
   // Export state to JSON for saving to database
   const exportToJson = useCallback((): Record<string, unknown> => {
@@ -229,5 +281,7 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
     loadFromJson,
     exportToJson,
     fitToView,
+    animateViewTransform,
+    cancelAnimation,
   };
 }

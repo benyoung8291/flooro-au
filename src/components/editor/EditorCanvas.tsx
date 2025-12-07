@@ -59,7 +59,7 @@ export function EditorCanvas({
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const hasInitializedRef = useRef(false);
   const hasAppliedZoomRef = useRef(false);
-  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView } = useCanvasHistory();
+  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform } = useCanvasHistory();
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<CanvasPoint[]>([]);
@@ -154,9 +154,9 @@ export function EditorCanvas({
     // Apply zoom-to-fit when we have rooms and valid canvas size (with slight delay for layout)
     if (hasRooms && hasValidSize && !hasAppliedZoomRef.current && hasInitializedRef.current) {
       hasAppliedZoomRef.current = true;
-      // Use requestAnimationFrame to ensure canvas is fully rendered
+      // Use requestAnimationFrame to ensure canvas is fully rendered, then animate to fit
       requestAnimationFrame(() => {
-        fitToView(canvasSize.width, canvasSize.height);
+        fitToView(canvasSize.width, canvasSize.height, true);
       });
     }
   }, [jsonData, canvasSize, loadFromJson, fitToView]);
