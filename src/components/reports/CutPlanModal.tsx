@@ -1,5 +1,6 @@
 import { useRef, useMemo } from 'react';
-import { StripPlanResult } from '@/lib/rollGoods';
+import { StripPlanResult, RollMaterialSpecs } from '@/lib/rollGoods';
+import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { formatArea, formatLength } from '@/lib/reports/calculations';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Printer, Download, Ruler, Scissors, Package, Repeat, Lightbulb, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import { LayoutComparison } from './LayoutComparison';
 
 interface CutPlanModalProps {
   open: boolean;
@@ -19,6 +21,9 @@ interface CutPlanModalProps {
   materialName?: string;
   rollWidth?: number;
   patternRepeat?: number;
+  room?: Room;
+  scale?: ScaleCalibration | null;
+  wastePercent?: number;
 }
 
 interface OptimizationSuggestion {
@@ -39,8 +44,19 @@ export function CutPlanModal({
   materialName = 'Roll Material',
   rollWidth = 4000,
   patternRepeat = 0,
+  room,
+  scale,
+  wastePercent = 10,
 }: CutPlanModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Build material specs for comparison
+  const materialSpecs: RollMaterialSpecs = useMemo(() => ({
+    width: rollWidth,
+    patternRepeat,
+    price: stripPlan.materialCost / stripPlan.totalMaterialAreaM2 || 0,
+    wastePercent,
+  }), [rollWidth, patternRepeat, stripPlan, wastePercent]);
 
   // Analyze pattern matching and generate optimization suggestions
   const { hasPattern, patternInfo, suggestions } = useMemo(() => {
@@ -309,6 +325,16 @@ export function CutPlanModal({
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Layout Direction Comparison */}
+          {room && (
+            <LayoutComparison
+              room={room}
+              materialSpecs={materialSpecs}
+              scale={scale || null}
+              currentPlan={stripPlan}
+            />
           )}
 
           <Separator />
