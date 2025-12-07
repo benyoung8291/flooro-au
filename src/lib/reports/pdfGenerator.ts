@@ -332,6 +332,7 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
       <table>
         <thead>
           <tr>
+            <th>Code</th>
             <th>Room</th>
             <th>Material</th>
             <th>Net Area</th>
@@ -343,6 +344,7 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
         <tbody>
           ${report.roomCalculations.map(room => `
             <tr>
+              <td style="font-family: 'SF Mono', Monaco, monospace; font-weight: 600; color: #0066cc;">${room.materialCode || '—'}</td>
               <td>${room.roomName}</td>
               <td>${room.materialName || '—'}</td>
               <td class="number">${formatArea(room.netAreaM2)}</td>
