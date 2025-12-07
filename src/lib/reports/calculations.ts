@@ -55,7 +55,24 @@ export interface MaterialSummaryItem {
 
 // Get waste percentage from material specs
 function getWastePercent(specs: MaterialSpecs): number {
-  return (specs.waste_percent as number) || (specs.wastePercent as number) || 10;
+  return specs.wastePercent || (specs.waste_percent as number) || 10;
+}
+
+// Get primary unit price from material specs (for tiles/linear)
+function getPrimaryPrice(specs: MaterialSpecs): number {
+  return specs.pricePerM2 || specs.price || 0;
+}
+
+// Get tile area in m² from mm dimensions
+function getTileAreaM2(specs: MaterialSpecs): number {
+  // Use new mm dimensions if available
+  if (specs.widthMm && specs.lengthMm) {
+    return (specs.widthMm / 1000) * (specs.lengthMm / 1000);
+  }
+  // Legacy: width/height in mm
+  const tileWidth = ((specs.width as number) || 300) / 1000;
+  const tileHeight = ((specs.height as number) || 300) / 1000;
+  return tileWidth * tileHeight;
 }
 
 // Calculate door width deductions in mm
@@ -103,7 +120,7 @@ export function calculateRoomCost(
   
   const wastePercent = getWastePercent(material.specs);
   const wasteFactor = 1 + wastePercent / 100;
-  const unitPrice = material.specs.price || 0;
+  const unitPrice = getPrimaryPrice(material.specs);
   
   let grossAreaM2 = netAreaM2;
   let totalCost = 0;
@@ -144,9 +161,8 @@ export function calculateRoomCost(
       
     case 'tile': {
       // Tiles: count = area / tile area, then add waste
-      const tileWidth = (material.specs.width || 300) / 1000; // mm to m
-      const tileHeight = (material.specs.height || 300) / 1000;
-      const tileAreaM2 = tileWidth * tileHeight;
+      // Use mm dimensions for precision
+      const tileAreaM2 = getTileAreaM2(material.specs);
       const tileCount = Math.ceil((netAreaM2 / tileAreaM2) * wasteFactor);
       grossAreaM2 = tileCount * tileAreaM2;
       quantity = tileCount;

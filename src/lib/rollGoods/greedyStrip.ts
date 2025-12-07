@@ -209,9 +209,51 @@ export function calculateStripPlan(
   const wastePercent = roomAreaMm2 > 0 ? (wasteAreaMm2 / totalMaterialMm2) * 100 : 0;
   const utilizationPercent = 100 - wastePercent;
 
-  // Calculate cost
+  // Calculate cost with roll vs cut pricing logic
   const totalMaterialAreaM2 = mmSquaredToMSquared(totalMaterialMm2);
-  const materialCost = totalMaterialAreaM2 * material.price;
+  const totalLengthM = totalRollLengthMm / 1000;
+  
+  let materialCost = 0;
+  let pricingMethod: 'per_m2' | 'per_roll' | 'per_linear_m' | 'mixed' = 'per_m2';
+  let fullRolls: number | undefined;
+  let cutLengthM: number | undefined;
+  let rollCost: number | undefined;
+  let cutCost: number | undefined;
+  
+  // Determine pricing method based on available specs
+  if (material.pricePerRoll && material.rollLengthM) {
+    // Roll + cut pricing logic
+    const rollLengthM = material.rollLengthM;
+    fullRolls = Math.floor(totalLengthM / rollLengthM);
+    cutLengthM = totalLengthM - (fullRolls * rollLengthM);
+    
+    rollCost = fullRolls * material.pricePerRoll;
+    
+    if (cutLengthM > 0 && material.pricePerLinearM) {
+      // Use cut pricing for remainder
+      cutCost = cutLengthM * material.pricePerLinearM;
+      pricingMethod = 'mixed';
+    } else if (cutLengthM > 0) {
+      // Need another full roll for the remainder
+      fullRolls += 1;
+      rollCost = fullRolls * material.pricePerRoll;
+      cutLengthM = 0;
+      pricingMethod = 'per_roll';
+    } else {
+      pricingMethod = 'per_roll';
+    }
+    
+    materialCost = rollCost + (cutCost || 0);
+  } else if (material.pricePerLinearM) {
+    // Linear meter pricing only
+    pricingMethod = 'per_linear_m';
+    materialCost = totalLengthM * material.pricePerLinearM;
+  } else {
+    // Default to per m² pricing
+    pricingMethod = 'per_m2';
+    const pricePerM2 = material.pricePerM2 || 0;
+    materialCost = totalMaterialAreaM2 * pricePerM2;
+  }
 
   return {
     roomId: room.id,
@@ -226,7 +268,7 @@ export function calculateStripPlan(
     roomAreaM2,
     
     totalRollLengthMm,
-    totalRollLengthM: totalRollLengthMm / 1000,
+    totalRollLengthM: totalLengthM,
     totalMaterialAreaMm2: totalMaterialMm2,
     totalMaterialAreaM2,
     
@@ -236,6 +278,11 @@ export function calculateStripPlan(
     
     utilizationPercent,
     materialCost,
+    pricingMethod,
+    fullRolls,
+    cutLengthM,
+    rollCost,
+    cutCost,
   };
 }
 
@@ -273,12 +320,22 @@ export function calculateMultiRoomStripPlan(
 
 /**
  * Get roll material specs from generic material specs
+ * Handles both legacy and new mm-based dimensions
  */
 export function extractRollMaterialSpecs(specs: Record<string, unknown>): RollMaterialSpecs {
+  // Handle new mm-based dimensions or legacy
+  const rollWidthMm = (specs.rollWidthMm as number) || 
+                      ((specs.width as number) || 3660); // Default 3.66m (12ft)
+  
   return {
-    width: (specs.width as number) || 3660, // Default 3.66m (12ft) roll
-    patternRepeat: (specs.patternRepeat as number) || (specs.pattern_repeat as number) || 0,
-    price: (specs.price as number) || 0,
+    width: rollWidthMm,
+    rollLengthM: (specs.rollLengthM as number) || undefined,
+    patternRepeat: (specs.patternRepeatMm as number) || 
+                   (specs.patternRepeat as number) || 
+                   (specs.pattern_repeat as number) || 0,
+    pricePerM2: (specs.pricePerM2 as number) || (specs.price as number) || undefined,
+    pricePerRoll: (specs.pricePerRoll as number) || undefined,
+    pricePerLinearM: (specs.pricePerLinearM as number) || undefined,
     wastePercent: (specs.wastePercent as number) || (specs.waste_percent as number) || 10,
   };
 }
