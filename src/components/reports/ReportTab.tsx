@@ -34,6 +34,7 @@ export function ReportTab({
     stripPlan: StripPlanResult | null;
     materialName?: string;
     rollWidth?: number;
+    patternRepeat?: number;
   }>({ open: false, stripPlan: null });
 
   const report = useMemo(
@@ -125,6 +126,7 @@ export function ReportTab({
                     .map(r => {
                       const material = materials.find(m => m.id === r.materialId);
                       const rollWidth = material?.specs?.width as number || 4000;
+                      const patternRepeat = material?.specs?.patternRepeat as number || material?.specs?.pattern_repeat as number || 0;
                       return (
                         <div key={r.roomId} className="relative group">
                           <SeamDiagram 
@@ -141,6 +143,7 @@ export function ReportTab({
                               stripPlan: r.stripPlan!,
                               materialName: material?.name,
                               rollWidth,
+                              patternRepeat,
                             })}
                           >
                             <Maximize2 className="w-3 h-3 mr-1" />
@@ -183,6 +186,7 @@ export function ReportTab({
           stripPlan={cutPlanModal.stripPlan}
           materialName={cutPlanModal.materialName}
           rollWidth={cutPlanModal.rollWidth}
+          patternRepeat={cutPlanModal.patternRepeat}
         />
       )}
     </>
