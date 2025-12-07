@@ -14,6 +14,7 @@ import Onboarding from "./pages/Onboarding";
 import NewProject from "./pages/NewProject";
 import ProjectEditor from "./pages/ProjectEditor";
 import Materials from "./pages/Materials";
+import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import ServiceQueue from "./pages/admin/ServiceQueue";
 import Organizations from "./pages/admin/Organizations";
@@ -41,6 +42,7 @@ const App = () => (
                 <Route path="/projects/new" element={<NewProject />} />
                 <Route path="/projects/:projectId" element={<ProjectEditor />} />
                 <Route path="/materials" element={<Materials />} />
+                <Route path="/settings" element={<Settings />} />
               </Route>
 
               {/* Admin Routes */}
