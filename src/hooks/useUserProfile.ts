@@ -18,6 +18,10 @@ interface Organization {
   subscription_tier: 'free' | 'pro' | 'enterprise';
   logo_url: string | null;
   address: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  terms_and_conditions: string | null;
   created_at: string;
   updated_at: string;
 }

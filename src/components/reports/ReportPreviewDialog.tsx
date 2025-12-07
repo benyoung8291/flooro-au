@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -56,26 +56,24 @@ export function ReportPreviewDialog({
   const { data: organization } = useUserOrganization();
   
   const [clientDetails, setClientDetails] = useState<ClientDetails>(defaultClientDetails);
-  const [companyBranding, setCompanyBranding] = useState<CompanyBranding>(() => ({
-    ...defaultCompanyBranding,
-    companyName: organization?.name || '',
-    logoUrl: organization?.logo_url || null,
-    companyAddress: organization?.address || '',
-  }));
+  const [companyBranding, setCompanyBranding] = useState<CompanyBranding>(defaultCompanyBranding);
   const [includeSeamDiagrams, setIncludeSeamDiagrams] = useState(true);
   const [activeTab, setActiveTab] = useState('preview');
 
-  // Update company branding when organization loads
-  useState(() => {
-    if (organization) {
-      setCompanyBranding(prev => ({
-        ...prev,
-        companyName: organization.name || prev.companyName,
-        logoUrl: organization.logo_url || prev.logoUrl,
-        companyAddress: organization.address || prev.companyAddress,
-      }));
+  // Update company branding when organization loads or dialog opens
+  useEffect(() => {
+    if (organization && open) {
+      setCompanyBranding({
+        companyName: organization.name || '',
+        companyEmail: organization.email || '',
+        companyPhone: organization.phone || '',
+        companyAddress: organization.address || '',
+        companyWebsite: organization.website || '',
+        logoUrl: organization.logo_url || null,
+        termsAndConditions: organization.terms_and_conditions || defaultCompanyBranding.termsAndConditions,
+      });
     }
-  });
+  }, [organization, open]);
 
   const handleExport = () => {
     exportToPDF({

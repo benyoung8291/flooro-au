@@ -59,29 +59,41 @@ export type Database = {
         Row: {
           address: string | null
           created_at: string
+          email: string | null
           id: string
           logo_url: string | null
           name: string
+          phone: string | null
           subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          terms_and_conditions: string | null
           updated_at: string
+          website: string | null
         }
         Insert: {
           address?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           name: string
+          phone?: string | null
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          terms_and_conditions?: string | null
           updated_at?: string
+          website?: string | null
         }
         Update: {
           address?: string | null
           created_at?: string
+          email?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          phone?: string | null
           subscription_tier?: Database["public"]["Enums"]["subscription_tier"]
+          terms_and_conditions?: string | null
           updated_at?: string
+          website?: string | null
         }
         Relationships: []
       }
@@ -213,11 +225,15 @@ export type Database = {
         Returns: {
           address: string | null
           created_at: string
+          email: string | null
           id: string
           logo_url: string | null
           name: string
+          phone: string | null
           subscription_tier: Database["public"]["Enums"]["subscription_tier"]
+          terms_and_conditions: string | null
           updated_at: string
+          website: string | null
         }
         SetofOptions: {
           from: "*"
