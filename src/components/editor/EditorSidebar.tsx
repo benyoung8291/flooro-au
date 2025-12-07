@@ -71,7 +71,7 @@ export function EditorSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-12 h-full border-l border-border bg-card flex flex-col items-center py-2 gap-1 z-20 relative">
+      <div className="w-12 h-full border-l border-border bg-card flex flex-col items-center py-2 gap-1 z-20 shrink-0">
         <Button variant="ghost" size="icon" onClick={onToggle} title="Expand sidebar">
           <ChevronRight className="w-4 h-4" />
         </Button>
@@ -102,7 +102,7 @@ export function EditorSidebar({
   }
 
   return (
-    <div className="w-72 h-full border-l border-border bg-card flex flex-col z-20 relative">
+    <div className="w-72 h-full border-l border-border bg-card flex flex-col z-20 shrink-0">
       <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col h-full">
         <div className="px-3 pt-3 pb-2 border-b border-border">
           <div className="flex items-center gap-2 mb-2">
