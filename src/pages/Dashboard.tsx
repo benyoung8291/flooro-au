@@ -2,20 +2,19 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile, useUserOrganization, useIsPlatformAdmin } from '@/hooks/useUserProfile';
+import { useProjectStats } from '@/hooks/useProjects';
+import { ProjectList } from '@/components/projects/ProjectList';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   Square, 
-  Plus, 
   FolderOpen, 
   Clock, 
   CheckCircle2, 
   Settings,
   LogOut,
-  Building2,
-  Users,
   Shield
 } from 'lucide-react';
 
@@ -24,6 +23,7 @@ export default function Dashboard() {
   const { data: profile, isLoading: profileLoading } = useUserProfile();
   const { data: organization, isLoading: orgLoading } = useUserOrganization();
   const isPlatformAdmin = useIsPlatformAdmin();
+  const stats = useProjectStats();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -94,108 +94,55 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <StatsCard 
             icon={<FolderOpen className="w-5 h-5" />}
             label="Total Projects"
-            value="0"
+            value={stats.total.toString()}
+          />
+          <StatsCard 
+            icon={<Clock className="w-5 h-5" />}
+            label="Pending Service"
+            value={stats.pending.toString()}
+            highlight={stats.pending > 0}
           />
           <StatsCard 
             icon={<Clock className="w-5 h-5" />}
             label="In Progress"
-            value="0"
+            value={stats.inProgress.toString()}
           />
           <StatsCard 
             icon={<CheckCircle2 className="w-5 h-5" />}
             label="Completed"
-            value="0"
-          />
-          <StatsCard 
-            icon={<Users className="w-5 h-5" />}
-            label="Team Members"
-            value="1"
+            value={stats.completed.toString()}
           />
         </div>
 
-        {/* Projects Section */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-foreground">Projects</h2>
-          <Button onClick={() => navigate('/projects/new')}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Project
-          </Button>
-        </div>
-
-        {/* Empty State */}
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <FolderOpen className="w-8 h-8 text-muted-foreground" />
-            </div>
-            <CardTitle className="text-lg mb-2">No projects yet</CardTitle>
-            <CardDescription className="text-center mb-6 max-w-sm">
-              Create your first project to start measuring floor plans and estimating materials.
-            </CardDescription>
-            <Button onClick={() => navigate('/projects/new')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create First Project
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Organization Info */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Organization
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-medium">{organization?.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Plan</p>
-                  <p className="font-medium capitalize">{organization?.subscription_tier}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <Users className="w-4 h-4 mr-2" />
-                Invite Team Members
-              </Button>
-              <Button variant="outline" className="w-full justify-start" size="sm">
-                <Settings className="w-4 h-4 mr-2" />
-                Organization Settings
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        {/* Projects List */}
+        <ProjectList />
       </main>
     </div>
   );
 }
 
-function StatsCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatsCard({ 
+  icon, 
+  label, 
+  value, 
+  highlight = false 
+}: { 
+  icon: React.ReactNode; 
+  label: string; 
+  value: string;
+  highlight?: boolean;
+}) {
   return (
-    <Card>
+    <Card className={highlight ? 'border-warning/50 bg-warning/5' : ''}>
       <CardContent className="pt-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+            highlight ? 'bg-warning/20 text-warning' : 'bg-primary/10 text-primary'
+          }`}>
             {icon}
           </div>
           <div>
