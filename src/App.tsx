@@ -6,12 +6,17 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/admin/AdminRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Onboarding from "./pages/Onboarding";
 import NewProject from "./pages/NewProject";
 import ProjectEditor from "./pages/ProjectEditor";
+import Admin from "./pages/Admin";
+import ServiceQueue from "./pages/admin/ServiceQueue";
+import Organizations from "./pages/admin/Organizations";
+import ProjectDetail from "./pages/admin/ProjectDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,6 +39,15 @@ const App = () => (
                 <Route path="/onboarding" element={<Onboarding />} />
                 <Route path="/projects/new" element={<NewProject />} />
                 <Route path="/projects/:projectId" element={<ProjectEditor />} />
+              </Route>
+
+              {/* Admin Routes */}
+              <Route element={<AdminRoute />}>
+                <Route path="/admin" element={<Admin />}>
+                  <Route path="queue" element={<ServiceQueue />} />
+                  <Route path="organizations" element={<Organizations />} />
+                  <Route path="projects/:projectId" element={<ProjectDetail />} />
+                </Route>
               </Route>
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
