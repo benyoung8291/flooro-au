@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Download, AlertCircle } from 'lucide-react';
+import { FileText, Download, AlertCircle, Scissors } from 'lucide-react';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { generateReport } from '@/lib/reports/calculations';
 import { CostSummaryCard } from './CostSummaryCard';
 import { RoomBreakdownList } from './RoomBreakdownList';
 import { ReportPreviewDialog } from './ReportPreviewDialog';
+import { SeamDiagram } from './SeamDiagram';
 
 interface ReportTabProps {
   rooms: Room[];
@@ -98,6 +99,33 @@ export function ReportTab({
             </div>
             <RoomBreakdownList roomCalculations={report.roomCalculations} />
           </div>
+
+          {/* Seam Diagrams for Roll Goods */}
+          {report.roomCalculations.some(r => r.stripPlan) && (
+            <>
+              <Separator />
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Scissors className="w-4 h-4 text-muted-foreground" />
+                  <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Cut Plans
+                  </h3>
+                </div>
+                <div className="space-y-3">
+                  {report.roomCalculations
+                    .filter(r => r.stripPlan)
+                    .map(r => (
+                      <SeamDiagram 
+                        key={r.roomId} 
+                        stripPlan={r.stripPlan!}
+                        width={320}
+                        height={200}
+                      />
+                    ))}
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 
