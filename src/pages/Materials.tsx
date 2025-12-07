@@ -4,6 +4,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { ArrowLeft, Square } from 'lucide-react';
 import { MaterialsList } from '@/components/materials/MaterialsList';
 import { CreateMaterialDialog } from '@/components/materials/CreateMaterialDialog';
+import { ImportProductDialog } from '@/components/materials/ImportProductDialog';
 
 export default function Materials() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function Materials() {
           </div>
           
           <div className="flex items-center gap-2">
+            <ImportProductDialog />
             <CreateMaterialDialog />
             <ThemeToggle />
           </div>
@@ -35,7 +37,7 @@ export default function Materials() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">Materials Library</h1>
           <p className="text-muted-foreground">
-            Manage flooring materials for your projects. Global materials are available to all organizations.
+            Manage flooring materials with precise dimensions and pricing. Import products from manufacturer websites using AI.
           </p>
         </div>
 

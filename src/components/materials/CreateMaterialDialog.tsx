@@ -16,6 +16,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import {
   Select,
@@ -26,15 +27,55 @@ import {
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Plus } from 'lucide-react';
-import { useCreateMaterial, Material } from '@/hooks/useMaterials';
+import { useCreateMaterial, Material, MaterialSubtype } from '@/hooks/useMaterials';
+
+// Dimension presets
+const TILE_PRESETS = [
+  { label: '500×500', widthMm: 500, lengthMm: 500 },
+  { label: '1000×250', widthMm: 1000, lengthMm: 250 },
+  { label: '610×610', widthMm: 610, lengthMm: 610 },
+  { label: '300×300', widthMm: 300, lengthMm: 300 },
+  { label: '300×600', widthMm: 300, lengthMm: 600 },
+  { label: '600×600', widthMm: 600, lengthMm: 600 },
+  { label: '1200×600', widthMm: 1200, lengthMm: 600 },
+];
+
+const ROLL_WIDTH_PRESETS = [
+  { label: '2m (Sheet Vinyl)', widthMm: 2000 },
+  { label: '3m (Sheet Vinyl)', widthMm: 3000 },
+  { label: '4m (Sheet Vinyl)', widthMm: 4000 },
+  { label: '3.66m (Broadloom)', widthMm: 3660 },
+  { label: '4m (Broadloom)', widthMm: 4000 },
+  { label: '4.57m (Broadloom)', widthMm: 4570 },
+];
 
 const materialSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   type: z.enum(['roll', 'tile', 'linear']),
-  width: z.coerce.number().positive().optional(),
-  height: z.coerce.number().positive().optional(),
-  price: z.coerce.number().positive('Price must be positive'),
+  subtype: z.string().optional(),
+  
+  // Tile dimensions (mm)
+  widthMm: z.coerce.number().positive().optional(),
+  lengthMm: z.coerce.number().positive().optional(),
+  
+  // Roll dimensions
+  rollWidthMm: z.coerce.number().positive().optional(),
+  rollLengthM: z.coerce.number().positive().optional(),
+  patternRepeatMm: z.coerce.number().min(0).optional(),
+  
+  // Pricing
+  pricePerM2: z.coerce.number().min(0).optional(),
+  pricePerRoll: z.coerce.number().min(0).optional(),
+  pricePerLinearM: z.coerce.number().min(0).optional(),
+  
+  // Waste
+  wastePercent: z.coerce.number().min(0).max(50).optional(),
+  
+  // Metadata
+  manufacturer: z.string().optional(),
+  sku: z.string().optional(),
 });
 
 type MaterialFormValues = z.infer<typeof materialSchema>;
@@ -51,27 +92,52 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
     resolver: zodResolver(materialSchema),
     defaultValues: {
       name: '',
-      type: 'roll',
-      price: 0,
+      type: 'tile',
+      wastePercent: 10,
     },
   });
 
   const selectedType = form.watch('type');
+  const selectedSubtype = form.watch('subtype');
+
+  const applyTilePreset = (preset: typeof TILE_PRESETS[0]) => {
+    form.setValue('widthMm', preset.widthMm);
+    form.setValue('lengthMm', preset.lengthMm);
+  };
+
+  const applyRollPreset = (preset: typeof ROLL_WIDTH_PRESETS[0]) => {
+    form.setValue('rollWidthMm', preset.widthMm);
+    if (preset.label.includes('Broadloom')) {
+      form.setValue('subtype', 'broadloom_carpet');
+    } else if (preset.label.includes('Vinyl')) {
+      form.setValue('subtype', 'sheet_vinyl');
+    }
+  };
 
   const onSubmit = async (values: MaterialFormValues) => {
-    const result = await createMaterial.mutateAsync({
+    await createMaterial.mutateAsync({
       name: values.name,
       type: values.type,
+      subtype: values.subtype as MaterialSubtype | undefined,
       specs: {
-        price: values.price,
-        ...(values.width ? { width: values.width } : {}),
-        ...(values.height ? { height: values.height } : {}),
+        widthMm: values.widthMm,
+        lengthMm: values.lengthMm,
+        rollWidthMm: values.rollWidthMm,
+        rollLengthM: values.rollLengthM,
+        patternRepeatMm: values.patternRepeatMm,
+        pricePerM2: values.pricePerM2,
+        pricePerRoll: values.pricePerRoll,
+        pricePerLinearM: values.pricePerLinearM,
+        wastePercent: values.wastePercent,
+        manufacturer: values.manufacturer,
+        sku: values.sku,
+        // Legacy compatibility
+        price: values.pricePerM2 || values.pricePerLinearM || 0,
       },
     });
     
     setOpen(false);
     form.reset();
-    onSuccess?.(result);
   };
 
   return (
@@ -82,7 +148,7 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
           Add Material
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Material</DialogTitle>
         </DialogHeader>
@@ -96,76 +162,294 @@ export function CreateMaterialDialog({ onSuccess }: CreateMaterialDialogProps) {
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Berber Carpet - Gray" {...field} />
+                    <Input placeholder="e.g., Premium Carpet Tile - Gray" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             
-            <FormField
-              control={form.control}
-              name="type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="roll">Roll (Width-based)</SelectItem>
-                      <SelectItem value="tile">Tile (Width × Height)</SelectItem>
-                      <SelectItem value="linear">Linear (Length-based)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {(selectedType === 'roll' || selectedType === 'tile') && (
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="width"
+                name="type"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Width (meters)</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="e.g., 3.66" {...field} />
-                    </FormControl>
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="tile">Tile / Plank</SelectItem>
+                        <SelectItem value="roll">Roll Goods</SelectItem>
+                        <SelectItem value="linear">Linear</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
+              
+              <FormField
+                control={form.control}
+                name="subtype"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {selectedType === 'tile' && (
+                          <>
+                            <SelectItem value="carpet_tile">Carpet Tile</SelectItem>
+                            <SelectItem value="ceramic_tile">Ceramic Tile</SelectItem>
+                            <SelectItem value="vinyl_plank">Vinyl Plank</SelectItem>
+                            <SelectItem value="lvt">LVT</SelectItem>
+                          </>
+                        )}
+                        {selectedType === 'roll' && (
+                          <>
+                            <SelectItem value="broadloom_carpet">Broadloom Carpet</SelectItem>
+                            <SelectItem value="sheet_vinyl">Sheet Vinyl</SelectItem>
+                          </>
+                        )}
+                        {selectedType === 'linear' && (
+                          <>
+                            <SelectItem value="baseboard">Baseboard</SelectItem>
+                            <SelectItem value="transition_strip">Transition Strip</SelectItem>
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
+            {/* Tile Dimensions */}
             {selectedType === 'tile' && (
+              <div className="space-y-3">
+                <FormLabel>Tile Dimensions (mm)</FormLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {TILE_PRESETS.map((preset) => (
+                    <Badge
+                      key={preset.label}
+                      variant="outline"
+                      className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                      onClick={() => applyTilePreset(preset)}
+                    >
+                      {preset.label}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="widthMm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Width (mm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="500" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lengthMm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Length (mm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="500" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Roll Dimensions */}
+            {selectedType === 'roll' && (
+              <div className="space-y-3">
+                <FormLabel>Roll Specifications</FormLabel>
+                <div className="flex flex-wrap gap-1.5">
+                  {ROLL_WIDTH_PRESETS.map((preset) => (
+                    <Badge
+                      key={preset.label}
+                      variant="outline"
+                      className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+                      onClick={() => applyRollPreset(preset)}
+                    >
+                      {preset.label}
+                    </Badge>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="rollWidthMm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Roll Width (mm)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="3660" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="rollLengthM"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Roll Length (m)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.1" placeholder="30" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="patternRepeatMm"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Pattern Repeat (mm)</FormLabel>
+                      <FormControl>
+                        <Input type="number" placeholder="0 for no pattern" {...field} />
+                      </FormControl>
+                      <FormDescription>Leave 0 if no pattern matching required</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+            
+            {/* Pricing Section */}
+            <div className="space-y-3 pt-2 border-t">
+              <FormLabel className="text-base">Pricing</FormLabel>
+              
+              {selectedType === 'linear' ? (
+                <FormField
+                  control={form.control}
+                  name="pricePerLinearM"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price per linear meter ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" placeholder="12.50" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="pricePerM2"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Price per m² ($)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" placeholder="45.00" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {selectedType === 'roll' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="pricePerRoll"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Full Roll Price ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="850.00" {...field} />
+                            </FormControl>
+                            <FormDescription>Optional bulk price</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="pricePerLinearM"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Cut Price/m ($)</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="55.00" {...field} />
+                            </FormControl>
+                            <FormDescription>For partial rolls</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            
+            {/* Waste & Metadata */}
+            <div className="grid grid-cols-2 gap-4 pt-2 border-t">
               <FormField
                 control={form.control}
-                name="height"
+                name="wastePercent"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Height (meters)</FormLabel>
+                    <FormLabel>Waste %</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" placeholder="e.g., 0.6" {...field} />
+                      <Input type="number" step="1" placeholder="10" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
+              <FormField
+                control={form.control}
+                name="manufacturer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Manufacturer</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             
             <FormField
               control={form.control}
-              name="price"
+              name="sku"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Price per m²</FormLabel>
+                  <FormLabel>SKU / Product Code</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="e.g., 45.00" {...field} />
+                    <Input placeholder="Optional" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
