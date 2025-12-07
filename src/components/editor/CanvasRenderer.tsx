@@ -14,6 +14,7 @@ interface CanvasRendererProps {
   hoveredVertex?: { roomId: string; index: number } | null;
   hoveredWall?: { roomId: string; index: number } | null;
   isDragging?: boolean;
+  onFillDirectionClick?: (roomId: string) => void;
 }
 
 // Cache for loaded images
@@ -31,6 +32,7 @@ export function CanvasRenderer({
   hoveredVertex,
   hoveredWall,
   isDragging,
+  onFillDirectionClick,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -133,6 +135,11 @@ export function CanvasRenderer({
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
       const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
       drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging);
+      
+      // Draw fill direction arrow for rooms with roll materials
+      if (room.materialId && materialTypes.get(room.materialId) === 'roll') {
+        drawFillDirectionArrow(ctx, room, zoom, state.selectedRoomId === room.id);
+      }
     });
 
     // Draw current drawing in progress
@@ -402,4 +409,65 @@ function drawRoom(
   ctx.fillText(room.name, centerX, centerY - 10 / zoom);
   ctx.font = `${12 / zoom}px Inter, sans-serif`;
   ctx.fillText(areaText, centerX, centerY + 10 / zoom);
+}
+
+function drawFillDirectionArrow(
+  ctx: CanvasRenderingContext2D,
+  room: Room,
+  zoom: number,
+  isSelected: boolean
+) {
+  if (room.points.length < 3) return;
+  
+  // Calculate room centroid
+  const centerX = room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
+  const centerY = room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
+  
+  const direction = room.fillDirection || 0;
+  const arrowLength = 35 / zoom;
+  const arrowHeadSize = 10 / zoom;
+  
+  // Calculate arrow end point
+  const radians = (direction * Math.PI) / 180;
+  const endX = centerX + Math.cos(radians) * arrowLength;
+  const endY = centerY + Math.sin(radians) * arrowLength;
+  
+  // Save context
+  ctx.save();
+  
+  // Draw arrow shaft
+  ctx.strokeStyle = isSelected ? 'hsl(180 70% 45%)' : 'hsl(180 60% 50%)';
+  ctx.lineWidth = 3 / zoom;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+  
+  // Draw arrow head
+  const headAngle1 = radians + Math.PI + Math.PI / 6;
+  const headAngle2 = radians + Math.PI - Math.PI / 6;
+  
+  ctx.beginPath();
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(
+    endX + Math.cos(headAngle1) * arrowHeadSize,
+    endY + Math.sin(headAngle1) * arrowHeadSize
+  );
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(
+    endX + Math.cos(headAngle2) * arrowHeadSize,
+    endY + Math.sin(headAngle2) * arrowHeadSize
+  );
+  ctx.stroke();
+  
+  // Draw center dot (clickable indicator)
+  ctx.fillStyle = isSelected ? 'hsl(180 70% 45%)' : 'hsl(180 60% 50%)';
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 5 / zoom, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
 }

@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { StripPlanResult, RollMaterialSpecs } from '@/lib/rollGoods';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { formatArea, formatLength } from '@/lib/reports/calculations';
@@ -11,8 +11,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Printer, Download, Ruler, Scissors, Package, Repeat, Lightbulb, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Printer, Download, Ruler, Scissors, Package, Repeat, Lightbulb, CheckCircle2, AlertTriangle, ArrowRight, ChevronDown, FileText, Recycle } from 'lucide-react';
 import { LayoutComparison } from './LayoutComparison';
+import { InstallerWorksheet } from './InstallerWorksheet';
 
 interface CutPlanModalProps {
   open: boolean;
@@ -49,6 +55,8 @@ export function CutPlanModal({
   wastePercent = 10,
 }: CutPlanModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
+  const worksheetRef = useRef<HTMLDivElement>(null);
+  const [showDropReuse, setShowDropReuse] = useState(false);
 
   // Build material specs for comparison
   const materialSpecs: RollMaterialSpecs = useMemo(() => ({
@@ -236,6 +244,73 @@ export function CutPlanModal({
     printWindow.print();
   };
 
+  const handlePrintInstallerWorksheet = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Installer Cut Sheet - ${stripPlan.roomName}</title>
+          <style>
+            * { box-sizing: border-box; margin: 0; padding: 0; }
+            body { 
+              font-family: system-ui, -apple-system, sans-serif; 
+              color: #1a1a1a;
+              background: white;
+            }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div id="worksheet"></div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `);
+    
+    // Get worksheet content
+    const worksheetContent = worksheetRef.current;
+    if (worksheetContent) {
+      printWindow.document.getElementById('worksheet')!.innerHTML = worksheetContent.innerHTML;
+    }
+    
+    printWindow.document.close();
+  };
+
+  // Calculate available drops for reuse
+  const availableDrops = useMemo(() => {
+    if (!stripPlan) return [];
+    
+    // Simulate drops from cuts - leftover pieces
+    const drops: { id: string; length: number; usable: boolean }[] = [];
+    
+    stripPlan.strips.forEach((strip, index) => {
+      // Assume some leftover from each strip based on room vs roll
+      const roomDimension = stripPlan.layoutDirection === 'horizontal'
+        ? stripPlan.roomBoundingBox.width
+        : stripPlan.roomBoundingBox.height;
+      
+      if (strip.length > roomDimension) {
+        const dropLength = strip.length - roomDimension;
+        if (dropLength > 100) { // At least 100mm to be worth tracking
+          drops.push({
+            id: `drop-${index}`,
+            length: dropLength,
+            usable: dropLength >= 300, // 300mm minimum for usable drop
+          });
+        }
+      }
+    });
+    
+    return drops;
+  }, [stripPlan]);
+
   // Calculate roll diagram dimensions
   const rollDiagramWidth = 600;
   const rollDiagramHeight = 120;
@@ -274,6 +349,10 @@ export function CutPlanModal({
           <Button variant="outline" size="sm" onClick={handlePrint}>
             <Download className="w-4 h-4 mr-2" />
             Export PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrintInstallerWorksheet}>
+            <FileText className="w-4 h-4 mr-2" />
+            Installer Worksheet
           </Button>
         </div>
 
@@ -335,6 +414,56 @@ export function CutPlanModal({
               scale={scale || null}
               currentPlan={stripPlan}
             />
+          )}
+
+          {/* Available Drops for Reuse */}
+          {availableDrops.length > 0 && (
+            <Collapsible open={showDropReuse} onOpenChange={setShowDropReuse}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between p-3 h-auto bg-muted/30 border hover:bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    <Recycle className="w-4 h-4 text-green-500" />
+                    <span className="font-medium text-sm">Available Drops ({availableDrops.length})</span>
+                  </div>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showDropReuse ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <div className="bg-muted/30 rounded-lg p-4 border space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    Leftover pieces from this cut plan that can be reused in other rooms
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    {availableDrops.map((drop) => (
+                      <div
+                        key={drop.id}
+                        className={`p-2 rounded border text-center ${
+                          drop.usable 
+                            ? 'bg-green-500/10 border-green-500/30' 
+                            : 'bg-amber-500/10 border-amber-500/30'
+                        }`}
+                      >
+                        <p className="text-xs text-muted-foreground">Drop</p>
+                        <p className="font-mono font-semibold">{(drop.length / 1000).toFixed(2)}m</p>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-[10px] mt-1 ${
+                            drop.usable 
+                              ? 'bg-green-500/20 text-green-700 border-green-500/30' 
+                              : 'bg-amber-500/20 text-amber-700 border-amber-500/30'
+                          }`}
+                        >
+                          {drop.usable ? 'Usable' : 'Short'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    💡 Use Cross-Room Optimizer to allocate drops to other rooms
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           <Separator />
@@ -582,6 +711,19 @@ export function CutPlanModal({
                 </Badge>
               </div>
             </div>
+          </div>
+
+          {/* Hidden Installer Worksheet for printing */}
+          <div className="hidden">
+            <InstallerWorksheet
+              ref={worksheetRef}
+              stripPlan={stripPlan}
+              materialName={materialName}
+              rollWidth={rollWidth}
+              patternRepeat={patternRepeat}
+              room={room || { id: '', name: stripPlan.roomName, points: [], holes: [], doors: [], materialId: null, color: '' }}
+              fillDirection={room?.fillDirection || 0}
+            />
           </div>
         </div>
       </DialogContent>

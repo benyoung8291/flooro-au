@@ -20,7 +20,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
 import { generateReport } from '@/lib/reports/calculations';
-import { Room, ScaleCalibration, BackgroundImage } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, BackgroundImage, RoomAccessories } from '@/lib/canvas/types';
+import { AccessoryQuickAddDialog } from '@/components/materials/AccessoryQuickAddDialog';
 import { 
   ArrowLeft, 
   Save, 
@@ -67,6 +68,11 @@ export default function ProjectEditor() {
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
   const [showFinishesLegend, setShowFinishesLegend] = useState(false);
+  const [accessoryDialogOpen, setAccessoryDialogOpen] = useState(false);
+  const [pendingMaterialRoom, setPendingMaterialRoom] = useState<{
+    roomId: string;
+    material: { id: string; name: string; type: string; specs?: any };
+  } | null>(null);
 
   // Sync local data with project data
   useEffect(() => {
@@ -102,6 +108,17 @@ export default function ProjectEditor() {
           break;
         case '3':
           setIs3DMode(true);
+          break;
+        case 'r':
+          // Rotate fill direction of selected room
+          if (selectedRoomId) {
+            const selectedRoom = rooms.find(r => r.id === selectedRoomId);
+            if (selectedRoom) {
+              const currentDirection = selectedRoom.fillDirection || 0;
+              const newDirection = (currentDirection + 45) % 360;
+              handleUpdateRoom(selectedRoomId, { fillDirection: newDirection });
+            }
+          }
           break;
       }
     };
@@ -191,12 +208,73 @@ export default function ProjectEditor() {
       });
       return;
     }
+    
+    // Assign material immediately
     handleUpdateRoom(selectedRoomId, { materialId: material.id });
-    toast({
-      title: "Material assigned",
-      description: `Material applied to ${rooms.find(r => r.id === selectedRoomId)?.name || 'room'}`,
-    });
-  }, [selectedRoomId, handleUpdateRoom, toast, rooms]);
+    
+    // Check "don't ask again" preference
+    const skipAccessories = localStorage.getItem('flooro_skip_accessory_prompt') === 'true';
+    
+    // Find full material data
+    const fullMaterial = materials?.find(m => m.id === material.id);
+    const roomName = rooms.find(r => r.id === selectedRoomId)?.name || 'room';
+    
+    // Show accessory dialog for roll/tile materials unless skipped
+    if (fullMaterial && !skipAccessories && (fullMaterial.type === 'roll' || fullMaterial.type === 'tile')) {
+      const specs = fullMaterial.specs as any;
+      setPendingMaterialRoom({
+        roomId: selectedRoomId,
+        material: {
+          id: fullMaterial.id,
+          name: fullMaterial.name,
+          type: fullMaterial.type,
+          specs,
+        },
+      });
+      setAccessoryDialogOpen(true);
+    } else {
+      toast({
+        title: "Material assigned",
+        description: `Material applied to ${roomName}`,
+      });
+    }
+  }, [selectedRoomId, handleUpdateRoom, toast, rooms, materials]);
+
+  const handleApplyAccessories = useCallback((accessories: Partial<RoomAccessories>) => {
+    if (pendingMaterialRoom) {
+      const currentRoom = rooms.find(r => r.id === pendingMaterialRoom.roomId);
+      handleUpdateRoom(pendingMaterialRoom.roomId, {
+        accessories: { ...currentRoom?.accessories, ...accessories },
+      });
+      toast({
+        title: "Material & accessories applied",
+        description: `Applied to ${currentRoom?.name || 'room'}`,
+      });
+    }
+    setAccessoryDialogOpen(false);
+    setPendingMaterialRoom(null);
+  }, [pendingMaterialRoom, handleUpdateRoom, rooms, toast]);
+
+  const handleSkipAccessories = useCallback(() => {
+    if (pendingMaterialRoom) {
+      const roomName = rooms.find(r => r.id === pendingMaterialRoom.roomId)?.name || 'room';
+      toast({
+        title: "Material assigned",
+        description: `Material applied to ${roomName}`,
+      });
+    }
+    setAccessoryDialogOpen(false);
+    setPendingMaterialRoom(null);
+  }, [pendingMaterialRoom, rooms, toast]);
+
+  const handleRotateFillDirection = useCallback((roomId: string) => {
+    const room = rooms.find(r => r.id === roomId);
+    if (room) {
+      const currentDirection = room.fillDirection || 0;
+      const newDirection = (currentDirection + 45) % 360;
+      handleUpdateRoom(roomId, { fillDirection: newDirection });
+    }
+  }, [rooms, handleUpdateRoom]);
   
   const report = useMemo(
     () => generateReport(rooms, materials || [], scale),
@@ -466,6 +544,20 @@ export default function ProjectEditor() {
         rooms={rooms}
         materials={materials || []}
       />
+
+      {/* Accessory Quick-Add Dialog */}
+      {pendingMaterialRoom && (
+        <AccessoryQuickAddDialog
+          open={accessoryDialogOpen}
+          onOpenChange={setAccessoryDialogOpen}
+          materialType={pendingMaterialRoom.material.type}
+          materialSubtype={pendingMaterialRoom.material.specs?.subtype}
+          materialName={pendingMaterialRoom.material.name}
+          room={rooms.find(r => r.id === pendingMaterialRoom.roomId) || rooms[0]}
+          onApplyAccessories={handleApplyAccessories}
+          onSkip={handleSkipAccessories}
+        />
+      )}
     </div>
   );
 }
