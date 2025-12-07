@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -12,13 +12,14 @@ import {
 import { FileText, Download, AlertCircle, Scissors, Maximize2, ArrowUpCircle, ArrowDownCircle, Circle } from 'lucide-react';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { Material, QuantityRoundingMode } from '@/hooks/useMaterials';
-import { generateReport } from '@/lib/reports/calculations';
+import { generateReport, WasteOverrides } from '@/lib/reports/calculations';
 import { CostSummaryCard } from './CostSummaryCard';
 import { RoomBreakdownList } from './RoomBreakdownList';
 import { ReportPreviewDialog } from './ReportPreviewDialog';
 import { SeamDiagram } from './SeamDiagram';
 import { CutPlanModal } from './CutPlanModal';
 import { FinishesSchedule } from './FinishesSchedule';
+import { WasteSuggestionCard } from './WasteSuggestionCard';
 import { StripPlanResult } from '@/lib/rollGoods';
 
 interface ReportTabProps {
@@ -27,6 +28,8 @@ interface ReportTabProps {
   scale: ScaleCalibration | null;
   projectName?: string;
   projectAddress?: string;
+  wasteOverrides?: WasteOverrides;
+  onWasteOverridesChange?: (overrides: WasteOverrides) => void;
 }
 
 export function ReportTab({
@@ -35,9 +38,12 @@ export function ReportTab({
   scale,
   projectName = 'Untitled Project',
   projectAddress,
+  wasteOverrides = {},
+  onWasteOverridesChange,
 }: ReportTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [roundingMode, setRoundingMode] = useState<QuantityRoundingMode>('up');
+  const [localWasteOverrides, setLocalWasteOverrides] = useState<WasteOverrides>(wasteOverrides);
   const [cutPlanModal, setCutPlanModal] = useState<{
     open: boolean;
     stripPlan: StripPlanResult | null;
@@ -48,10 +54,28 @@ export function ReportTab({
     room?: Room;
   }>({ open: false, stripPlan: null });
 
+  // Use provided overrides or local state
+  const effectiveOverrides = onWasteOverridesChange ? wasteOverrides : localWasteOverrides;
+
   const report = useMemo(
-    () => generateReport(rooms, materials, scale, roundingMode),
-    [rooms, materials, scale, roundingMode]
+    () => generateReport(rooms, materials, scale, roundingMode, effectiveOverrides),
+    [rooms, materials, scale, roundingMode, effectiveOverrides]
   );
+
+  const handleWasteOverrideChange = useCallback((materialId: string, value: number | undefined) => {
+    const newOverrides = { ...effectiveOverrides };
+    if (value === undefined) {
+      delete newOverrides[materialId];
+    } else {
+      newOverrides[materialId] = value;
+    }
+    
+    if (onWasteOverridesChange) {
+      onWasteOverridesChange(newOverrides);
+    } else {
+      setLocalWasteOverrides(newOverrides);
+    }
+  }, [effectiveOverrides, onWasteOverridesChange]);
 
   // Check if any materials have box quantities
   const hasBoxQuantities = useMemo(
@@ -113,7 +137,17 @@ export function ReportTab({
 
           <Separator />
 
-          {/* Quantity Rounding Toggle - only show if materials with box quantities */}
+          {/* Wastage Suggestions */}
+          {report.wasteSuggestions.size > 0 && (
+            <WasteSuggestionCard
+              materials={materials}
+              wasteSuggestions={report.wasteSuggestions}
+              wasteOverrides={effectiveOverrides}
+              onOverrideChange={handleWasteOverrideChange}
+            />
+          )}
+
+          <Separator />
           {hasBoxQuantities && (
             <div className="bg-muted/50 rounded-lg p-3">
               <div className="flex items-center justify-between">
