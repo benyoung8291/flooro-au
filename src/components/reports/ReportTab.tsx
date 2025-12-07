@@ -21,6 +21,7 @@ import { CutPlanModal } from './CutPlanModal';
 import { FinishesSchedule } from './FinishesSchedule';
 import { WasteSuggestionCard } from './WasteSuggestionCard';
 import { CrossRoomOptimizer } from './CrossRoomOptimizer';
+import { LaborCostPanel } from './LaborCostPanel';
 import { StripPlanResult, extractRollMaterialSpecs } from '@/lib/rollGoods';
 
 interface ReportTabProps {
@@ -304,6 +305,22 @@ export function ReportTab({
                     })}
                 </div>
               </div>
+            </>
+          )}
+
+          {/* Labor & Total Cost */}
+          {hasMaterialsAssigned && (
+            <>
+              <Separator />
+              <LaborCostPanel
+                rooms={rooms}
+                materials={materials}
+                materialCosts={new Map(
+                  report.roomCalculations.map(r => [r.roomId, r.totalCost])
+                )}
+                accessoryCosts={new Map()}
+                scale={scale}
+              />
             </>
           )}
 
