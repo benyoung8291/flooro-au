@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject, useUpdateProject, useRequestService } from '@/hooks/useProjects';
 import { useHasRole } from '@/hooks/useUserProfile';
+import { useMaterials } from '@/hooks/useMaterials';
 import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
@@ -10,6 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
+import { generateReport } from '@/lib/reports/calculations';
+import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { 
   ArrowLeft, 
   Save, 
@@ -40,6 +44,7 @@ export default function ProjectEditor() {
   const { toast } = useToast();
   
   const { data: project, isLoading } = useProject(projectId);
+  const { data: materials } = useMaterials();
   const updateProject = useUpdateProject();
   const requestService = useRequestService();
   const isViewer = useHasRole('viewer');
@@ -48,6 +53,7 @@ export default function ProjectEditor() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
+  const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
 
   // Sync local data with project data
   useEffect(() => {
@@ -118,6 +124,15 @@ export default function ProjectEditor() {
       toast({ title: 'Request failed', description: error.message, variant: 'destructive' });
     }
   };
+
+  // Extract rooms and scale from localData for report generation
+  const rooms = (localData.rooms as Room[]) || [];
+  const scale = (localData.scale as ScaleCalibration) || null;
+  
+  const report = useMemo(
+    () => generateReport(rooms, materials || [], scale),
+    [rooms, materials, scale]
+  );
 
   if (isLoading) {
     return <EditorSkeleton />;
@@ -205,7 +220,7 @@ export default function ProjectEditor() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Export PDF</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setReportPreviewOpen(true)}>Export PDF</DropdownMenuItem>
               <DropdownMenuItem>Share Project</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}/settings`)}>
@@ -254,8 +269,21 @@ export default function ProjectEditor() {
         <EditorSidebar 
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          rooms={rooms}
+          scale={scale}
+          projectName={project.name}
+          projectAddress={project.address || undefined}
         />
       </div>
+
+      {/* Report Preview Dialog */}
+      <ReportPreviewDialog
+        open={reportPreviewOpen}
+        onOpenChange={setReportPreviewOpen}
+        projectName={project.name}
+        projectAddress={project.address || undefined}
+        report={report}
+      />
     </div>
   );
 }

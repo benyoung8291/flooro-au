@@ -1,0 +1,125 @@
+import { useState, useMemo } from 'react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { FileText, Download, AlertCircle } from 'lucide-react';
+import { Room, ScaleCalibration } from '@/lib/canvas/types';
+import { Material } from '@/hooks/useMaterials';
+import { generateReport } from '@/lib/reports/calculations';
+import { CostSummaryCard } from './CostSummaryCard';
+import { RoomBreakdownList } from './RoomBreakdownList';
+import { ReportPreviewDialog } from './ReportPreviewDialog';
+
+interface ReportTabProps {
+  rooms: Room[];
+  materials: Material[];
+  scale: ScaleCalibration | null;
+  projectName?: string;
+  projectAddress?: string;
+}
+
+export function ReportTab({
+  rooms,
+  materials,
+  scale,
+  projectName = 'Untitled Project',
+  projectAddress,
+}: ReportTabProps) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const report = useMemo(
+    () => generateReport(rooms, materials, scale),
+    [rooms, materials, scale]
+  );
+
+  const hasRooms = rooms.length > 0;
+  const hasMaterialsAssigned = report.roomCalculations.some(r => r.materialId);
+  const isCalibrated = scale !== null;
+
+  if (!hasRooms) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+        <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
+          <FileText className="w-6 h-6 text-muted-foreground" />
+        </div>
+        <p className="text-sm font-medium mb-1">No rooms yet</p>
+        <p className="text-xs text-muted-foreground">
+          Draw some rooms on the canvas to see cost estimates
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ScrollArea className="h-full">
+        <div className="p-3 space-y-4">
+          {/* Warnings */}
+          {(!isCalibrated || !hasMaterialsAssigned) && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs space-y-1">
+              {!isCalibrated && (
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-amber-700 dark:text-amber-400">
+                    Scale not calibrated. Areas are in pixel units.
+                  </span>
+                </div>
+              )}
+              {!hasMaterialsAssigned && (
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-3 h-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-amber-700 dark:text-amber-400">
+                    No materials assigned. Drag materials onto rooms.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Cost Summary */}
+          <CostSummaryCard
+            totalCost={report.totalCost}
+            totalNetArea={report.totalNetArea}
+            totalGrossArea={report.totalGrossArea}
+            totalPerimeter={report.totalPerimeter}
+          />
+
+          <Separator />
+
+          {/* Room Breakdown */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Room Breakdown
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {rooms.length} room{rooms.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <RoomBreakdownList roomCalculations={report.roomCalculations} />
+          </div>
+
+          <Separator />
+
+          {/* Export Button */}
+          <Button 
+            className="w-full" 
+            onClick={() => setPreviewOpen(true)}
+            disabled={!hasRooms}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Preview & Export PDF
+          </Button>
+        </div>
+      </ScrollArea>
+
+      <ReportPreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        projectName={projectName}
+        projectAddress={projectAddress}
+        report={report}
+      />
+    </>
+  );
+}
