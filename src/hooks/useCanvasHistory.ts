@@ -1,5 +1,6 @@
 import { useReducer, useCallback, useRef } from 'react';
 import { CanvasState, CanvasAction, Room, Hole, Door, ScaleCalibration, ViewTransform, BackgroundImage } from '@/lib/canvas/types';
+import { calculateBoundingBox, calculateZoomToFit } from '@/lib/canvas/geometry';
 
 const INITIAL_STATE: CanvasState = {
   rooms: [],
@@ -158,7 +159,7 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
   const canRedo = historyIndexRef.current < historyRef.current.length - 1;
   
   // Load state from JSON (e.g., from database)
-  const loadFromJson = useCallback((jsonData: Record<string, unknown>) => {
+  const loadFromJson = useCallback((jsonData: Record<string, unknown>, canvasSize?: { width: number; height: number }) => {
     if (jsonData?.rooms && Array.isArray(jsonData.rooms)) {
       const rooms: Room[] = (jsonData.rooms as any[]).map((room, index) => ({
         id: room.id || `room_${index}`,
@@ -167,18 +168,27 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
         holes: room.holes || [],
         doors: room.doors || [],
         materialId: room.materialId || null,
+        materialCode: room.materialCode,
         color: room.color || 'hsla(217, 91%, 50%, 0.15)',
       }));
       
       const scale = jsonData.scale as ScaleCalibration | null;
-      
       const backgroundImage = jsonData.backgroundImage as BackgroundImage | null;
+      
+      // Calculate zoom-to-fit if we have rooms and canvas dimensions
+      let viewTransform = INITIAL_STATE.viewTransform;
+      if (rooms.length > 0 && canvasSize && canvasSize.width > 0 && canvasSize.height > 0) {
+        const boundingBox = calculateBoundingBox(rooms);
+        if (boundingBox) {
+          viewTransform = calculateZoomToFit(boundingBox, canvasSize.width, canvasSize.height);
+        }
+      }
       
       const newState: CanvasState = {
         rooms,
         scale: scale || null,
         selectedRoomId: null,
-        viewTransform: (jsonData.viewTransform as ViewTransform) || INITIAL_STATE.viewTransform,
+        viewTransform,
         backgroundImage: backgroundImage || null,
       };
       
@@ -187,6 +197,17 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
       historyIndexRef.current = 0;
     }
   }, []);
+  
+  // Fit view to show all rooms centered
+  const fitToView = useCallback((canvasWidth: number, canvasHeight: number) => {
+    if (state.rooms.length === 0) return;
+    
+    const boundingBox = calculateBoundingBox(state.rooms);
+    if (!boundingBox) return;
+    
+    const newTransform = calculateZoomToFit(boundingBox, canvasWidth, canvasHeight);
+    dispatch({ type: 'SET_VIEW_TRANSFORM', transform: newTransform });
+  }, [state.rooms]);
   
   // Export state to JSON for saving to database
   const exportToJson = useCallback((): Record<string, unknown> => {
@@ -207,5 +228,6 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
     canRedo,
     loadFromJson,
     exportToJson,
+    fitToView,
   };
 }

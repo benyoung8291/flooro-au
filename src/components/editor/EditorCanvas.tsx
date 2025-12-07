@@ -19,6 +19,8 @@ import {
 } from '@/lib/canvas/geometry';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
 import { FinishesLegend } from '@/components/reports/FinishesLegend';
+import { Maximize2 } from 'lucide-react';
+
 
 export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan';
 
@@ -55,7 +57,8 @@ export function EditorCanvas({
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson } = useCanvasHistory();
+  const hasInitializedRef = useRef(false);
+  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView } = useCanvasHistory();
   
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<CanvasPoint[]>([]);
@@ -119,25 +122,40 @@ export function EditorCanvas({
 
   // Load initial data and track canvas size
   useEffect(() => {
-    if (jsonData) {
-      loadFromJson(jsonData);
-    }
-    onCanvasReady?.();
-    
-    // Track canvas size for minimap
+    // Track canvas size for minimap and zoom-to-fit
     const updateSize = () => {
       if (containerRef.current) {
-        setCanvasSize({
+        const newSize = {
           width: containerRef.current.clientWidth,
           height: containerRef.current.clientHeight,
-        });
+        };
+        setCanvasSize(newSize);
+        return newSize;
       }
+      return null;
     };
     
-    updateSize();
+    const currentSize = updateSize();
+    
+    // Load data with canvas size for zoom-to-fit
+    if (jsonData && !hasInitializedRef.current && currentSize) {
+      hasInitializedRef.current = true;
+      loadFromJson(jsonData, currentSize);
+    }
+    
+    onCanvasReady?.();
+    
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+  
+  // Handle jsonData changes after initial load
+  useEffect(() => {
+    if (jsonData && hasInitializedRef.current === false && canvasSize.width > 0) {
+      hasInitializedRef.current = true;
+      loadFromJson(jsonData, canvasSize);
+    }
+  }, [jsonData, canvasSize, loadFromJson]);
 
   // Notify parent of changes (including backgroundImage)
   useEffect(() => {
@@ -586,9 +604,20 @@ export function EditorCanvas({
         </div>
       )}
 
-      {/* Zoom indicator */}
-      <div className="absolute bottom-4 left-4 px-2 py-1 rounded bg-background/80 backdrop-blur text-xs text-muted-foreground">
-        {Math.round(state.viewTransform.zoom * 100)}%
+      {/* Zoom controls */}
+      <div className="absolute bottom-4 left-4 flex items-center gap-2">
+        <div className="px-2 py-1 rounded bg-background/80 backdrop-blur text-xs text-muted-foreground">
+          {Math.round(state.viewTransform.zoom * 100)}%
+        </div>
+        {state.rooms.length > 0 && (
+          <button
+            onClick={() => fitToView(canvasSize.width, canvasSize.height)}
+            className="p-1.5 rounded bg-background/80 backdrop-blur hover:bg-background/90 transition-colors text-muted-foreground hover:text-foreground"
+            title="Fit to view"
+          >
+            <Maximize2 className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* Door width selector when door tool is active */}
