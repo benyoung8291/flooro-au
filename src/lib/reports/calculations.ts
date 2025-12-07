@@ -1,6 +1,12 @@
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { calculateRoomNetArea, pixelAreaToRealArea, mmSquaredToMSquared, calculatePerimeter } from '@/lib/canvas/geometry';
 import { Material, MaterialSpecs } from '@/hooks/useMaterials';
+import { 
+  calculateStripPlan, 
+  extractRollMaterialSpecs,
+  StripPlanResult,
+  MultiRoomStripPlan 
+} from '@/lib/rollGoods';
 
 export interface RoomCalculation {
   roomId: string;
@@ -16,8 +22,10 @@ export interface RoomCalculation {
   netPerimeterM: number;
   unitPrice: number;
   totalCost: number;
-  quantity: number; // tiles or linear meters
+  quantity: number;
   unit: string;
+  // Roll goods specific
+  stripPlan?: StripPlanResult;
 }
 
 export interface ReportSummary {
@@ -27,6 +35,8 @@ export interface ReportSummary {
   totalCost: number;
   roomCalculations: RoomCalculation[];
   materialSummary: MaterialSummaryItem[];
+  // Roll goods aggregation
+  rollGoodsPlans: Map<string, MultiRoomStripPlan>;
 }
 
 export interface MaterialSummaryItem {
@@ -38,6 +48,9 @@ export interface MaterialSummaryItem {
   unitPrice: number;
   totalCost: number;
   unit: string;
+  // Roll goods specific
+  utilizationPercent?: number;
+  wastePercent?: number;
 }
 
 // Get waste percentage from material specs
@@ -96,17 +109,40 @@ export function calculateRoomCost(
   let totalCost = 0;
   let quantity = 0;
   let unit = 'm²';
+  let stripPlan: StripPlanResult | undefined;
   
   switch (material.type) {
-    case 'roll':
-      // Roll goods: area + waste
-      grossAreaM2 = netAreaM2 * wasteFactor;
-      quantity = grossAreaM2;
-      totalCost = grossAreaM2 * unitPrice;
-      unit = 'm²';
-      break;
+    case 'roll': {
+      // Use Greedy Strip algorithm for roll goods
+      const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
+      stripPlan = calculateStripPlan(room, rollSpecs, scale);
       
-    case 'tile':
+      grossAreaM2 = stripPlan.totalMaterialAreaM2;
+      quantity = grossAreaM2;
+      totalCost = stripPlan.materialCost;
+      unit = 'm²';
+      
+      return {
+        roomId: room.id,
+        roomName: room.name,
+        materialId: material.id,
+        materialName: material.name,
+        materialType: material.type,
+        netAreaM2,
+        grossAreaM2,
+        wastePercent: stripPlan.wastePercent,
+        perimeterM,
+        doorDeductionM,
+        netPerimeterM,
+        unitPrice,
+        totalCost,
+        quantity,
+        unit,
+        stripPlan,
+      };
+    }
+      
+    case 'tile': {
       // Tiles: count = area / tile area, then add waste
       const tileWidth = (material.specs.width || 300) / 1000; // mm to m
       const tileHeight = (material.specs.height || 300) / 1000;
@@ -117,14 +153,16 @@ export function calculateRoomCost(
       totalCost = tileCount * unitPrice;
       unit = 'tiles';
       break;
+    }
       
-    case 'linear':
+    case 'linear': {
       // Linear (baseboards): perimeter minus doors
       grossAreaM2 = netPerimeterM * wasteFactor;
       quantity = grossAreaM2;
       totalCost = grossAreaM2 * unitPrice;
       unit = 'm';
       break;
+    }
   }
   
   return {
@@ -143,6 +181,7 @@ export function calculateRoomCost(
     totalCost,
     quantity,
     unit,
+    stripPlan,
   };
 }
 
@@ -161,6 +200,7 @@ export function generateReport(
   
   // Aggregate by material
   const materialAggregates = new Map<string, MaterialSummaryItem>();
+  const rollGoodsPlans = new Map<string, MultiRoomStripPlan>();
   
   for (const calc of roomCalculations) {
     if (!calc.materialId) continue;
@@ -170,8 +210,16 @@ export function generateReport(
       existing.totalArea += calc.grossAreaM2;
       existing.totalQuantity += calc.quantity;
       existing.totalCost += calc.totalCost;
+      
+      // Update utilization for roll goods
+      if (calc.stripPlan && existing.wastePercent !== undefined) {
+        const totalWaste = (existing.wastePercent * existing.totalArea + calc.stripPlan.wastePercent * calc.grossAreaM2) / 
+          (existing.totalArea + calc.grossAreaM2);
+        existing.wastePercent = totalWaste;
+        existing.utilizationPercent = 100 - totalWaste;
+      }
     } else {
-      materialAggregates.set(calc.materialId, {
+      const summaryItem: MaterialSummaryItem = {
         materialId: calc.materialId,
         materialName: calc.materialName || '',
         materialType: calc.materialType || '',
@@ -180,7 +228,15 @@ export function generateReport(
         unitPrice: calc.unitPrice,
         totalCost: calc.totalCost,
         unit: calc.unit,
-      });
+      };
+      
+      // Add utilization info for roll goods
+      if (calc.stripPlan) {
+        summaryItem.wastePercent = calc.stripPlan.wastePercent;
+        summaryItem.utilizationPercent = calc.stripPlan.utilizationPercent;
+      }
+      
+      materialAggregates.set(calc.materialId, summaryItem);
     }
   }
   
@@ -191,6 +247,7 @@ export function generateReport(
     totalCost: roomCalculations.reduce((sum, r) => sum + r.totalCost, 0),
     roomCalculations,
     materialSummary: Array.from(materialAggregates.values()),
+    rollGoodsPlans,
   };
 }
 
