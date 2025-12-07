@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { StripPlanResult } from '@/lib/rollGoods';
 import { formatArea, formatLength } from '@/lib/reports/calculations';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Printer, Download, Ruler, Scissors, Package } from 'lucide-react';
+import { Printer, Download, Ruler, Scissors, Package, Repeat, Lightbulb, CheckCircle2, AlertTriangle, ArrowRight } from 'lucide-react';
 
 interface CutPlanModalProps {
   open: boolean;
@@ -18,6 +18,14 @@ interface CutPlanModalProps {
   stripPlan: StripPlanResult;
   materialName?: string;
   rollWidth?: number;
+  patternRepeat?: number;
+}
+
+interface OptimizationSuggestion {
+  type: 'success' | 'warning' | 'info';
+  title: string;
+  description: string;
+  savings?: string;
 }
 
 /**
@@ -30,8 +38,117 @@ export function CutPlanModal({
   stripPlan,
   materialName = 'Roll Material',
   rollWidth = 4000,
+  patternRepeat = 0,
 }: CutPlanModalProps) {
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Analyze pattern matching and generate optimization suggestions
+  const { hasPattern, patternInfo, suggestions } = useMemo(() => {
+    const hasPattern = patternRepeat > 0;
+    const patternRepeats = hasPattern 
+      ? Math.ceil(stripPlan.roomBoundingBox.height / patternRepeat)
+      : 0;
+    
+    const suggestions: OptimizationSuggestion[] = [];
+
+    // Check utilization efficiency
+    if (stripPlan.utilizationPercent >= 90) {
+      suggestions.push({
+        type: 'success',
+        title: 'Excellent Utilization',
+        description: 'This layout achieves optimal material usage with minimal waste.',
+      });
+    } else if (stripPlan.utilizationPercent >= 80) {
+      suggestions.push({
+        type: 'info',
+        title: 'Good Utilization',
+        description: 'Material usage is within acceptable range.',
+      });
+    } else {
+      suggestions.push({
+        type: 'warning',
+        title: 'High Waste',
+        description: 'Consider rotating the layout direction to reduce waste.',
+        savings: `${(stripPlan.wastePercent - 10).toFixed(1)}% potential savings`,
+      });
+    }
+
+    // Pattern matching suggestions
+    if (hasPattern) {
+      const allStripsAligned = stripPlan.strips.every((strip, i) => {
+        if (i === 0) return true;
+        return strip.patternOffset % patternRepeat === 0;
+      });
+
+      if (allStripsAligned) {
+        suggestions.push({
+          type: 'success',
+          title: 'Pattern Aligned',
+          description: 'All strips are properly aligned for pattern matching.',
+        });
+      } else {
+        suggestions.push({
+          type: 'warning',
+          title: 'Pattern Offset Required',
+          description: 'Some strips require offset cuts for pattern alignment.',
+        });
+      }
+
+      // Check if pattern repeat causes extra waste
+      const roomLength = stripPlan.layoutDirection === 'horizontal' 
+        ? stripPlan.roomBoundingBox.width 
+        : stripPlan.roomBoundingBox.height;
+      const patternWaste = (Math.ceil(roomLength / patternRepeat) * patternRepeat) - roomLength;
+      if (patternWaste > patternRepeat * 0.5) {
+        suggestions.push({
+          type: 'info',
+          title: 'Pattern Repeat Impact',
+          description: `Room dimensions cause ${(patternWaste / 1000).toFixed(2)}m extra per strip for pattern matching.`,
+        });
+      }
+    }
+
+    // Seam placement suggestions
+    if (stripPlan.seamLines.length > 3) {
+      suggestions.push({
+        type: 'warning',
+        title: 'Multiple Seams',
+        description: 'Consider a wider roll material to reduce seam count.',
+      });
+    } else if (stripPlan.seamLines.length === 0) {
+      suggestions.push({
+        type: 'success',
+        title: 'Seamless Installation',
+        description: 'Room can be covered with a single strip - no seams required!',
+      });
+    }
+
+    // Layout direction suggestion
+    const altDirection = stripPlan.layoutDirection === 'horizontal' ? 'vertical' : 'horizontal';
+    const currentDimension = stripPlan.layoutDirection === 'horizontal' 
+      ? stripPlan.roomBoundingBox.height 
+      : stripPlan.roomBoundingBox.width;
+    const altDimension = stripPlan.layoutDirection === 'horizontal' 
+      ? stripPlan.roomBoundingBox.width 
+      : stripPlan.roomBoundingBox.height;
+    
+    if (altDimension < currentDimension && altDimension <= rollWidth) {
+      suggestions.push({
+        type: 'info',
+        title: 'Alternative Layout',
+        description: `Try ${altDirection} layout for potentially fewer strips.`,
+      });
+    }
+
+    return {
+      hasPattern,
+      patternInfo: {
+        repeat: patternRepeat,
+        repeatsNeeded: patternRepeats,
+      },
+      suggestions,
+    };
+  }, [stripPlan, patternRepeat, rollWidth]);
 
   const handlePrint = () => {
     const content = printRef.current;
@@ -151,6 +268,7 @@ export function CutPlanModal({
             <h1 className="title text-xl font-semibold">{stripPlan.roomName} - Cut Plan</h1>
             <p className="subtitle text-sm text-muted-foreground">
               Material: {materialName} • Roll Width: {(rollWidth / 1000).toFixed(2)}m
+              {hasPattern && ` • Pattern Repeat: ${(patternRepeat / 1000).toFixed(2)}m`}
             </p>
           </div>
 
@@ -177,6 +295,21 @@ export function CutPlanModal({
               highlight={stripPlan.utilizationPercent >= 85}
             />
           </div>
+
+          {/* Optimization Suggestions */}
+          {suggestions.length > 0 && (
+            <div className="bg-muted/30 rounded-lg p-4 border">
+              <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                Optimization Analysis
+              </h3>
+              <div className="grid gap-2">
+                {suggestions.map((suggestion, index) => (
+                  <SuggestionCard key={index} suggestion={suggestion} />
+                ))}
+              </div>
+            </div>
+          )}
 
           <Separator />
 
@@ -295,9 +428,49 @@ export function CutPlanModal({
 
           <Separator />
 
+          {/* Pattern Matching Info */}
+          {hasPattern && (
+            <>
+              <div>
+                <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+                  <Repeat className="w-4 h-4" />
+                  Pattern Matching Guide
+                </h3>
+                <div className="bg-muted/30 rounded-lg p-4 border">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground uppercase">Pattern Repeat</p>
+                      <p className="text-lg font-mono font-semibold">{(patternRepeat / 1000).toFixed(2)}m</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground uppercase">Repeats/Strip</p>
+                      <p className="text-lg font-mono font-semibold">{patternInfo.repeatsNeeded}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground uppercase">Total Strips</p>
+                      <p className="text-lg font-mono font-semibold">{stripPlan.strips.length}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground uppercase">Seam Count</p>
+                      <p className="text-lg font-mono font-semibold">{stripPlan.seamLines.length}</p>
+                    </div>
+                  </div>
+
+                  {/* Pattern Alignment Diagram */}
+                  <PatternAlignmentDiagram 
+                    strips={stripPlan.strips} 
+                    patternRepeat={patternRepeat}
+                    rollWidth={rollWidth}
+                  />
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
+
           {/* Cut List Table */}
           <div>
-            <h3 className="text-sm font-medium mb-3">Cut List</h3>
+            <h3 className="text-sm font-medium mb-3">Cut List {hasPattern && '& Pattern Offsets'}</h3>
             <div className="border rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
@@ -306,6 +479,9 @@ export function CutPlanModal({
                     <th className="text-left px-3 py-2 font-medium text-xs uppercase text-muted-foreground">Length</th>
                     <th className="text-left px-3 py-2 font-medium text-xs uppercase text-muted-foreground">Width</th>
                     <th className="text-left px-3 py-2 font-medium text-xs uppercase text-muted-foreground">Area</th>
+                    {hasPattern && (
+                      <th className="text-left px-3 py-2 font-medium text-xs uppercase text-muted-foreground">Pattern Offset</th>
+                    )}
                     <th className="text-left px-3 py-2 font-medium text-xs uppercase text-muted-foreground">Position</th>
                   </tr>
                 </thead>
@@ -314,10 +490,33 @@ export function CutPlanModal({
                     const areaM2 = (strip.length * strip.width) / 1_000_000;
                     return (
                       <tr key={strip.id} className="border-t border-border/50">
-                        <td className="px-3 py-2 font-medium">Strip #{index + 1}</td>
+                        <td className="px-3 py-2 font-medium">
+                          <div className="flex items-center gap-2">
+                            Strip #{index + 1}
+                            {index === 0 && hasPattern && (
+                              <Badge variant="secondary" className="text-[10px]">Reference</Badge>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-3 py-2 font-mono">{(strip.length / 1000).toFixed(3)}m</td>
                         <td className="px-3 py-2 font-mono">{(strip.width / 1000).toFixed(3)}m</td>
                         <td className="px-3 py-2 font-mono">{areaM2.toFixed(2)} m²</td>
+                        {hasPattern && (
+                          <td className="px-3 py-2">
+                            {index === 0 ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <span className="font-mono">{(strip.patternOffset / 1000).toFixed(3)}m</span>
+                                {strip.patternOffset > 0 && (
+                                  <Badge variant="outline" className="text-[10px] bg-blue-500/10 text-blue-600 border-blue-500/30">
+                                    Offset
+                                  </Badge>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-muted-foreground">
                           X: {(strip.x / 1000).toFixed(2)}m, Y: {(strip.y / 1000).toFixed(2)}m
                         </td>
@@ -331,6 +530,7 @@ export function CutPlanModal({
                     <td className="px-3 py-2 font-mono font-medium">{formatLength(stripPlan.totalRollLengthM)}</td>
                     <td className="px-3 py-2">—</td>
                     <td className="px-3 py-2 font-mono font-medium">{formatArea(stripPlan.totalMaterialAreaM2)}</td>
+                    {hasPattern && <td className="px-3 py-2">—</td>}
                     <td className="px-3 py-2">—</td>
                   </tr>
                 </tfoot>
@@ -381,6 +581,188 @@ function StatBox({
         <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
       </div>
       <p className={`text-lg font-semibold font-mono ${highlight ? 'text-primary' : ''}`}>{value}</p>
+    </div>
+  );
+}
+
+function SuggestionCard({ suggestion }: { suggestion: OptimizationSuggestion }) {
+  const iconMap = {
+    success: <CheckCircle2 className="w-4 h-4 text-green-500" />,
+    warning: <AlertTriangle className="w-4 h-4 text-amber-500" />,
+    info: <ArrowRight className="w-4 h-4 text-blue-500" />,
+  };
+
+  const bgMap = {
+    success: 'bg-green-500/10 border-green-500/30',
+    warning: 'bg-amber-500/10 border-amber-500/30',
+    info: 'bg-blue-500/10 border-blue-500/30',
+  };
+
+  return (
+    <div className={`flex items-start gap-3 p-3 rounded-lg border ${bgMap[suggestion.type]}`}>
+      <div className="mt-0.5">{iconMap[suggestion.type]}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium">{suggestion.title}</p>
+        <p className="text-xs text-muted-foreground">{suggestion.description}</p>
+        {suggestion.savings && (
+          <Badge variant="outline" className="mt-1 text-[10px]">
+            {suggestion.savings}
+          </Badge>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PatternAlignmentDiagram({ 
+  strips, 
+  patternRepeat,
+  rollWidth,
+}: { 
+  strips: StripPlanResult['strips']; 
+  patternRepeat: number;
+  rollWidth: number;
+}) {
+  const diagramWidth = 500;
+  const stripHeight = 50;
+  const padding = 20;
+  const totalHeight = padding * 2 + strips.length * (stripHeight + 10) + 30;
+
+  // Find max length for scaling
+  const maxLength = Math.max(...strips.map(s => s.length));
+  const scaleX = (diagramWidth - padding * 2) / Math.max(maxLength, 1);
+
+  // Calculate pattern repeat width in diagram
+  const patternWidth = patternRepeat * scaleX;
+
+  return (
+    <div className="mt-4">
+      <p className="text-xs text-muted-foreground mb-2">Pattern Alignment View</p>
+      <svg 
+        viewBox={`0 0 ${diagramWidth} ${totalHeight}`}
+        className="w-full h-auto bg-background rounded border"
+      >
+        {/* Pattern repeat markers */}
+        {patternWidth > 20 && Array.from({ length: Math.ceil((diagramWidth - padding * 2) / patternWidth) + 1 }).map((_, i) => (
+          <g key={`pattern-${i}`}>
+            <line
+              x1={padding + i * patternWidth}
+              y1={padding - 10}
+              x2={padding + i * patternWidth}
+              y2={totalHeight - 30}
+              stroke="hsl(var(--border))"
+              strokeWidth="1"
+              strokeDasharray="4 4"
+            />
+            {i > 0 && (
+              <text
+                x={padding + i * patternWidth}
+                y={padding - 14}
+                textAnchor="middle"
+                className="text-[8px]"
+                fill="hsl(var(--muted-foreground))"
+              >
+                {i}×
+              </text>
+            )}
+          </g>
+        ))}
+
+        {/* Strips */}
+        {strips.map((strip, index) => {
+          const y = padding + index * (stripHeight + 10);
+          const width = strip.length * scaleX;
+          const offsetX = strip.patternOffset * scaleX;
+
+          return (
+            <g key={strip.id}>
+              {/* Strip background */}
+              <rect
+                x={padding}
+                y={y}
+                width={width}
+                height={stripHeight}
+                fill={index % 2 === 0 ? 'hsl(217 91% 60% / 0.2)' : 'hsl(217 91% 50% / 0.2)'}
+                stroke="hsl(217 91% 50%)"
+                strokeWidth="1"
+                rx="2"
+              />
+
+              {/* Pattern offset indicator */}
+              {index > 0 && strip.patternOffset > 0 && (
+                <>
+                  <rect
+                    x={padding}
+                    y={y}
+                    width={offsetX}
+                    height={stripHeight}
+                    fill="hsl(0 84% 60% / 0.3)"
+                    stroke="hsl(0 84% 60%)"
+                    strokeWidth="1"
+                    strokeDasharray="3 2"
+                  />
+                  <text
+                    x={padding + offsetX / 2}
+                    y={y + stripHeight / 2}
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    className="text-[8px] font-medium"
+                    fill="hsl(0 84% 40%)"
+                  >
+                    Offset
+                  </text>
+                </>
+              )}
+
+              {/* Pattern lines within strip */}
+              {patternWidth > 10 && Array.from({ length: Math.floor(width / patternWidth) }).map((_, pi) => (
+                <line
+                  key={`p-${pi}`}
+                  x1={padding + (pi + 1) * patternWidth}
+                  y1={y + 5}
+                  x2={padding + (pi + 1) * patternWidth}
+                  y2={y + stripHeight - 5}
+                  stroke="hsl(142 76% 36% / 0.5)"
+                  strokeWidth="2"
+                />
+              ))}
+
+              {/* Strip label */}
+              <text
+                x={padding + width / 2}
+                y={y + stripHeight / 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="text-[10px] font-medium"
+                fill="hsl(var(--foreground))"
+              >
+                Strip #{index + 1} ({(strip.length / 1000).toFixed(2)}m)
+              </text>
+
+              {/* Reference badge for first strip */}
+              {index === 0 && (
+                <text
+                  x={padding + 4}
+                  y={y + 12}
+                  className="text-[8px] font-medium"
+                  fill="hsl(217 91% 50%)"
+                >
+                  REF
+                </text>
+              )}
+            </g>
+          );
+        })}
+
+        {/* Legend */}
+        <g transform={`translate(${padding}, ${totalHeight - 25})`}>
+          <rect x="0" y="0" width="12" height="12" fill="hsl(142 76% 36% / 0.5)" rx="1" />
+          <text x="16" y="10" className="text-[9px]" fill="hsl(var(--muted-foreground))">Pattern repeat</text>
+          
+          <rect x="100" y="0" width="12" height="12" fill="hsl(0 84% 60% / 0.3)" stroke="hsl(0 84% 60%)" strokeWidth="1" strokeDasharray="2 1" rx="1" />
+          <text x="116" y="10" className="text-[9px]" fill="hsl(var(--muted-foreground))">Pattern offset cut</text>
+        </g>
+      </svg>
     </div>
   );
 }
