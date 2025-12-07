@@ -60,10 +60,28 @@ export function RoomBreakdownList({ roomCalculations }: RoomBreakdownListProps) 
               
               {room.wastePercent > 0 && (
                 <span className="text-xs text-muted-foreground">
-                  +{room.wastePercent}% waste
+                  +{room.wastePercent.toFixed(1)}% waste
                 </span>
               )}
             </div>
+
+            {/* Roll goods pricing breakdown */}
+            {room.stripPlan && room.stripPlan.pricingMethod !== 'per_m2' && (
+              <div className="mt-2 text-xs text-muted-foreground space-y-0.5">
+                {room.stripPlan.fullRolls !== undefined && room.stripPlan.fullRolls > 0 && (
+                  <div>
+                    {room.stripPlan.fullRolls} full roll{room.stripPlan.fullRolls !== 1 ? 's' : ''}
+                    {room.stripPlan.rollCost && ` @ ${formatCurrency(room.stripPlan.rollCost)}`}
+                  </div>
+                )}
+                {room.stripPlan.cutLengthM !== undefined && room.stripPlan.cutLengthM > 0 && (
+                  <div>
+                    {room.stripPlan.cutLengthM.toFixed(2)}m cut
+                    {room.stripPlan.cutCost && ` @ ${formatCurrency(room.stripPlan.cutCost)}`}
+                  </div>
+                )}
+              </div>
+            )}
 
             {room.materialType === 'linear' && room.doorDeductionM > 0 && (
               <div className="mt-2 text-xs text-muted-foreground">
