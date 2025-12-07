@@ -12,6 +12,7 @@ import { ImageControls } from '@/components/editor/ImageControls';
 import { MobileNav } from '@/components/editor/MobileNav';
 import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
 import { MobileSidebarDrawer } from '@/components/editor/MobileSidebarDrawer';
+import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,7 @@ export default function ProjectEditor() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
+  const [is3DMode, setIs3DMode] = useState(false);
 
   // Sync local data with project data
   useEffect(() => {
@@ -92,6 +94,12 @@ export default function ProjectEditor() {
         case ' ': 
           e.preventDefault();
           setActiveTool('pan'); 
+          break;
+        case '2':
+          setIs3DMode(false);
+          break;
+        case '3':
+          setIs3DMode(true);
           break;
       }
     };
@@ -283,8 +291,10 @@ export default function ProjectEditor() {
               <EditorToolbar
                 activeTool={activeTool}
                 onToolChange={setActiveTool}
+                is3DMode={is3DMode}
+                onToggle3D={() => setIs3DMode(!is3DMode)}
               />
-              {!isViewer && (
+              {!isViewer && !is3DMode && (
                 <FloorPlanUpload
                   projectId={projectId!}
                   onImageUploaded={handleSetBackgroundImage}
@@ -294,7 +304,7 @@ export default function ProjectEditor() {
           )}
 
           {/* Image Controls (when background image exists) - Responsive */}
-          {backgroundImage && (
+          {backgroundImage && !is3DMode && (
             <div className={`absolute z-10 ${isMobile ? 'top-2 left-2 right-2' : 'top-4 left-1/2 -translate-x-1/2'}`}>
               <ImageControls
                 image={backgroundImage}
@@ -320,16 +330,24 @@ export default function ProjectEditor() {
             </Button>
           )}
 
-          {/* Canvas */}
-          <EditorCanvas
-            activeTool={activeTool}
-            jsonData={localData}
-            onDataChange={handleDataChange}
-            backgroundImage={backgroundImage}
-            onSetBackgroundImage={handleSetBackgroundImage}
-            onUpdateBackgroundImage={handleUpdateBackgroundImage}
-            onRemoveBackgroundImage={handleRemoveBackgroundImage}
-          />
+          {/* Canvas or 3D View */}
+          {is3DMode ? (
+            <ThreeDViewer
+              rooms={rooms}
+              scale={scale}
+              materials={materials?.map(m => ({ id: m.id, type: m.type, name: m.name }))}
+            />
+          ) : (
+            <EditorCanvas
+              activeTool={activeTool}
+              jsonData={localData}
+              onDataChange={handleDataChange}
+              backgroundImage={backgroundImage}
+              onSetBackgroundImage={handleSetBackgroundImage}
+              onUpdateBackgroundImage={handleUpdateBackgroundImage}
+              onRemoveBackgroundImage={handleRemoveBackgroundImage}
+            />
+          )}
         </div>
 
         {/* Desktop Right Sidebar */}

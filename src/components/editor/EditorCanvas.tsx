@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
+import { Minimap } from './Minimap';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
@@ -47,6 +48,7 @@ export function EditorCanvas({
   onRemoveBackgroundImage,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson } = useCanvasHistory();
   
   const [isDrawing, setIsDrawing] = useState(false);
@@ -109,12 +111,26 @@ export function EditorCanvas({
     }
   }, [backgroundImage, dispatch]);
 
-  // Load initial data
+  // Load initial data and track canvas size
   useEffect(() => {
     if (jsonData) {
       loadFromJson(jsonData);
     }
     onCanvasReady?.();
+    
+    // Track canvas size for minimap
+    const updateSize = () => {
+      if (containerRef.current) {
+        setCanvasSize({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight,
+        });
+      }
+    };
+    
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
   }, []);
 
   // Notify parent of changes (including backgroundImage)
@@ -587,6 +603,19 @@ export function EditorCanvas({
           ))}
         </div>
       )}
+      
+      {/* Minimap */}
+      <Minimap
+        rooms={state.rooms}
+        viewTransform={state.viewTransform}
+        canvasSize={canvasSize}
+        onNavigate={(offsetX, offsetY) => {
+          dispatch({
+            type: 'SET_VIEW_TRANSFORM',
+            transform: { offsetX, offsetY },
+          });
+        }}
+      />
     </div>
   );
 }
