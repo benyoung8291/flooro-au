@@ -48,23 +48,40 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+// Persisted allocation structure
+export interface PersistedDropAllocation {
+  dropId: string;
+  sourceRoomId: string;
+  sourceRoomName: string;
+  targetRoomId: string;
+  targetRoomName: string;
+  length: number;
+  width: number;
+}
+
 interface CrossRoomOptimizerProps {
   rooms: Room[];
   material: RollMaterialSpecs;
+  materialId: string;
   materialName?: string;
   scale: ScaleCalibration | null;
   onApplyOptimization?: (plan: OptimizedCutPlan) => void;
   onAllocateDrop?: (drop: DropPiece, targetRoomId: string) => void;
+  onAllocationsChange?: (materialId: string, allocations: PersistedDropAllocation[]) => void;
+  savedAllocations?: PersistedDropAllocation[];
   showDetailedDrops?: boolean;
 }
 
 export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
   rooms,
   material,
+  materialId,
   materialName,
   scale,
   onApplyOptimization,
   onAllocateDrop,
+  onAllocationsChange,
+  savedAllocations = [],
   showDetailedDrops = false,
 }) => {
   const [showSettings, setShowSettings] = useState(false);
@@ -72,11 +89,50 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
   const [showManualAllocation, setShowManualAllocation] = useState(false);
   const [draggedDrop, setDraggedDrop] = useState<DropPiece | null>(null);
   const [dragOverRoomId, setDragOverRoomId] = useState<string | null>(null);
-  const [manualAllocations, setManualAllocations] = useState<Map<string, { drop: DropPiece; targetRoomId: string; targetRoomName: string }>>(new Map());
   const [options, setOptions] = useState<OptimizationOptions>({
     minDropLength: 500,
     allowPatternMismatch: false,
   });
+
+  // Initialize manual allocations from saved data
+  const [manualAllocations, setManualAllocations] = useState<Map<string, { drop: DropPiece; targetRoomId: string; targetRoomName: string }>>(() => {
+    const map = new Map<string, { drop: DropPiece; targetRoomId: string; targetRoomName: string }>();
+    savedAllocations.forEach(alloc => {
+      map.set(alloc.dropId, {
+        drop: {
+          id: alloc.dropId,
+          sourceRoomId: alloc.sourceRoomId,
+          sourceRoomName: alloc.sourceRoomName,
+          sourceStripId: '', // Not persisted, will be matched at runtime
+          length: alloc.length,
+          width: alloc.width,
+          patternOffset: 0,
+          cost: 0,
+          isUsed: false,
+        },
+        targetRoomId: alloc.targetRoomId,
+        targetRoomName: alloc.targetRoomName,
+      });
+    });
+    return map;
+  });
+
+  // Persist allocations when they change
+  const persistAllocations = useCallback((allocationsMap: Map<string, { drop: DropPiece; targetRoomId: string; targetRoomName: string }>) => {
+    if (!onAllocationsChange) return;
+    
+    const persisted: PersistedDropAllocation[] = Array.from(allocationsMap.entries()).map(([dropId, alloc]) => ({
+      dropId,
+      sourceRoomId: alloc.drop.sourceRoomId,
+      sourceRoomName: alloc.drop.sourceRoomName,
+      targetRoomId: alloc.targetRoomId,
+      targetRoomName: alloc.targetRoomName,
+      length: alloc.drop.length,
+      width: alloc.drop.width,
+    }));
+    
+    onAllocationsChange(materialId, persisted);
+  }, [materialId, onAllocationsChange]);
 
   const optimizedPlan = useMemo(() => {
     if (rooms.length < 2) return null;
@@ -153,7 +209,7 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
       return;
     }
 
-    // Add to manual allocations
+    // Add to manual allocations and persist
     setManualAllocations(prev => {
       const newMap = new Map(prev);
       newMap.set(draggedDrop.id, {
@@ -161,6 +217,7 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
         targetRoomId: targetRoom.id,
         targetRoomName: targetRoom.name,
       });
+      persistAllocations(newMap);
       return newMap;
     });
 
@@ -174,16 +231,23 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
     });
 
     setDraggedDrop(null);
-  }, [draggedDrop, onAllocateDrop]);
+  }, [draggedDrop, onAllocateDrop, persistAllocations]);
 
   const handleRemoveAllocation = useCallback((dropId: string) => {
     setManualAllocations(prev => {
       const newMap = new Map(prev);
       newMap.delete(dropId);
+      persistAllocations(newMap);
       return newMap;
     });
     toast.info('Allocation removed');
-  }, []);
+  }, [persistAllocations]);
+
+  const handleClearAllAllocations = useCallback(() => {
+    setManualAllocations(new Map());
+    persistAllocations(new Map());
+    toast.info('All allocations cleared');
+  }, [persistAllocations]);
 
   // Get unallocated usable drops (excluding manual allocations)
   const unallocatedDrops = useMemo(() => {
@@ -522,7 +586,7 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setManualAllocations(new Map())}
+                        onClick={handleClearAllAllocations}
                         className="text-xs h-7"
                       >
                         Clear All
