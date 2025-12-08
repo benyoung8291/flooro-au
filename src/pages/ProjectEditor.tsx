@@ -166,6 +166,13 @@ export default function ProjectEditor() {
   const scale = (localData.scale as ScaleCalibration) || null;
   const backgroundImage = (localData.backgroundImage as BackgroundImage) || null;
   const selectedRoomId = (localData.selectedRoomId as string | null) || null;
+  const dropAllocations = (localData.dropAllocations as Record<string, unknown>) || {};
+
+  // Handle drop allocations change
+  const handleDropAllocationsChange = useCallback((allocations: Record<string, unknown>) => {
+    setLocalData(prev => ({ ...prev, dropAllocations: allocations }));
+    setHasUnsavedChanges(true);
+  }, []);
 
   // Room management handlers
   const handleSelectRoom = useCallback((roomId: string | null) => {
@@ -495,6 +502,8 @@ export default function ProjectEditor() {
             onMaterialSelect={handleMaterialSelect}
             projectName={project.name}
             projectAddress={project.address || undefined}
+            dropAllocations={dropAllocations as any}
+            onDropAllocationsChange={handleDropAllocationsChange as any}
           />
         )}
       </div>

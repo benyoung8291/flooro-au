@@ -20,11 +20,14 @@ import { SeamDiagram } from './SeamDiagram';
 import { CutPlanModal } from './CutPlanModal';
 import { FinishesSchedule } from './FinishesSchedule';
 import { WasteSuggestionCard } from './WasteSuggestionCard';
-import { CrossRoomOptimizer } from './CrossRoomOptimizer';
+import { CrossRoomOptimizer, PersistedDropAllocation } from './CrossRoomOptimizer';
 import { LaborCostPanel } from './LaborCostPanel';
 import { StripPlanResult, extractRollMaterialSpecs } from '@/lib/rollGoods';
 import { OptimizedCutPlan } from '@/lib/rollGoods/cutOptimizer';
 import { toast } from 'sonner';
+
+// Per-material drop allocations stored in project
+export type DropAllocationsMap = Record<string, PersistedDropAllocation[]>;
 
 interface ReportTabProps {
   rooms: Room[];
@@ -34,6 +37,8 @@ interface ReportTabProps {
   projectAddress?: string;
   wasteOverrides?: WasteOverrides;
   onWasteOverridesChange?: (overrides: WasteOverrides) => void;
+  dropAllocations?: DropAllocationsMap;
+  onDropAllocationsChange?: (allocations: DropAllocationsMap) => void;
 }
 
 export function ReportTab({
@@ -44,6 +49,8 @@ export function ReportTab({
   projectAddress,
   wasteOverrides = {},
   onWasteOverridesChange,
+  dropAllocations = {},
+  onDropAllocationsChange,
 }: ReportTabProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [roundingMode, setRoundingMode] = useState<QuantityRoundingMode>('up');
@@ -80,6 +87,19 @@ export function ReportTab({
       setLocalWasteOverrides(newOverrides);
     }
   }, [effectiveOverrides, onWasteOverridesChange]);
+
+  // Handle drop allocation changes
+  const handleDropAllocationsChange = useCallback((materialId: string, allocations: PersistedDropAllocation[]) => {
+    if (!onDropAllocationsChange) return;
+    
+    const newAllocations = { ...dropAllocations };
+    if (allocations.length === 0) {
+      delete newAllocations[materialId];
+    } else {
+      newAllocations[materialId] = allocations;
+    }
+    onDropAllocationsChange(newAllocations);
+  }, [dropAllocations, onDropAllocationsChange]);
 
   // Check if any materials have box quantities
   const hasBoxQuantities = useMemo(
@@ -253,9 +273,12 @@ export function ReportTab({
                     key={materialId}
                     rooms={materialRooms}
                     material={extractRollMaterialSpecs(material.specs as Record<string, unknown>)}
+                    materialId={materialId}
                     materialName={material.name}
                     scale={scale}
                     onApplyOptimization={handleApplyOptimization}
+                    onAllocationsChange={handleDropAllocationsChange}
+                    savedAllocations={dropAllocations[materialId] || []}
                     showDetailedDrops
                   />
                 );

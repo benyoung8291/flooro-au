@@ -27,7 +27,7 @@ import { LayersPanel } from './LayersPanel';
 import { AccessoriesPanel } from './AccessoriesPanel';
 import { SeamEditor } from './SeamEditor';
 import { TilePatternViewer } from './TilePatternViewer';
-import { ReportTab } from '@/components/reports/ReportTab';
+import { ReportTab, DropAllocationsMap } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { TileSpecs, TilePattern } from '@/lib/tiles/types';
@@ -48,6 +48,8 @@ interface EditorSidebarProps {
   projectAddress?: string;
   stripPlans?: Map<string, StripPlanResult>;
   onRecalculateStripPlan?: (roomId: string) => void;
+  dropAllocations?: DropAllocationsMap;
+  onDropAllocationsChange?: (allocations: DropAllocationsMap) => void;
 }
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -71,6 +73,8 @@ export function EditorSidebar({
   projectAddress,
   stripPlans,
   onRecalculateStripPlan,
+  dropAllocations = {},
+  onDropAllocationsChange,
 }: EditorSidebarProps) {
   const [selectedTab, setSelectedTab] = useState('materials');
   const { data: materials, isLoading } = useMaterials();
@@ -432,6 +436,8 @@ export function EditorSidebar({
               scale={scale}
               projectName={projectName}
               projectAddress={projectAddress}
+              dropAllocations={dropAllocations}
+              onDropAllocationsChange={onDropAllocationsChange}
             />
           </TabsContent>
         </Tabs>
