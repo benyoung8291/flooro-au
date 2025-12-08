@@ -8,6 +8,7 @@ import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { EditorSidebar } from '@/components/editor/EditorSidebar';
 import { FloorPlanUpload } from '@/components/editor/FloorPlanUpload';
+import { AutoTakeoffDialog } from '@/components/editor/AutoTakeoffDialog';
 import { ImageControls } from '@/components/editor/ImageControls';
 import { MobileNav } from '@/components/editor/MobileNav';
 import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
@@ -309,6 +310,24 @@ export default function ProjectEditor() {
     setHasUnsavedChanges(true);
   }, []);
 
+  // Handle AI auto-takeoff results
+  const handleAutoTakeoffResults = useCallback((
+    detectedRooms: Room[], 
+    detectedScale?: ScaleCalibration, 
+    detectedBackgroundImage?: BackgroundImage
+  ) => {
+    setLocalData(prev => {
+      const existingRooms = (prev.rooms as Room[]) || [];
+      return {
+        ...prev,
+        rooms: [...existingRooms, ...detectedRooms],
+        ...(detectedScale ? { scale: detectedScale } : {}),
+        ...(detectedBackgroundImage ? { backgroundImage: detectedBackgroundImage } : {}),
+      };
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   if (isLoading) {
     return <EditorSkeleton />;
   }
@@ -431,10 +450,16 @@ export default function ProjectEditor() {
                 onToggle3D={() => setIs3DMode(!is3DMode)}
               />
               {!isViewer && !is3DMode && (
-                <FloorPlanUpload
-                  projectId={projectId!}
-                  onImageUploaded={handleSetBackgroundImage}
-                />
+                <>
+                  <FloorPlanUpload
+                    projectId={projectId!}
+                    onImageUploaded={handleSetBackgroundImage}
+                  />
+                  <AutoTakeoffDialog
+                    projectId={projectId!}
+                    onRoomsDetected={handleAutoTakeoffResults}
+                  />
+                </>
               )}
             </div>
           )}
