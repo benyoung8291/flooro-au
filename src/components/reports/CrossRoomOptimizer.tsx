@@ -254,11 +254,106 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
     return categorizedDrops.usable.filter(drop => !manualAllocations.has(drop.id));
   }, [categorizedDrops.usable, manualAllocations]);
 
+  // Calculate room material needs for drop matching
+  const roomNeeds = useMemo(() => {
+    if (!optimizedPlan || !scale) return new Map<string, { areaM2: number; shortestStripMm: number; longestStripMm: number }>();
+    
+    const needs = new Map<string, { areaM2: number; shortestStripMm: number; longestStripMm: number }>();
+    
+    optimizedPlan.originalRoomPlans.forEach(plan => {
+      const room = rooms.find(r => r.id === plan.roomId);
+      if (!room) return;
+      
+      // Calculate room needs based on strip plan
+      const stripLengths = plan.strips.map(s => s.length);
+      const shortestStrip = stripLengths.length > 0 ? Math.min(...stripLengths) : 0;
+      const longestStrip = stripLengths.length > 0 ? Math.max(...stripLengths) : 0;
+      
+      needs.set(room.id, {
+        areaM2: plan.totalMaterialAreaM2,
+        shortestStripMm: shortestStrip,
+        longestStripMm: longestStrip,
+      });
+    });
+    
+    return needs;
+  }, [optimizedPlan, rooms, scale]);
+
+  // Calculate match quality for a drop and a room
+  const getDropMatchQuality = useCallback((drop: DropPiece, roomId: string): 'excellent' | 'good' | 'partial' | 'none' => {
+    const need = roomNeeds.get(roomId);
+    if (!need) return 'none';
+    
+    // Can't use drop in its source room
+    if (drop.sourceRoomId === roomId) return 'none';
+    
+    const dropLengthM = drop.length / 1000;
+    const shortestNeedM = need.shortestStripMm / 1000;
+    const longestNeedM = need.longestStripMm / 1000;
+    
+    // Excellent: Drop is >= longest strip needed (can cover any strip)
+    if (drop.length >= need.longestStripMm) return 'excellent';
+    
+    // Good: Drop can cover at least shortest strip
+    if (drop.length >= need.shortestStripMm) return 'good';
+    
+    // Partial: Drop is at least 50% of shortest strip (could supplement)
+    if (drop.length >= need.shortestStripMm * 0.5) return 'partial';
+    
+    return 'none';
+  }, [roomNeeds]);
+
+  // Get rooms sorted by match quality for current dragged drop
+  const getRoomsByMatchQuality = useMemo(() => {
+    if (!draggedDrop) return { excellent: [] as Room[], good: [] as Room[], partial: [] as Room[], none: [] as Room[] };
+    
+    const result = { excellent: [] as Room[], good: [] as Room[], partial: [] as Room[], none: [] as Room[] };
+    
+    rooms.forEach(room => {
+      const quality = getDropMatchQuality(draggedDrop, room.id);
+      result[quality].push(room);
+    });
+    
+    return result;
+  }, [draggedDrop, rooms, getDropMatchQuality]);
+
   // Get drop color based on length
   const getDropColor = (length: number) => {
     if (length >= 1000) return 'bg-green-500/20 border-green-500/40 text-green-700 dark:text-green-400';
     if (length >= 500) return 'bg-amber-500/20 border-amber-500/40 text-amber-700 dark:text-amber-400';
     return 'bg-muted border-border text-muted-foreground';
+  };
+
+  // Get match quality color for room highlighting
+  const getMatchQualityStyles = (quality: 'excellent' | 'good' | 'partial' | 'none', isDropTarget: boolean) => {
+    if (isDropTarget) {
+      return 'bg-primary/20 border-primary border-dashed ring-2 ring-primary/50';
+    }
+    
+    switch (quality) {
+      case 'excellent':
+        return 'bg-green-500/15 border-green-500/50 ring-1 ring-green-500/30';
+      case 'good':
+        return 'bg-blue-500/15 border-blue-500/50 ring-1 ring-blue-500/30';
+      case 'partial':
+        return 'bg-amber-500/10 border-amber-500/40';
+      case 'none':
+      default:
+        return 'bg-muted/50 border-border';
+    }
+  };
+
+  const getMatchQualityBadge = (quality: 'excellent' | 'good' | 'partial' | 'none') => {
+    switch (quality) {
+      case 'excellent':
+        return { label: 'Best fit', className: 'bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/30' };
+      case 'good':
+        return { label: 'Good fit', className: 'bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/30' };
+      case 'partial':
+        return { label: 'Partial', className: 'bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30' };
+      default:
+        return null;
+    }
   };
 
   if (rooms.length < 2) {
@@ -448,9 +543,23 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                 {/* Instructions */}
                 <div className="flex items-start gap-2 p-2 rounded bg-primary/5 border border-primary/10">
                   <Info className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                  <p className="text-xs text-muted-foreground">
-                    Drag drops from the left panel and drop them onto target rooms on the right to manually allocate material.
-                  </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Drag drops onto target rooms. Rooms highlight by match quality:</p>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-green-500/15 border border-green-500/30 text-green-700 dark:text-green-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        Best fit
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-500/15 border border-blue-500/30 text-blue-700 dark:text-blue-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        Good fit
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                        Partial
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -507,6 +616,11 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                     <Label className="text-xs font-medium flex items-center gap-1.5">
                       <Target className="w-3 h-3" />
                       Target Rooms ({rooms.length})
+                      {draggedDrop && (
+                        <Badge variant="outline" className="text-[10px] ml-auto">
+                          Matches highlighted
+                        </Badge>
+                      )}
                     </Label>
                     <ScrollArea className="h-[180px]">
                       <div className="space-y-2 pr-2">
@@ -515,6 +629,10 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                           const roomAllocations = Array.from(manualAllocations.values()).filter(
                             a => a.targetRoomId === room.id
                           );
+                          const matchQuality = draggedDrop ? getDropMatchQuality(draggedDrop, room.id) : 'none';
+                          const matchBadge = draggedDrop ? getMatchQualityBadge(matchQuality) : null;
+                          const isSourceRoom = draggedDrop && draggedDrop.sourceRoomId === room.id;
+                          const need = roomNeeds.get(room.id);
                           
                           return (
                             <div
@@ -524,17 +642,35 @@ export const CrossRoomOptimizer: React.FC<CrossRoomOptimizerProps> = ({
                               onDrop={(e) => handleDrop(e, room)}
                               className={cn(
                                 "p-2 rounded border transition-all",
-                                isDropTarget 
-                                  ? "bg-primary/20 border-primary border-dashed ring-2 ring-primary/50" 
-                                  : "bg-muted/50 border-border hover:bg-muted",
-                                draggedDrop && draggedDrop.sourceRoomId === room.id && "opacity-40"
+                                isSourceRoom 
+                                  ? "opacity-40 cursor-not-allowed"
+                                  : draggedDrop 
+                                    ? getMatchQualityStyles(matchQuality, isDropTarget)
+                                    : "bg-muted/50 border-border hover:bg-muted"
                               )}
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm font-medium truncate">{room.name}</span>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="text-sm font-medium truncate">{room.name}</span>
+                                  {need && !draggedDrop && (
+                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                      {(need.shortestStripMm / 1000).toFixed(1)}-{(need.longestStripMm / 1000).toFixed(1)}m
+                                    </span>
+                                  )}
+                                </div>
                                 {isDropTarget && (
                                   <Badge variant="secondary" className="text-[10px] shrink-0">
                                     Drop here
+                                  </Badge>
+                                )}
+                                {matchBadge && !isDropTarget && !isSourceRoom && (
+                                  <Badge variant="outline" className={cn("text-[10px] shrink-0 border", matchBadge.className)}>
+                                    {matchBadge.label}
+                                  </Badge>
+                                )}
+                                {isSourceRoom && (
+                                  <Badge variant="outline" className="text-[10px] shrink-0 text-muted-foreground">
+                                    Source
                                   </Badge>
                                 )}
                               </div>
