@@ -77,6 +77,8 @@ export function EditorCanvas({
   const [selectedDoorWidth, setSelectedDoorWidth] = useState<number>(DOOR_WIDTHS[1].value);
   const [isTouchGesture, setIsTouchGesture] = useState(false);
   const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
+  const [isDraggingMaterial, setIsDraggingMaterial] = useState(false);
+  const [dragTargetRoomId, setDragTargetRoomId] = useState<string | null>(null);
 
   // Canvas editing hook for vertex and wall dragging
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
@@ -514,15 +516,52 @@ export function EditorCanvas({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const materialId = e.dataTransfer.getData('materialId');
-    const materialType = e.dataTransfer.getData('materialType');
     
-    if (materialId && state.selectedRoomId) {
-      dispatch({ type: 'ASSIGN_MATERIAL', roomId: state.selectedRoomId, materialId });
+    // Use drag target room if available, otherwise fall back to selected room
+    const targetRoomId = dragTargetRoomId || state.selectedRoomId;
+    
+    if (materialId && targetRoomId) {
+      dispatch({ type: 'ASSIGN_MATERIAL', roomId: targetRoomId, materialId });
+      // Also select the room we just assigned to
+      if (targetRoomId !== state.selectedRoomId) {
+        dispatch({ type: 'SELECT_ROOM', roomId: targetRoomId });
+      }
     }
-  }, [state.selectedRoomId, dispatch]);
+    
+    setIsDraggingMaterial(false);
+    setDragTargetRoomId(null);
+  }, [state.selectedRoomId, dragTargetRoomId, dispatch]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    
+    // Check if we're dragging a material
+    if (!isDraggingMaterial) {
+      setIsDraggingMaterial(true);
+    }
+    
+    // Find which room the cursor is over
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const point = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top);
+    
+    let foundRoom: string | null = null;
+    for (const room of state.rooms) {
+      if (isPointInPolygon(point, room.points)) {
+        foundRoom = room.id;
+        break;
+      }
+    }
+    setDragTargetRoomId(foundRoom);
+  }, [isDraggingMaterial, screenToCanvas, state.rooms]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only reset if we're leaving the canvas entirely
+    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsDraggingMaterial(false);
+      setDragTargetRoomId(null);
+    }
   }, []);
 
   const getCursor = useCallback((): string => {
@@ -595,6 +634,7 @@ export function EditorCanvas({
       onWheel={handleWheel}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -612,9 +652,18 @@ export function EditorCanvas({
         hoveredWall={hoveredWall}
         hoveredRoomId={hoveredRoomId}
         isDragging={isDragging}
+        isDraggingMaterial={isDraggingMaterial}
+        dragTargetRoomId={dragTargetRoomId}
         showDimensionLabels={showDimensionLabels}
         dimensionUnit={dimensionUnit}
       />
+
+      {/* Material drag indicator */}
+      {isDraggingMaterial && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-fade-in">
+          {dragTargetRoomId ? 'Drop to assign material' : 'Drag over a room to assign'}
+        </div>
+      )}
 
       {/* Drawing indicator */}
       {isDrawing && (

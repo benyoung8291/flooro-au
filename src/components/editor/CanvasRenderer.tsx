@@ -15,6 +15,8 @@ interface CanvasRendererProps {
   hoveredWall?: { roomId: string; index: number } | null;
   hoveredRoomId?: string | null;
   isDragging?: boolean;
+  isDraggingMaterial?: boolean;
+  dragTargetRoomId?: string | null;
   onFillDirectionClick?: (roomId: string) => void;
   showDimensionLabels?: boolean;
   dimensionUnit?: DimensionUnit;
@@ -59,6 +61,8 @@ export function CanvasRenderer({
   hoveredWall,
   hoveredRoomId,
   isDragging,
+  isDraggingMaterial = false,
+  dragTargetRoomId,
   onFillDirectionClick,
   showDimensionLabels = true,
   dimensionUnit = 'm',
@@ -164,8 +168,10 @@ export function CanvasRenderer({
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
       const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
       const isRoomHovered = hoveredRoomId === room.id && state.selectedRoomId !== room.id;
+      const isDragTarget = isDraggingMaterial && dragTargetRoomId === room.id;
+      const isValidDropZone = isDraggingMaterial && !isDragTarget;
       const materialType = room.materialId ? materialTypes.get(room.materialId) : undefined;
-      drawRoom(ctx, room, state.selectedRoomId === room.id, isRoomHovered, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, showDimensionLabels, dimensionUnit);
+      drawRoom(ctx, room, state.selectedRoomId === room.id, isRoomHovered, isDragTarget, isValidDropZone, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, showDimensionLabels, dimensionUnit);
       
       // Draw fill direction arrow for rooms with roll materials
       if (room.materialId && materialType === 'roll') {
@@ -220,7 +226,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredRoomId, isDragging]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId]);
 
   useEffect(() => {
     render();
@@ -312,6 +318,8 @@ function drawRoom(
   room: Room,
   isSelected: boolean,
   isHovered: boolean,
+  isDragTarget: boolean,
+  isValidDropZone: boolean,
   fillColor: string,
   zoom: number,
   scale: CanvasState['scale'],
@@ -323,8 +331,16 @@ function drawRoom(
 ) {
   if (room.points.length < 3) return;
 
-  // Draw fill
-  ctx.fillStyle = fillColor;
+  // Draw fill with drag target highlighting
+  if (isDragTarget) {
+    // Highlight as active drop target
+    ctx.fillStyle = 'hsla(142 71% 45% / 0.3)';
+  } else if (isValidDropZone) {
+    // Subtle highlight for valid drop zones
+    ctx.fillStyle = 'hsla(217 91% 50% / 0.15)';
+  } else {
+    ctx.fillStyle = fillColor;
+  }
   ctx.beginPath();
   ctx.moveTo(room.points[0].x, room.points[0].y);
   room.points.slice(1).forEach(point => {
@@ -350,7 +366,7 @@ function drawRoom(
     }
   });
 
-  // Draw outline with wall highlighting and hover effect
+  // Draw outline with wall highlighting, hover effect, and drag target effect
   for (let i = 0; i < room.points.length; i++) {
     const j = (i + 1) % room.points.length;
     const p1 = room.points[i];
@@ -358,19 +374,38 @@ function drawRoom(
     
     const isWallHovered = hoveredWallIndex === i && !isDragging;
     
-    ctx.strokeStyle = isWallHovered 
-      ? 'hsl(45 93% 47%)' 
-      : isSelected 
-        ? 'hsl(142 71% 45%)' 
-        : isHovered
-          ? 'hsl(217 91% 60%)'  // Brighter blue on room hover
-          : 'hsl(217 91% 50%)';
-    ctx.lineWidth = (isWallHovered ? 4 : isSelected ? 3 : isHovered ? 2.5 : 2) / zoom;
+    // Determine stroke style based on state priority
+    if (isDragTarget) {
+      ctx.strokeStyle = 'hsl(142 71% 45%)'; // Green for active drop target
+      ctx.lineWidth = 4 / zoom;
+      ctx.setLineDash([8 / zoom, 4 / zoom]); // Dashed for emphasis
+    } else if (isValidDropZone) {
+      ctx.strokeStyle = 'hsl(217 91% 60%)'; // Brighter blue for valid zones
+      ctx.lineWidth = 2.5 / zoom;
+      ctx.setLineDash([4 / zoom, 4 / zoom]); // Subtle dashed
+    } else if (isWallHovered) {
+      ctx.strokeStyle = 'hsl(45 93% 47%)';
+      ctx.lineWidth = 4 / zoom;
+      ctx.setLineDash([]);
+    } else if (isSelected) {
+      ctx.strokeStyle = 'hsl(142 71% 45%)';
+      ctx.lineWidth = 3 / zoom;
+      ctx.setLineDash([]);
+    } else if (isHovered) {
+      ctx.strokeStyle = 'hsl(217 91% 60%)';
+      ctx.lineWidth = 2.5 / zoom;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = 'hsl(217 91% 50%)';
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash([]);
+    }
     
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
+    ctx.setLineDash([]); // Reset dash
   }
 
   // Draw dimension labels on each wall (if enabled)
