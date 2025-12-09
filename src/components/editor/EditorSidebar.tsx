@@ -27,6 +27,7 @@ import { LayersPanel } from './LayersPanel';
 import { AccessoriesPanel } from './AccessoriesPanel';
 import { SeamEditor } from './SeamEditor';
 import { TilePatternViewer } from './TilePatternViewer';
+import { RoomContextHeader } from './RoomContextHeader';
 import { ReportTab, DropAllocationsMap } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
@@ -44,6 +45,8 @@ interface EditorSidebarProps {
   onDeleteRoom?: (roomId: string) => void;
   onRenameRoom?: (roomId: string, name: string) => void;
   onUpdateRoom?: (roomId: string, updates: Partial<Room>) => void;
+  onNavigatePrevRoom?: () => void;
+  onNavigateNextRoom?: () => void;
   projectName?: string;
   projectAddress?: string;
   stripPlans?: Map<string, StripPlanResult>;
@@ -69,6 +72,8 @@ export function EditorSidebar({
   onDeleteRoom,
   onRenameRoom,
   onUpdateRoom,
+  onNavigatePrevRoom,
+  onNavigateNextRoom,
   projectName,
   projectAddress,
   stripPlans,
@@ -195,33 +200,16 @@ export function EditorSidebar({
           <TabsContent value="materials" className="flex-1 m-0">
             <ScrollArea className="h-full">
               <div className="p-3 space-y-2">
-                {/* Selected Room Indicator */}
-                {selectedRoom ? (
-                  <div className="mb-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: selectedRoom.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{selectedRoom.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedRoomMaterial ? selectedRoomMaterial.name : 'No material assigned'}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-primary mt-2">Tap a material below to assign</p>
-                  </div>
-                ) : (
-                  <div className="mb-3 p-3 rounded-lg border border-border bg-muted/50">
-                    <p className="text-sm text-muted-foreground text-center">
-                      No room selected
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center mt-1">
-                      Select a room on canvas or from Layers tab
-                    </p>
-                  </div>
-                )}
+                {/* Room Context Header */}
+                <RoomContextHeader
+                  room={selectedRoom || null}
+                  rooms={rooms}
+                  materials={materials || []}
+                  scale={scale}
+                  onSelectRoom={onSelectRoom}
+                  onNavigatePrev={onNavigatePrevRoom}
+                  onNavigateNext={onNavigateNextRoom}
+                />
 
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-xs text-muted-foreground">
@@ -325,9 +313,17 @@ export function EditorSidebar({
                 }}
               />
             ) : (
-              <div className="p-3 text-center text-sm text-muted-foreground">
-                Select a room to configure accessories
-              </div>
+              <ScrollArea className="h-full">
+                <div className="p-3">
+                  <RoomContextHeader
+                    room={null}
+                    rooms={rooms}
+                    materials={materials || []}
+                    scale={scale}
+                    onSelectRoom={onSelectRoom}
+                  />
+                </div>
+              </ScrollArea>
             )}
           </TabsContent>
 
@@ -381,9 +377,22 @@ export function EditorSidebar({
                 <p className="text-xs mt-1">Assign a carpet or vinyl material to this room.</p>
               </div>
             ) : (
-              <div className="p-3 text-center text-sm text-muted-foreground">
-                Select a room to edit seams
-              </div>
+              <ScrollArea className="h-full">
+                <div className="p-3">
+                  <RoomContextHeader
+                    room={null}
+                    rooms={rooms}
+                    materials={materials || []}
+                    scale={scale}
+                    onSelectRoom={onSelectRoom}
+                  />
+                  {selectedRoom && (
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Seam editing is for roll materials. Assign a carpet or vinyl to this room.
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
             )}
           </TabsContent>
 
@@ -407,26 +416,35 @@ export function EditorSidebar({
                 <p className="text-xs mt-1">Assign a tile material to this room.</p>
               </div>
             ) : (
-              <div className="p-3 text-center text-sm text-muted-foreground">
-                Select a room to configure tile pattern
-              </div>
+              <ScrollArea className="h-full">
+                <div className="p-3">
+                  <RoomContextHeader
+                    room={null}
+                    rooms={rooms}
+                    materials={materials || []}
+                    scale={scale}
+                    onSelectRoom={onSelectRoom}
+                  />
+                  {selectedRoom && (
+                    <p className="text-xs text-muted-foreground text-center mt-3">
+                      Tile patterns are for tile materials. Assign a tile to this room.
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
             )}
           </TabsContent>
 
-          <TabsContent value="layers" className="flex-1 m-0">
-            <div className="p-3">
-              <p className="text-xs text-muted-foreground mb-3">
-                {rooms.length} room{rooms.length !== 1 ? 's' : ''} • Click to select
-              </p>
-              <LayersPanel
-                rooms={rooms}
-                selectedRoomId={selectedRoomId}
-                scale={scale}
-                onSelectRoom={onSelectRoom || (() => {})}
-                onDeleteRoom={onDeleteRoom || (() => {})}
-                onRenameRoom={onRenameRoom || (() => {})}
-              />
-            </div>
+          <TabsContent value="layers" className="flex-1 m-0 overflow-hidden">
+            <LayersPanel
+              rooms={rooms}
+              selectedRoomId={selectedRoomId}
+              scale={scale}
+              materials={materials || []}
+              onSelectRoom={onSelectRoom || (() => {})}
+              onDeleteRoom={onDeleteRoom || (() => {})}
+              onRenameRoom={onRenameRoom || (() => {})}
+            />
           </TabsContent>
 
           <TabsContent value="report" className="flex-1 m-0 overflow-hidden">

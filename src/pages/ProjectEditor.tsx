@@ -110,17 +110,6 @@ export default function ProjectEditor() {
         case '3':
           setIs3DMode(true);
           break;
-        case 'r':
-          // Rotate fill direction of selected room
-          if (selectedRoomId) {
-            const selectedRoom = rooms.find(r => r.id === selectedRoomId);
-            if (selectedRoom) {
-              const currentDirection = selectedRoom.fillDirection || 0;
-              const newDirection = (currentDirection + 45) % 360;
-              handleUpdateRoom(selectedRoomId, { fillDirection: newDirection });
-            }
-          }
-          break;
       }
     };
 
@@ -179,6 +168,68 @@ export default function ProjectEditor() {
   const handleSelectRoom = useCallback((roomId: string | null) => {
     setLocalData(prev => ({ ...prev, selectedRoomId: roomId }));
   }, []);
+
+  // Room navigation handlers
+  const handleNavigatePrevRoom = useCallback(() => {
+    const currentRooms = (localData.rooms as Room[]) || [];
+    const currentSelectedId = (localData.selectedRoomId as string | null);
+    if (currentRooms.length === 0) return;
+    const currentIndex = currentRooms.findIndex(r => r.id === currentSelectedId);
+    const prevIndex = currentIndex <= 0 ? currentRooms.length - 1 : currentIndex - 1;
+    setLocalData(prev => ({ ...prev, selectedRoomId: currentRooms[prevIndex].id }));
+  }, [localData.rooms, localData.selectedRoomId]);
+
+  const handleNavigateNextRoom = useCallback(() => {
+    const currentRooms = (localData.rooms as Room[]) || [];
+    const currentSelectedId = (localData.selectedRoomId as string | null);
+    if (currentRooms.length === 0) return;
+    const currentIndex = currentRooms.findIndex(r => r.id === currentSelectedId);
+    const nextIndex = currentIndex >= currentRooms.length - 1 ? 0 : currentIndex + 1;
+    setLocalData(prev => ({ ...prev, selectedRoomId: currentRooms[nextIndex].id }));
+  }, [localData.rooms, localData.selectedRoomId]);
+
+  // Extended keyboard shortcuts for room navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      
+      const currentRooms = (localData.rooms as Room[]) || [];
+      const currentSelectedId = (localData.selectedRoomId as string | null);
+      
+      switch (e.key) {
+        case 'r':
+          if (currentSelectedId) {
+            const selectedRoom = currentRooms.find(r => r.id === currentSelectedId);
+            if (selectedRoom) {
+              const currentDirection = selectedRoom.fillDirection || 0;
+              const newDirection = (currentDirection + 45) % 360;
+              setLocalData(prev => {
+                const rooms = (prev.rooms as Room[]) || [];
+                return {
+                  ...prev,
+                  rooms: rooms.map(room => 
+                    room.id === currentSelectedId ? { ...room, fillDirection: newDirection } : room
+                  )
+                };
+              });
+              setHasUnsavedChanges(true);
+            }
+          }
+          break;
+        case '[':
+          e.preventDefault();
+          handleNavigatePrevRoom();
+          break;
+        case ']':
+          e.preventDefault();
+          handleNavigateNextRoom();
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [localData.rooms, localData.selectedRoomId, handleNavigatePrevRoom, handleNavigateNextRoom]);
 
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
     setLocalData(prev => {
@@ -524,6 +575,8 @@ export default function ProjectEditor() {
             onDeleteRoom={handleDeleteRoom}
             onRenameRoom={handleRenameRoom}
             onUpdateRoom={handleUpdateRoom}
+            onNavigatePrevRoom={handleNavigatePrevRoom}
+            onNavigateNextRoom={handleNavigateNextRoom}
             onMaterialSelect={handleMaterialSelect}
             projectName={project.name}
             projectAddress={project.address || undefined}
