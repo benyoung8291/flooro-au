@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { LayersPanel } from './LayersPanel';
+import { RoomContextHeader } from './RoomContextHeader';
 import { ReportTab } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { Separator } from '@/components/ui/separator';
@@ -145,55 +146,17 @@ export function MobileSidebarDrawer({
           <TabsContent value="materials" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-[40vh]">
               <div className="p-4 space-y-2">
-                {/* Selected Room Indicator */}
-                {selectedRoom ? (
-                  <div className="mb-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: selectedRoom.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{selectedRoom.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {selectedRoomMaterial ? selectedRoomMaterial.name : 'No material'}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-primary mt-2">Tap a material below to assign</p>
-                  </div>
-                ) : (
-                  <div className="mb-3 p-3 rounded-lg border border-border bg-muted/50">
-                    <p className="text-sm text-muted-foreground text-center">
-                      No room selected
-                    </p>
-                    <p className="text-xs text-muted-foreground text-center mt-1">
-                      Close drawer, tap a room, then return here
-                    </p>
-                    {/* Quick room selection */}
-                    {rooms.length > 0 && (
-                      <div className="mt-3 flex flex-wrap gap-1 justify-center">
-                        {rooms.slice(0, 4).map(room => (
-                          <Button
-                            key={room.id}
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs"
-                            onClick={() => onSelectRoom?.(room.id)}
-                          >
-                            <div 
-                              className="w-2 h-2 rounded-sm mr-1.5"
-                              style={{ backgroundColor: room.color }}
-                            />
-                            {room.name}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Room Context Header */}
+                <RoomContextHeader
+                  room={selectedRoom || null}
+                  rooms={rooms}
+                  materials={materials || []}
+                  scale={scale}
+                  onSelectRoom={onSelectRoom}
+                  compact
+                />
 
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mt-3">
                   <p className="text-xs text-muted-foreground">
                     Available materials
                   </p>
@@ -268,13 +231,11 @@ export function MobileSidebarDrawer({
           <TabsContent value="layers" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-[40vh]">
               <div className="p-4">
-                <p className="text-xs text-muted-foreground mb-3">
-                  {rooms.length} room{rooms.length !== 1 ? 's' : ''} • Tap to select
-                </p>
                 <LayersPanel
                   rooms={rooms}
                   selectedRoomId={selectedRoomId}
                   scale={scale}
+                  materials={materials || []}
                   onSelectRoom={(id) => {
                     onSelectRoom?.(id);
                     onOpenChange(false);
