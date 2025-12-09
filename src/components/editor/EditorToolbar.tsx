@@ -24,7 +24,8 @@ import {
   Maximize2,
   Box,
   Grid2X2,
-  ChevronDown
+  ChevronDown,
+  HelpCircle
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -43,6 +44,7 @@ interface EditorToolbarProps {
   onToggleDimensionLabels?: () => void;
   dimensionUnit?: DimensionUnit;
   onDimensionUnitChange?: (unit: DimensionUnit) => void;
+  onShowShortcuts?: () => void;
 }
 
 const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut: string }[] = [
@@ -77,6 +79,7 @@ export function EditorToolbar({
   onToggleDimensionLabels,
   dimensionUnit = 'm',
   onDimensionUnitChange,
+  onShowShortcuts,
 }: EditorToolbarProps) {
   return (
     <div className="glass-panel flex items-center gap-1 p-1.5">
@@ -284,6 +287,28 @@ export function EditorToolbar({
               </DropdownMenu>
             )}
           </div>
+        </>
+      )}
+
+      {/* Help */}
+      {onShowShortcuts && (
+        <>
+          <Separator orientation="vertical" className="h-6 mx-1" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="tool-button"
+                onClick={onShowShortcuts}
+              >
+                <HelpCircle className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Keyboard Shortcuts <span className="text-muted-foreground ml-1">(?)</span></p>
+            </TooltipContent>
+          </Tooltip>
         </>
       )}
     </div>
