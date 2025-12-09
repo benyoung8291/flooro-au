@@ -525,6 +525,7 @@ export default function ProjectEditor() {
                 onToggleDimensionLabels={() => setShowDimensionLabels(!showDimensionLabels)}
                 dimensionUnit={dimensionUnit}
                 onDimensionUnitChange={setDimensionUnit}
+                onShowShortcuts={() => setShortcutsPanelOpen(true)}
               />
               {!isViewer && !is3DMode && (
                 <>
