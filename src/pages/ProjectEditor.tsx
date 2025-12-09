@@ -14,6 +14,7 @@ import { MobileNav } from '@/components/editor/MobileNav';
 import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
 import { MobileSidebarDrawer } from '@/components/editor/MobileSidebarDrawer';
 import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
+import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -70,6 +71,7 @@ export default function ProjectEditor() {
   const [is3DMode, setIs3DMode] = useState(false);
   const [showFinishesLegend, setShowFinishesLegend] = useState(false);
   const [accessoryDialogOpen, setAccessoryDialogOpen] = useState(false);
+  const [shortcutsPanelOpen, setShortcutsPanelOpen] = useState(false);
   const [pendingMaterialRoom, setPendingMaterialRoom] = useState<{
     roomId: string;
     material: { id: string; name: string; type: string; specs?: any };
@@ -126,6 +128,9 @@ export default function ProjectEditor() {
           break;
         case '3':
           setIs3DMode(true);
+          break;
+        case '?':
+          setShortcutsPanelOpen(true);
           break;
       }
     };
@@ -668,6 +673,12 @@ export default function ProjectEditor() {
           onSkip={handleSkipAccessories}
         />
       )}
+
+      {/* Keyboard Shortcuts Panel */}
+      <KeyboardShortcutsPanel
+        open={shortcutsPanelOpen}
+        onOpenChange={setShortcutsPanelOpen}
+      />
     </div>
   );
 }
