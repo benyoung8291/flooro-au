@@ -261,30 +261,40 @@ export function EditorToolbar({
             </Tooltip>
 
             {onDimensionUnitChange && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="tool-button h-8 px-2 gap-1 text-xs font-medium"
-                  >
-                    {dimensionUnit}
-                    <ChevronDown className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {(Object.keys(unitLabels) as DimensionUnit[]).map((unit) => (
-                    <DropdownMenuItem
-                      key={unit}
-                      onClick={() => onDimensionUnitChange(unit)}
-                      className={dimensionUnit === unit ? 'bg-accent' : ''}
-                    >
-                      <span className="font-mono w-8">{unit}</span>
-                      <span className="text-muted-foreground ml-2">{unitLabels[unit]}</span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2.5 gap-1.5 text-xs font-medium border-primary/30 hover:border-primary/50 hover:bg-primary/5"
+                        >
+                          <RulerIcon className="w-3.5 h-3.5 text-primary" />
+                          <span className="font-mono uppercase">{dimensionUnit}</span>
+                          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover border shadow-lg">
+                        {(Object.keys(unitLabels) as DimensionUnit[]).map((unit) => (
+                          <DropdownMenuItem
+                            key={unit}
+                            onClick={() => onDimensionUnitChange(unit)}
+                            className={`cursor-pointer ${dimensionUnit === unit ? 'bg-accent font-medium' : ''}`}
+                          >
+                            <span className="font-mono w-10 uppercase">{unit}</span>
+                            <span className="text-muted-foreground">{unitLabels[unit]}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Change measurement units</p>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
         </>
