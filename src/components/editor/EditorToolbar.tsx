@@ -2,12 +2,20 @@ import { EditorTool } from './EditorCanvas';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { DimensionUnit } from '@/lib/canvas/types';
 import { 
   MousePointer2, 
   Pencil, 
   Square, 
   DoorOpen, 
   Ruler,
+  RulerIcon,
   Move,
   Undo,
   Redo,
@@ -15,7 +23,8 @@ import {
   ZoomOut,
   Maximize2,
   Box,
-  Grid2X2
+  Grid2X2,
+  ChevronDown
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -30,6 +39,10 @@ interface EditorToolbarProps {
   canRedo?: boolean;
   is3DMode?: boolean;
   onToggle3D?: () => void;
+  showDimensionLabels?: boolean;
+  onToggleDimensionLabels?: () => void;
+  dimensionUnit?: DimensionUnit;
+  onDimensionUnitChange?: (unit: DimensionUnit) => void;
 }
 
 const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut: string }[] = [
@@ -40,6 +53,13 @@ const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut:
   { id: 'scale', icon: Ruler, label: 'Set Scale', shortcut: 'S' },
   { id: 'pan', icon: Move, label: 'Pan', shortcut: 'Space' },
 ];
+
+const unitLabels: Record<DimensionUnit, string> = {
+  m: 'Meters',
+  cm: 'Centimeters', 
+  mm: 'Millimeters',
+  imperial: 'Feet & Inches',
+};
 
 export function EditorToolbar({
   activeTool,
@@ -53,6 +73,10 @@ export function EditorToolbar({
   canRedo = false,
   is3DMode = false,
   onToggle3D,
+  showDimensionLabels = true,
+  onToggleDimensionLabels,
+  dimensionUnit = 'm',
+  onDimensionUnitChange,
 }: EditorToolbarProps) {
   return (
     <div className="glass-panel flex items-center gap-1 p-1.5">
@@ -210,6 +234,58 @@ export function EditorToolbar({
           </TooltipContent>
         </Tooltip>
       </div>
+
+      {/* View Options */}
+      {onToggleDimensionLabels && (
+        <>
+          <Separator orientation="vertical" className="h-6 mx-1" />
+          
+          <div className="flex items-center gap-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={`tool-button ${showDimensionLabels ? 'active' : ''}`}
+                  onClick={onToggleDimensionLabels}
+                >
+                  <RulerIcon className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>{showDimensionLabels ? 'Hide' : 'Show'} Dimensions</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {onDimensionUnitChange && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="tool-button h-8 px-2 gap-1 text-xs font-medium"
+                  >
+                    {dimensionUnit}
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {(Object.keys(unitLabels) as DimensionUnit[]).map((unit) => (
+                    <DropdownMenuItem
+                      key={unit}
+                      onClick={() => onDimensionUnitChange(unit)}
+                      className={dimensionUnit === unit ? 'bg-accent' : ''}
+                    >
+                      <span className="font-mono w-8">{unit}</span>
+                      <span className="text-muted-foreground ml-2">{unitLabels[unit]}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
