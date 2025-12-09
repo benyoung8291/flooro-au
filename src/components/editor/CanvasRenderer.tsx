@@ -13,6 +13,7 @@ interface CanvasRendererProps {
   materialTypes?: Map<string, string>;
   hoveredVertex?: { roomId: string; index: number } | null;
   hoveredWall?: { roomId: string; index: number } | null;
+  hoveredRoomId?: string | null;
   isDragging?: boolean;
   onFillDirectionClick?: (roomId: string) => void;
   showDimensionLabels?: boolean;
@@ -56,6 +57,7 @@ export function CanvasRenderer({
   materialTypes = new Map(),
   hoveredVertex,
   hoveredWall,
+  hoveredRoomId,
   isDragging,
   onFillDirectionClick,
   showDimensionLabels = true,
@@ -161,8 +163,9 @@ export function CanvasRenderer({
     state.rooms.forEach(room => {
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
       const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
+      const isRoomHovered = hoveredRoomId === room.id && state.selectedRoomId !== room.id;
       const materialType = room.materialId ? materialTypes.get(room.materialId) : undefined;
-      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, showDimensionLabels, dimensionUnit);
+      drawRoom(ctx, room, state.selectedRoomId === room.id, isRoomHovered, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, showDimensionLabels, dimensionUnit);
       
       // Draw fill direction arrow for rooms with roll materials
       if (room.materialId && materialType === 'roll') {
@@ -217,7 +220,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, isDragging]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredRoomId, isDragging]);
 
   useEffect(() => {
     render();
@@ -308,6 +311,7 @@ function drawRoom(
   ctx: CanvasRenderingContext2D,
   room: Room,
   isSelected: boolean,
+  isHovered: boolean,
   fillColor: string,
   zoom: number,
   scale: CanvasState['scale'],
@@ -346,7 +350,7 @@ function drawRoom(
     }
   });
 
-  // Draw outline with wall highlighting
+  // Draw outline with wall highlighting and hover effect
   for (let i = 0; i < room.points.length; i++) {
     const j = (i + 1) % room.points.length;
     const p1 = room.points[i];
@@ -358,8 +362,10 @@ function drawRoom(
       ? 'hsl(45 93% 47%)' 
       : isSelected 
         ? 'hsl(142 71% 45%)' 
-        : 'hsl(217 91% 50%)';
-    ctx.lineWidth = (isWallHovered ? 4 : isSelected ? 3 : 2) / zoom;
+        : isHovered
+          ? 'hsl(217 91% 60%)'  // Brighter blue on room hover
+          : 'hsl(217 91% 50%)';
+    ctx.lineWidth = (isWallHovered ? 4 : isSelected ? 3 : isHovered ? 2.5 : 2) / zoom;
     
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);

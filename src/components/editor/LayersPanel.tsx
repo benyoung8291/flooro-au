@@ -3,6 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Room } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea } from '@/lib/canvas/geometry';
@@ -94,12 +99,26 @@ export function LayersPanel({
                 )}
                 onClick={() => onSelectRoom(room.id)}
               >
-                <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 cursor-grab" />
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>Drag to reorder</p>
+                  </TooltipContent>
+                </Tooltip>
                 
-                <div
-                  className="w-4 h-4 rounded-sm border flex-shrink-0"
-                  style={{ backgroundColor: room.color }}
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className="w-4 h-4 rounded-sm border flex-shrink-0"
+                      style={{ backgroundColor: room.color }}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>Room color</p>
+                  </TooltipContent>
+                </Tooltip>
                 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -110,11 +129,18 @@ export function LayersPanel({
                       className="h-5 text-sm bg-transparent border-none p-0 focus-visible:ring-0 flex-1"
                     />
                     {/* Material status indicator */}
-                    {material ? (
-                      <Check className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-                    ) : (
-                      <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
-                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        {material ? (
+                          <Check className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+                        ) : (
+                          <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+                        )}
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>{material ? 'Material assigned' : 'No material assigned'}</p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-xs text-muted-foreground">
@@ -134,17 +160,24 @@ export function LayersPanel({
                   </div>
                 </div>
                 
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteRoom(room.id);
-                  }}
-                >
-                  <Trash2 className="h-3 w-3 text-destructive" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteRoom(room.id);
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p>Delete room</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             );
           })}

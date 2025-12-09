@@ -8,6 +8,11 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { 
   Layers, 
   Package, 
@@ -114,57 +119,103 @@ export function EditorSidebar({
       )}
     >
       {collapsed ? (
-        // Collapsed state - icons only
+        // Collapsed state - icons only with tooltips
         <div className="flex flex-col items-center py-2 gap-1 w-full">
-          <Button variant="ghost" size="icon" onClick={onToggle} title="Expand sidebar">
-            <ChevronRight className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={onToggle}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Expand sidebar</p>
+            </TooltipContent>
+          </Tooltip>
           <Separator className="my-2" />
-          <Button 
-            variant={selectedTab === 'materials' ? 'secondary' : 'ghost'} 
-            size="icon"
-            onClick={() => { setSelectedTab('materials'); onToggle?.(); }}
-          >
-            <Package className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={selectedTab === 'accessories' ? 'secondary' : 'ghost'} 
-            size="icon"
-            onClick={() => { setSelectedTab('accessories'); onToggle?.(); }}
-            title="Accessories"
-          >
-            <Wrench className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={selectedTab === 'seams' ? 'secondary' : 'ghost'} 
-            size="icon"
-            onClick={() => { setSelectedTab('seams'); onToggle?.(); }}
-            title="Seam Editor"
-          >
-            <Scissors className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={selectedTab === 'tiles' ? 'secondary' : 'ghost'} 
-            size="icon"
-            onClick={() => { setSelectedTab('tiles'); onToggle?.(); }}
-            title="Tile Patterns"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={selectedTab === 'layers' ? 'secondary' : 'ghost'} 
-            size="icon"
-            onClick={() => { setSelectedTab('layers'); onToggle?.(); }}
-          >
-            <Layers className="w-4 h-4" />
-          </Button>
-          <Button 
-            variant={selectedTab === 'report' ? 'secondary' : 'ghost'} 
-            size="icon"
-            onClick={() => { setSelectedTab('report'); onToggle?.(); }}
-          >
-            <FileText className="w-4 h-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={selectedTab === 'materials' ? 'secondary' : 'ghost'} 
+                size="icon"
+                onClick={() => { setSelectedTab('materials'); onToggle?.(); }}
+              >
+                <Package className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Materials</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={selectedTab === 'accessories' ? 'secondary' : 'ghost'} 
+                size="icon"
+                onClick={() => { setSelectedTab('accessories'); onToggle?.(); }}
+              >
+                <Wrench className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Accessories</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={selectedTab === 'seams' ? 'secondary' : 'ghost'} 
+                size="icon"
+                onClick={() => { setSelectedTab('seams'); onToggle?.(); }}
+              >
+                <Scissors className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Seam Editor</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={selectedTab === 'tiles' ? 'secondary' : 'ghost'} 
+                size="icon"
+                onClick={() => { setSelectedTab('tiles'); onToggle?.(); }}
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Tile Patterns</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={selectedTab === 'layers' ? 'secondary' : 'ghost'} 
+                size="icon"
+                onClick={() => { setSelectedTab('layers'); onToggle?.(); }}
+              >
+                <Layers className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Layers</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                variant={selectedTab === 'report' ? 'secondary' : 'ghost'} 
+                size="icon"
+                onClick={() => { setSelectedTab('report'); onToggle?.(); }}
+              >
+                <FileText className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Report</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       ) : (
         // Expanded state - full sidebar with tabs
@@ -172,28 +223,77 @@ export function EditorSidebar({
           <div className="px-3 pt-3 pb-2 border-b border-border">
             <div className="flex items-center gap-2 mb-2">
               <TabsList className="flex-1 grid grid-cols-6">
-                <TabsTrigger value="materials" className="text-xs px-1" title="Materials">
-                  <Package className="w-3 h-3" />
-                </TabsTrigger>
-                <TabsTrigger value="accessories" className="text-xs px-1" title="Accessories">
-                  <Wrench className="w-3 h-3" />
-                </TabsTrigger>
-                <TabsTrigger value="seams" className="text-xs px-1" title="Seam Editor">
-                  <Scissors className="w-3 h-3" />
-                </TabsTrigger>
-                <TabsTrigger value="tiles" className="text-xs px-1" title="Tile Patterns">
-                  <LayoutGrid className="w-3 h-3" />
-                </TabsTrigger>
-                <TabsTrigger value="layers" className="text-xs px-1" title="Layers">
-                  <Layers className="w-3 h-3" />
-                </TabsTrigger>
-                <TabsTrigger value="report" className="text-xs px-1" title="Report">
-                  <FileText className="w-3 h-3" />
-                </TabsTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="materials" className="text-xs px-1">
+                      <Package className="w-3 h-3" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Materials</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="accessories" className="text-xs px-1">
+                      <Wrench className="w-3 h-3" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Accessories</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="seams" className="text-xs px-1">
+                      <Scissors className="w-3 h-3" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Seam Editor</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="tiles" className="text-xs px-1">
+                      <LayoutGrid className="w-3 h-3" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Tile Patterns</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="layers" className="text-xs px-1">
+                      <Layers className="w-3 h-3" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Layers</p>
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <TabsTrigger value="report" className="text-xs px-1">
+                      <FileText className="w-3 h-3" />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Report</p>
+                  </TooltipContent>
+                </Tooltip>
               </TabsList>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggle} title="Collapse sidebar">
-                <ChevronRight className="w-4 h-4 rotate-180" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onToggle}>
+                    <ChevronRight className="w-4 h-4 rotate-180" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p>Collapse sidebar</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
