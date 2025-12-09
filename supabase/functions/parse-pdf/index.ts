@@ -1,5 +1,6 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,10 +29,18 @@ serve(async (req) => {
 
     console.log('Processing PDF:', pdfUrl);
 
-    // Use vision AI to analyze PDF pages and extract information
-    // Since we can't directly parse PDFs in edge functions, we'll use the vision model
-    // to analyze the PDF URL directly (Gemini supports PDF input)
+    // Download the PDF and convert to base64
+    console.log('Downloading PDF...');
+    const pdfResponse = await fetch(pdfUrl);
+    if (!pdfResponse.ok) {
+      throw new Error(`Failed to download PDF: ${pdfResponse.status}`);
+    }
     
+    const pdfArrayBuffer = await pdfResponse.arrayBuffer();
+    const pdfBase64 = base64Encode(pdfArrayBuffer);
+    
+    console.log('PDF downloaded, size:', pdfArrayBuffer.byteLength, 'bytes');
+
     const systemPrompt = `You are an expert architectural drawing analyzer. Analyze this PDF floor plan document and extract:
 
 1. **Page Analysis**: For each page, determine:
@@ -71,6 +80,7 @@ Return your analysis as JSON with this structure:
   "units": "imperial" | "metric" | "unknown"
 }`;
 
+    // Send PDF as base64 data URL with correct mime type
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -90,7 +100,9 @@ Return your analysis as JSON with this structure:
               },
               {
                 type: 'image_url',
-                image_url: { url: pdfUrl }
+                image_url: { 
+                  url: `data:application/pdf;base64,${pdfBase64}`
+                }
               }
             ]
           }
@@ -107,6 +119,13 @@ Return your analysis as JSON with this structure:
         return new Response(
           JSON.stringify({ success: false, error: 'Rate limit exceeded. Please try again later.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'AI credits exhausted. Please add credits to continue.' }),
+          { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
