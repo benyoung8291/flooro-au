@@ -76,6 +76,7 @@ export function EditorCanvas({
   const [scaleStart, setScaleStart] = useState<CanvasPoint | null>(null);
   const [selectedDoorWidth, setSelectedDoorWidth] = useState<number>(DOOR_WIDTHS[1].value);
   const [isTouchGesture, setIsTouchGesture] = useState(false);
+  const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
 
   // Canvas editing hook for vertex and wall dragging
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
@@ -427,6 +428,18 @@ export function EditorCanvas({
     // Handle hover for select mode (visual feedback)
     if (activeTool === 'select') {
       handleHover(point);
+      
+      // Check for room hover
+      let foundHoveredRoom: string | null = null;
+      for (const room of state.rooms) {
+        if (isPointInPolygon(point, room.points)) {
+          foundHoveredRoom = room.id;
+          break;
+        }
+      }
+      setHoveredRoomId(foundHoveredRoom);
+    } else {
+      setHoveredRoomId(null);
     }
 
     // Update cursor position
@@ -523,6 +536,9 @@ export function EditorCanvas({
     }
     
     switch (activeTool) {
+      case 'select':
+        if (hoveredRoomId) return 'pointer';
+        return 'default';
       case 'draw':
       case 'hole':
         return 'crosshair';
@@ -535,7 +551,7 @@ export function EditorCanvas({
       default:
         return 'default';
     }
-  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart]);
+  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart, hoveredRoomId]);
 
   // Touch event handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -594,6 +610,7 @@ export function EditorCanvas({
         materialTypes={materialTypes}
         hoveredVertex={hoveredVertex}
         hoveredWall={hoveredWall}
+        hoveredRoomId={hoveredRoomId}
         isDragging={isDragging}
         showDimensionLabels={showDimensionLabels}
         dimensionUnit={dimensionUnit}

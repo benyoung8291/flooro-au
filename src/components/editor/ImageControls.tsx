@@ -9,6 +9,11 @@ import {
   Trash2,
   Eye
 } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { BackgroundImage } from '@/lib/canvas/types';
 
 interface ImageControlsProps {
@@ -27,14 +32,21 @@ export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps)
     <div className="glass-panel p-3 space-y-4 min-w-[200px]">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">Floor Plan</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive"
-          onClick={onRemove}
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-destructive hover:text-destructive"
+              onClick={onRemove}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="left">
+            <p>Remove floor plan</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Opacity Slider */}
@@ -80,46 +92,67 @@ export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps)
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground">Rotation</Label>
         <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 h-8"
-            onClick={() => handleRotate(-90)}
-          >
-            <RotateCcw className="w-3 h-3 mr-1" />
-            -90°
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1 h-8"
-            onClick={() => handleRotate(90)}
-          >
-            <RotateCw className="w-3 h-3 mr-1" />
-            +90°
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => handleRotate(-90)}
+              >
+                <RotateCcw className="w-3 h-3 mr-1" />
+                -90°
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Rotate counter-clockwise</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => handleRotate(90)}
+              >
+                <RotateCw className="w-3 h-3 mr-1" />
+                +90°
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Rotate clockwise</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
       {/* Lock Toggle */}
-      <Button
-        variant={image.locked ? 'secondary' : 'outline'}
-        size="sm"
-        className="w-full"
-        onClick={() => onUpdate({ locked: !image.locked })}
-      >
-        {image.locked ? (
-          <>
-            <Lock className="w-3 h-3 mr-2" />
-            Locked
-          </>
-        ) : (
-          <>
-            <Unlock className="w-3 h-3 mr-2" />
-            Lock Position
-          </>
-        )}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant={image.locked ? 'secondary' : 'outline'}
+            size="sm"
+            className="w-full"
+            onClick={() => onUpdate({ locked: !image.locked })}
+          >
+            {image.locked ? (
+              <>
+                <Lock className="w-3 h-3 mr-2" />
+                Locked
+              </>
+            ) : (
+              <>
+                <Unlock className="w-3 h-3 mr-2" />
+                Lock Position
+              </>
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>{image.locked ? 'Unlock to move/resize' : 'Lock position to prevent accidental changes'}</p>
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

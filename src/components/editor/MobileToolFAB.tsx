@@ -34,26 +34,35 @@ export function MobileToolFAB({ activeTool, onToolChange }: MobileToolFABProps) 
   };
   
   return (
-    <div className="fixed right-4 bottom-24 z-40 flex flex-col-reverse items-center gap-2">
+    <div className="fixed right-4 bottom-24 z-40 flex flex-col-reverse items-end gap-2">
       {/* Tool Options */}
       <div className={cn(
-        "flex flex-col-reverse items-center gap-2 transition-all duration-300",
+        "flex flex-col-reverse items-end gap-2 transition-all duration-300",
         expanded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4 pointer-events-none"
       )}>
         {fabTools.map((tool, index) => (
-          <Button
+          <div 
             key={tool.id}
-            variant={activeTool === tool.id ? 'default' : 'secondary'}
-            size="icon"
             className={cn(
-              "w-12 h-12 rounded-full shadow-lg transition-all duration-200",
-              expanded ? "scale-100" : "scale-0"
+              "flex items-center gap-2 transition-all duration-200",
+              expanded ? "scale-100 opacity-100" : "scale-0 opacity-0"
             )}
             style={{ transitionDelay: expanded ? `${index * 50}ms` : '0ms' }}
-            onClick={() => handleToolSelect(tool.id)}
           >
-            <tool.icon className="w-5 h-5" />
-          </Button>
+            {/* Label */}
+            <span className="text-xs font-medium bg-background/95 backdrop-blur px-2.5 py-1.5 rounded-md shadow-md border border-border whitespace-nowrap">
+              {tool.label}
+            </span>
+            {/* Button */}
+            <Button
+              variant={activeTool === tool.id ? 'default' : 'secondary'}
+              size="icon"
+              className="w-12 h-12 rounded-full shadow-lg"
+              onClick={() => handleToolSelect(tool.id)}
+            >
+              <tool.icon className="w-5 h-5" />
+            </Button>
+          </div>
         ))}
       </div>
       
