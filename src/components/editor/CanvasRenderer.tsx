@@ -337,6 +337,9 @@ function drawRoom(
     ctx.stroke();
   }
 
+  // Draw dimension labels on each wall
+  drawDimensionLabels(ctx, room.points, zoom, scale);
+
   // Draw hole outlines
   room.holes.forEach(hole => {
     if (hole.points.length >= 3) {
@@ -409,6 +412,96 @@ function drawRoom(
   ctx.fillText(room.name, centerX, centerY - 10 / zoom);
   ctx.font = `${12 / zoom}px Inter, sans-serif`;
   ctx.fillText(areaText, centerX, centerY + 10 / zoom);
+}
+
+function drawDimensionLabels(
+  ctx: CanvasRenderingContext2D,
+  points: CanvasPoint[],
+  zoom: number,
+  scale: CanvasState['scale']
+) {
+  if (points.length < 2) return;
+
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    const p1 = points[i];
+    const p2 = points[j];
+
+    // Calculate wall length
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const pixelLength = Math.sqrt(dx * dx + dy * dy);
+
+    // Skip very short walls
+    if (pixelLength < 20) continue;
+
+    // Calculate midpoint
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+
+    // Calculate wall angle
+    const angle = Math.atan2(dy, dx);
+
+    // Format dimension text
+    let dimensionText: string;
+    if (scale) {
+      const realLengthMm = pixelLength / scale.pixelsPerMm;
+      if (realLengthMm >= 1000) {
+        dimensionText = `${(realLengthMm / 1000).toFixed(2)}m`;
+      } else {
+        dimensionText = `${Math.round(realLengthMm)}mm`;
+      }
+    } else {
+      dimensionText = `${Math.round(pixelLength)}px`;
+    }
+
+    // Calculate offset perpendicular to wall (outside the room)
+    const offsetDistance = 16 / zoom;
+    const perpAngle = angle - Math.PI / 2;
+    const offsetX = Math.cos(perpAngle) * offsetDistance;
+    const offsetY = Math.sin(perpAngle) * offsetDistance;
+
+    // Determine text rotation (keep text readable)
+    let textAngle = angle;
+    if (textAngle > Math.PI / 2 || textAngle < -Math.PI / 2) {
+      textAngle += Math.PI;
+    }
+
+    // Draw dimension label background
+    ctx.save();
+    ctx.translate(midX + offsetX, midY + offsetY);
+    ctx.rotate(textAngle);
+
+    const fontSize = 10 / zoom;
+    ctx.font = `${fontSize}px Inter, sans-serif`;
+    const textWidth = ctx.measureText(dimensionText).width;
+    const padding = 3 / zoom;
+
+    // Background pill
+    ctx.fillStyle = 'hsla(0, 0%, 100%, 0.9)';
+    ctx.beginPath();
+    ctx.roundRect(
+      -textWidth / 2 - padding,
+      -fontSize / 2 - padding,
+      textWidth + padding * 2,
+      fontSize + padding * 2,
+      3 / zoom
+    );
+    ctx.fill();
+
+    // Border
+    ctx.strokeStyle = 'hsl(214 32% 80%)';
+    ctx.lineWidth = 0.5 / zoom;
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = 'hsl(217 91% 30%)';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(dimensionText, 0, 0);
+
+    ctx.restore();
+  }
 }
 
 function drawFillDirectionArrow(
