@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
+import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit } from '@/lib/canvas/types';
 import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea } from '@/lib/canvas/geometry';
 
 interface CanvasRendererProps {
@@ -15,10 +15,35 @@ interface CanvasRendererProps {
   hoveredWall?: { roomId: string; index: number } | null;
   isDragging?: boolean;
   onFillDirectionClick?: (roomId: string) => void;
+  showDimensionLabels?: boolean;
+  dimensionUnit?: DimensionUnit;
 }
 
 // Cache for loaded images
 const imageCache = new Map<string, HTMLImageElement>();
+
+// Format dimension based on selected unit
+function formatDimension(realLengthMm: number, unit: DimensionUnit): string {
+  switch (unit) {
+    case 'mm':
+      return `${Math.round(realLengthMm).toLocaleString()}mm`;
+    case 'cm':
+      return `${(realLengthMm / 10).toFixed(1)}cm`;
+    case 'm':
+      return `${(realLengthMm / 1000).toFixed(2)}m`;
+    case 'imperial':
+      // Convert mm to inches (1 inch = 25.4mm)
+      const totalInches = realLengthMm / 25.4;
+      const feet = Math.floor(totalInches / 12);
+      const inches = totalInches % 12;
+      if (feet > 0) {
+        return `${feet}'${inches.toFixed(1)}"`;
+      }
+      return `${inches.toFixed(1)}"`;
+    default:
+      return `${(realLengthMm / 1000).toFixed(2)}m`;
+  }
+}
 
 export function CanvasRenderer({
   state,
@@ -33,6 +58,8 @@ export function CanvasRenderer({
   hoveredWall,
   isDragging,
   onFillDirectionClick,
+  showDimensionLabels = true,
+  dimensionUnit = 'm',
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -135,7 +162,7 @@ export function CanvasRenderer({
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
       const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
       const materialType = room.materialId ? materialTypes.get(room.materialId) : undefined;
-      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, materialType);
+      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, showDimensionLabels, dimensionUnit);
       
       // Draw fill direction arrow for rooms with roll materials
       if (room.materialId && materialType === 'roll') {
@@ -287,7 +314,8 @@ function drawRoom(
   hoveredVertexIndex: number | null = null,
   hoveredWallIndex: number | null = null,
   isDragging: boolean = false,
-  materialType?: string
+  showDimensionLabels: boolean = true,
+  dimensionUnit: DimensionUnit = 'm'
 ) {
   if (room.points.length < 3) return;
 
@@ -339,8 +367,10 @@ function drawRoom(
     ctx.stroke();
   }
 
-  // Draw dimension labels on each wall
-  drawDimensionLabels(ctx, room.points, zoom, scale, materialType);
+  // Draw dimension labels on each wall (if enabled)
+  if (showDimensionLabels) {
+    drawDimensionLabels(ctx, room.points, zoom, scale, dimensionUnit);
+  }
 
   // Draw hole outlines
   room.holes.forEach(hole => {
@@ -421,7 +451,7 @@ function drawDimensionLabels(
   points: CanvasPoint[],
   zoom: number,
   scale: CanvasState['scale'],
-  materialType?: string
+  dimensionUnit: DimensionUnit = 'm'
 ) {
   if (points.length < 2) return;
 
@@ -445,24 +475,11 @@ function drawDimensionLabels(
     // Calculate wall angle
     const angle = Math.atan2(dy, dx);
 
-    // Format dimension text based on material type
-    // Tiles: prefer mm (matches tile dimensions like 500x500mm)
-    // Roll/Linear/Default: prefer m for larger dimensions
+    // Format dimension text using user's selected unit
     let dimensionText: string;
     if (scale) {
       const realLengthMm = pixelLength / scale.pixelsPerMm;
-      
-      if (materialType === 'tile') {
-        // Tiles always show in mm for precision
-        dimensionText = `${Math.round(realLengthMm).toLocaleString()}mm`;
-      } else {
-        // Roll goods, linear materials, and default: prefer meters
-        if (realLengthMm >= 1000) {
-          dimensionText = `${(realLengthMm / 1000).toFixed(2)}m`;
-        } else {
-          dimensionText = `${Math.round(realLengthMm)}mm`;
-        }
-      }
+      dimensionText = formatDimension(realLengthMm, dimensionUnit);
     } else {
       dimensionText = `${Math.round(pixelLength)}px`;
     }

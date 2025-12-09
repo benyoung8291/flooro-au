@@ -1,3 +1,5 @@
+export type DimensionUnit = 'm' | 'cm' | 'mm' | 'imperial';
+
 export interface CanvasPoint {
   x: number;
   y: number;

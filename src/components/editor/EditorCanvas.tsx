@@ -4,7 +4,7 @@ import { Minimap } from './Minimap';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
-import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage } from '@/lib/canvas/types';
+import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import {
   findSnapPoint,
@@ -40,6 +40,8 @@ interface EditorCanvasProps {
   onUpdateBackgroundImage?: (updates: Partial<BackgroundImage>) => void;
   onRemoveBackgroundImage?: () => void;
   showFinishesLegend?: boolean;
+  showDimensionLabels?: boolean;
+  dimensionUnit?: DimensionUnit;
 }
 
 export function EditorCanvas({
@@ -54,6 +56,8 @@ export function EditorCanvas({
   onUpdateBackgroundImage,
   onRemoveBackgroundImage,
   showFinishesLegend = false,
+  showDimensionLabels = true,
+  dimensionUnit = 'm',
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -591,6 +595,8 @@ export function EditorCanvas({
         hoveredVertex={hoveredVertex}
         hoveredWall={hoveredWall}
         isDragging={isDragging}
+        showDimensionLabels={showDimensionLabels}
+        dimensionUnit={dimensionUnit}
       />
 
       {/* Drawing indicator */}

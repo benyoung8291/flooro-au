@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
 import { generateReport } from '@/lib/reports/calculations';
-import { Room, ScaleCalibration, BackgroundImage, RoomAccessories } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit } from '@/lib/canvas/types';
 import { AccessoryQuickAddDialog } from '@/components/materials/AccessoryQuickAddDialog';
 import { 
   ArrowLeft, 
@@ -74,6 +74,23 @@ export default function ProjectEditor() {
     roomId: string;
     material: { id: string; name: string; type: string; specs?: any };
   } | null>(null);
+  
+  // Dimension display preferences with localStorage persistence
+  const [showDimensionLabels, setShowDimensionLabels] = useState(() => {
+    return localStorage.getItem('flooro_show_dimensions') !== 'false';
+  });
+  const [dimensionUnit, setDimensionUnit] = useState<DimensionUnit>(() => {
+    return (localStorage.getItem('flooro_dimension_unit') as DimensionUnit) || 'm';
+  });
+
+  // Persist dimension preferences
+  useEffect(() => {
+    localStorage.setItem('flooro_show_dimensions', String(showDimensionLabels));
+  }, [showDimensionLabels]);
+
+  useEffect(() => {
+    localStorage.setItem('flooro_dimension_unit', dimensionUnit);
+  }, [dimensionUnit]);
 
   // Sync local data with project data
   useEffect(() => {
@@ -499,6 +516,10 @@ export default function ProjectEditor() {
                 onToolChange={setActiveTool}
                 is3DMode={is3DMode}
                 onToggle3D={() => setIs3DMode(!is3DMode)}
+                showDimensionLabels={showDimensionLabels}
+                onToggleDimensionLabels={() => setShowDimensionLabels(!showDimensionLabels)}
+                dimensionUnit={dimensionUnit}
+                onDimensionUnitChange={setDimensionUnit}
               />
               {!isViewer && !is3DMode && (
                 <>
@@ -559,6 +580,8 @@ export default function ProjectEditor() {
               onUpdateBackgroundImage={handleUpdateBackgroundImage}
               onRemoveBackgroundImage={handleRemoveBackgroundImage}
               showFinishesLegend={showFinishesLegend}
+              showDimensionLabels={showDimensionLabels}
+              dimensionUnit={dimensionUnit}
             />
           )}
         </div>
