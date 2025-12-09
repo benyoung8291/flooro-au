@@ -134,10 +134,11 @@ export function CanvasRenderer({
     state.rooms.forEach(room => {
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
       const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
-      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging);
+      const materialType = room.materialId ? materialTypes.get(room.materialId) : undefined;
+      drawRoom(ctx, room, state.selectedRoomId === room.id, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, materialType);
       
       // Draw fill direction arrow for rooms with roll materials
-      if (room.materialId && materialTypes.get(room.materialId) === 'roll') {
+      if (room.materialId && materialType === 'roll') {
         drawFillDirectionArrow(ctx, room, zoom, state.selectedRoomId === room.id);
       }
     });
@@ -285,7 +286,8 @@ function drawRoom(
   scale: CanvasState['scale'],
   hoveredVertexIndex: number | null = null,
   hoveredWallIndex: number | null = null,
-  isDragging: boolean = false
+  isDragging: boolean = false,
+  materialType?: string
 ) {
   if (room.points.length < 3) return;
 
@@ -338,7 +340,7 @@ function drawRoom(
   }
 
   // Draw dimension labels on each wall
-  drawDimensionLabels(ctx, room.points, zoom, scale);
+  drawDimensionLabels(ctx, room.points, zoom, scale, materialType);
 
   // Draw hole outlines
   room.holes.forEach(hole => {
@@ -418,7 +420,8 @@ function drawDimensionLabels(
   ctx: CanvasRenderingContext2D,
   points: CanvasPoint[],
   zoom: number,
-  scale: CanvasState['scale']
+  scale: CanvasState['scale'],
+  materialType?: string
 ) {
   if (points.length < 2) return;
 
@@ -442,14 +445,23 @@ function drawDimensionLabels(
     // Calculate wall angle
     const angle = Math.atan2(dy, dx);
 
-    // Format dimension text
+    // Format dimension text based on material type
+    // Tiles: prefer mm (matches tile dimensions like 500x500mm)
+    // Roll/Linear/Default: prefer m for larger dimensions
     let dimensionText: string;
     if (scale) {
       const realLengthMm = pixelLength / scale.pixelsPerMm;
-      if (realLengthMm >= 1000) {
-        dimensionText = `${(realLengthMm / 1000).toFixed(2)}m`;
+      
+      if (materialType === 'tile') {
+        // Tiles always show in mm for precision
+        dimensionText = `${Math.round(realLengthMm).toLocaleString()}mm`;
       } else {
-        dimensionText = `${Math.round(realLengthMm)}mm`;
+        // Roll goods, linear materials, and default: prefer meters
+        if (realLengthMm >= 1000) {
+          dimensionText = `${(realLengthMm / 1000).toFixed(2)}m`;
+        } else {
+          dimensionText = `${Math.round(realLengthMm)}mm`;
+        }
       }
     } else {
       dimensionText = `${Math.round(pixelLength)}px`;
