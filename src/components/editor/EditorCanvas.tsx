@@ -63,6 +63,7 @@ export function EditorCanvas({
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const hasInitializedRef = useRef(false);
   const hasAppliedZoomRef = useRef(false);
+  const lastJsonDataRef = useRef<Record<string, unknown> | null>(null);
   const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform } = useCanvasHistory();
   
   const [isDrawing, setIsDrawing] = useState(false);
@@ -146,27 +147,39 @@ export function EditorCanvas({
     return () => window.removeEventListener('resize', updateSize);
   }, [onCanvasReady]);
   
-  // Load data and apply zoom-to-fit when we have both jsonData with rooms AND valid canvas size
+  // Reset initialization state when jsonData identity changes (project switch)
   useEffect(() => {
-    const rooms = (jsonData?.rooms as any[]) || [];
-    const hasRooms = rooms.length > 0;
-    const hasValidSize = canvasSize.width > 0 && canvasSize.height > 0;
-    
-    // Load data once when we have jsonData
-    if (jsonData && !hasInitializedRef.current) {
-      hasInitializedRef.current = true;
-      loadFromJson(jsonData, hasValidSize ? canvasSize : undefined);
+    if (jsonData !== lastJsonDataRef.current) {
+      hasInitializedRef.current = false;
+      hasAppliedZoomRef.current = false;
+      lastJsonDataRef.current = jsonData || null;
     }
+  }, [jsonData]);
+
+  // Load data when we have jsonData and valid canvas size
+  useEffect(() => {
+    const hasValidSize = canvasSize.width > 100 && canvasSize.height > 100;
     
-    // Apply zoom-to-fit when we have rooms and valid canvas size (with slight delay for layout)
+    if (jsonData && hasValidSize && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      loadFromJson(jsonData, canvasSize);
+    }
+  }, [jsonData, canvasSize, loadFromJson]);
+
+  // Apply zoom-to-fit after state.rooms is populated
+  useEffect(() => {
+    const hasRooms = state.rooms.length > 0;
+    const hasValidSize = canvasSize.width > 100 && canvasSize.height > 100;
+    
     if (hasRooms && hasValidSize && !hasAppliedZoomRef.current && hasInitializedRef.current) {
       hasAppliedZoomRef.current = true;
-      // Use requestAnimationFrame to ensure canvas is fully rendered, then animate to fit
-      requestAnimationFrame(() => {
+      // Small delay to ensure DOM layout is complete
+      const timeoutId = setTimeout(() => {
         fitToView(canvasSize.width, canvasSize.height, true);
-      });
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
-  }, [jsonData, canvasSize, loadFromJson, fitToView]);
+  }, [state.rooms, canvasSize, fitToView]);
 
   // Notify parent of changes (including backgroundImage)
   useEffect(() => {
