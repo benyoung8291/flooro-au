@@ -656,10 +656,6 @@ function drawSeamLines(
 ) {
   if (!scale || !stripPlan.seamLines || stripPlan.seamLines.length === 0) return;
   
-  // Calculate room bounding box minimum point in pixels
-  const roomMinX = Math.min(...room.points.map(p => p.x));
-  const roomMinY = Math.min(...room.points.map(p => p.y));
-  
   ctx.save();
   
   // Set seam line style - purple/magenta to distinguish from other elements
@@ -669,12 +665,12 @@ function drawSeamLines(
   ctx.lineCap = 'round';
   
   stripPlan.seamLines.forEach(seam => {
-    // Convert mm coordinates back to pixels
-    // Seam coordinates are in mm relative to room bounding box
-    const x1Px = roomMinX + (seam.x1 * scale.pixelsPerMm);
-    const y1Px = roomMinY + (seam.y1 * scale.pixelsPerMm);
-    const x2Px = roomMinX + (seam.x2 * scale.pixelsPerMm);
-    const y2Px = roomMinY + (seam.y2 * scale.pixelsPerMm);
+    // Convert mm coordinates directly to pixels
+    // Seam coordinates from stripPlan are absolute mm coordinates
+    const x1Px = seam.x1 * scale.pixelsPerMm;
+    const y1Px = seam.y1 * scale.pixelsPerMm;
+    const x2Px = seam.x2 * scale.pixelsPerMm;
+    const y2Px = seam.y2 * scale.pixelsPerMm;
     
     ctx.beginPath();
     ctx.moveTo(x1Px, y1Px);
