@@ -224,6 +224,50 @@ export function EditorCanvas({
   }, [state.rooms, state.scale, state.backgroundImage, exportToJson, onDataChange]);
 
 
+  // Sync external room property changes (fillDirection, seamOptions, accessories, etc.)
+  // This handles updates from TakeoffPanel/RoomDetailView that don't change geometry
+  useEffect(() => {
+    if (!jsonData?.rooms || !hasInitializedRef.current) return;
+    
+    const incomingRooms = jsonData.rooms as Room[];
+    
+    // For each room in internal state, check if external data has updated non-geometry properties
+    state.rooms.forEach(internalRoom => {
+      const externalRoom = incomingRooms.find(r => r.id === internalRoom.id);
+      if (!externalRoom) return;
+      
+      // Check if non-geometry properties differ
+      const propsChanged = (
+        internalRoom.fillDirection !== externalRoom.fillDirection ||
+        internalRoom.materialId !== externalRoom.materialId ||
+        internalRoom.materialCode !== externalRoom.materialCode ||
+        internalRoom.name !== externalRoom.name ||
+        internalRoom.color !== externalRoom.color ||
+        internalRoom.tilePattern !== externalRoom.tilePattern ||
+        JSON.stringify(internalRoom.accessories) !== JSON.stringify(externalRoom.accessories) ||
+        JSON.stringify(internalRoom.seamOptions) !== JSON.stringify(externalRoom.seamOptions)
+      );
+      
+      if (propsChanged) {
+        // Merge external properties into internal state, preserving geometry
+        dispatch({
+          type: 'UPDATE_ROOM',
+          roomId: internalRoom.id,
+          updates: {
+            fillDirection: externalRoom.fillDirection,
+            materialId: externalRoom.materialId,
+            materialCode: externalRoom.materialCode,
+            name: externalRoom.name,
+            color: externalRoom.color,
+            tilePattern: externalRoom.tilePattern,
+            accessories: externalRoom.accessories,
+            seamOptions: externalRoom.seamOptions,
+          },
+        });
+      }
+    });
+  }, [jsonData?.rooms, dispatch, state.rooms]);
+
   // Handle keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
