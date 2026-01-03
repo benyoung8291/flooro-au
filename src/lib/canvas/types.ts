@@ -5,6 +5,14 @@ export interface CanvasPoint {
   y: number;
 }
 
+// Edge curve types for curved/rounded edges
+export type EdgeCurveType = 'straight' | 'quadratic';
+
+export interface EdgeCurve {
+  type: EdgeCurveType;
+  controlPoint?: CanvasPoint; // For quadratic Bezier - single control point
+}
+
 // Room-level accessory configurations
 export interface CovingConfig {
   enabled: boolean;
@@ -67,6 +75,7 @@ export interface Room {
   accessories?: RoomAccessories;
   fillDirection?: number; // Lay direction in degrees (0 = horizontal, 90 = vertical)
   tilePattern?: 'grid' | 'brick' | 'thirds' | 'herringbone' | 'basketweave' | 'diagonal'; // For tile materials
+  edgeCurves?: EdgeCurve[]; // Curve data per edge, indexed same as points
   
   // Seam management options
   seamOptions?: {
@@ -90,6 +99,7 @@ export interface Room {
 export interface Hole {
   id: string;
   points: CanvasPoint[];
+  edgeCurves?: EdgeCurve[]; // Curve data per edge, indexed same as points
 }
 
 export interface Door {
