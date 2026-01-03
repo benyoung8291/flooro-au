@@ -15,12 +15,15 @@ import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
 import { MobileSidebarDrawer } from '@/components/editor/MobileSidebarDrawer';
 import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
+import { ProjectProgressBar } from '@/components/editor/ProjectProgressBar';
+import { RoomsOverviewDialog } from '@/components/editor/RoomsOverviewDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
+import { QuoteSummaryDialog } from '@/components/reports/QuoteSummaryDialog';
 import { generateReport } from '@/lib/reports/calculations';
 import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit } from '@/lib/canvas/types';
 import { AccessoryQuickAddDialog } from '@/components/materials/AccessoryQuickAddDialog';
@@ -32,7 +35,9 @@ import {
   Loader2,
   PanelRightClose,
   PanelRight,
-  ClipboardList
+  ClipboardList,
+  LayoutGrid,
+  FileText,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -68,6 +73,8 @@ export default function ProjectEditor() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
+  const [quoteSummaryOpen, setQuoteSummaryOpen] = useState(false);
+  const [roomsOverviewOpen, setRoomsOverviewOpen] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
   const [showFinishesLegend, setShowFinishesLegend] = useState(false);
   const [accessoryDialogOpen, setAccessoryDialogOpen] = useState(false);
@@ -131,6 +138,12 @@ export default function ProjectEditor() {
           break;
         case '?':
           setShortcutsPanelOpen(true);
+          break;
+        case 'q':
+          setQuoteSummaryOpen(true);
+          break;
+        case 'l':
+          setRoomsOverviewOpen(true);
           break;
       }
     };
@@ -401,6 +414,46 @@ export default function ProjectEditor() {
     setHasUnsavedChanges(true);
   }, []);
 
+  // Bulk assign material to multiple rooms
+  const handleBulkAssignMaterial = useCallback((roomIds: string[], materialId: string) => {
+    setLocalData(prev => {
+      const currentRooms = (prev.rooms as Room[]) || [];
+      const updatedRooms = currentRooms.map(room => 
+        roomIds.includes(room.id) ? { ...room, materialId } : room
+      );
+      return { ...prev, rooms: updatedRooms };
+    });
+    setHasUnsavedChanges(true);
+    toast({
+      title: 'Materials assigned',
+      description: `Applied to ${roomIds.length} room${roomIds.length !== 1 ? 's' : ''}`,
+    });
+  }, [toast]);
+
+  // Handle progress bar step clicks
+  const handleProgressStepClick = useCallback((stepId: string) => {
+    switch (stepId) {
+      case 'floorplan':
+        // Focus on floor plan upload
+        break;
+      case 'scale':
+        setActiveTool('scale');
+        break;
+      case 'rooms':
+        setActiveTool('draw');
+        break;
+      case 'materials':
+        setSidebarCollapsed(false);
+        break;
+      case 'accessories':
+        setSidebarCollapsed(false);
+        break;
+      case 'quote':
+        setQuoteSummaryOpen(true);
+        break;
+    }
+  }, []);
+
   if (isLoading) {
     return <EditorSkeleton />;
   }
@@ -446,6 +499,18 @@ export default function ProjectEditor() {
               </>
             )}
           </div>
+
+          {/* Progress Bar - Desktop Only */}
+          {!isMobile && (
+            <div className="hidden lg:block ml-4">
+              <ProjectProgressBar
+                rooms={rooms}
+                scale={scale}
+                backgroundImage={backgroundImage}
+                onStepClick={handleProgressStepClick}
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-1 md:gap-2">
@@ -463,6 +528,35 @@ export default function ProjectEditor() {
                 <Phone className="w-4 h-4 mr-2" />
               )}
               Request Measurement Service
+            </Button>
+          )}
+
+          {/* Rooms Overview Button - Desktop Only */}
+          {!isMobile && rooms.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setRoomsOverviewOpen(true)}
+              className="hidden md:flex"
+            >
+              <LayoutGrid className="w-4 h-4 mr-2" />
+              Rooms
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {rooms.length}
+              </Badge>
+            </Button>
+          )}
+
+          {/* Quote Button - Desktop Only */}
+          {!isMobile && rooms.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setQuoteSummaryOpen(true)}
+              className="hidden md:flex"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Quote
             </Button>
           )}
 
@@ -493,6 +587,15 @@ export default function ProjectEditor() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setQuoteSummaryOpen(true)}>
+                <FileText className="w-4 h-4 mr-2" />
+                View Quote (Q)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setRoomsOverviewOpen(true)}>
+                <LayoutGrid className="w-4 h-4 mr-2" />
+                All Rooms (L)
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setReportPreviewOpen(true)}>Export PDF</DropdownMenuItem>
               <DropdownMenuItem>Share Project</DropdownMenuItem>
               {isMobile && !project.service_requested && (
@@ -659,6 +762,35 @@ export default function ProjectEditor() {
         report={report}
         rooms={rooms}
         materials={materials || []}
+      />
+
+      {/* Quote Summary Dialog */}
+      <QuoteSummaryDialog
+        open={quoteSummaryOpen}
+        onOpenChange={setQuoteSummaryOpen}
+        rooms={rooms}
+        materials={materials || []}
+        scale={scale}
+        projectName={project.name}
+        projectAddress={project.address || undefined}
+        onExportPDF={() => {
+          setQuoteSummaryOpen(false);
+          setReportPreviewOpen(true);
+        }}
+      />
+
+      {/* Rooms Overview Dialog */}
+      <RoomsOverviewDialog
+        open={roomsOverviewOpen}
+        onOpenChange={setRoomsOverviewOpen}
+        rooms={rooms}
+        materials={materials || []}
+        scale={scale}
+        selectedRoomId={selectedRoomId}
+        onSelectRoom={handleSelectRoom}
+        onDeleteRoom={handleDeleteRoom}
+        onUpdateRoom={handleUpdateRoom}
+        onBulkAssignMaterial={handleBulkAssignMaterial}
       />
 
       {/* Accessory Quick-Add Dialog */}
