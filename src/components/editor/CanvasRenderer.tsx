@@ -32,6 +32,10 @@ interface CanvasRendererProps {
   stripPlans?: Map<string, StripPlanResult>;
   showSeamLines?: boolean;
   showSharedEdgeIndicators?: boolean;
+  // Merge mode props
+  mergeFirstRoomId?: string | null;
+  mergeableRoomIds?: string[];
+  isMergeMode?: boolean;
 }
 
 // Cache for loaded images
@@ -82,6 +86,9 @@ export function CanvasRenderer({
   stripPlans,
   showSeamLines = true,
   showSharedEdgeIndicators = true,
+  mergeFirstRoomId,
+  mergeableRoomIds = [],
+  isMergeMode = false,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -193,7 +200,33 @@ export function CanvasRenderer({
       const isDragTarget = isDraggingMaterial && dragTargetRoomId === room.id;
       const isValidDropZone = isDraggingMaterial && !isDragTarget;
       const materialType = room.materialId ? materialTypes.get(room.materialId) : undefined;
-      drawRoom(ctx, room, state.selectedRoomId === room.id, isRoomHovered, isDragTarget, isValidDropZone, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, roomHoveredCurve, isDragging, showDimensionLabels, dimensionUnit);
+      
+      // Merge mode states
+      const isMergeSelected = isMergeMode && mergeFirstRoomId === room.id;
+      const isMergeable = isMergeMode && mergeableRoomIds.includes(room.id);
+      const isMergeTarget = isMergeMode && isMergeable && hoveredRoomId === room.id;
+      const isMergeDimmed = isMergeMode && mergeFirstRoomId && !isMergeable && room.id !== mergeFirstRoomId;
+      
+      drawRoom(
+        ctx, room, 
+        state.selectedRoomId === room.id, 
+        isRoomHovered, 
+        isDragTarget, 
+        isValidDropZone, 
+        getRoomColor(room), 
+        zoom, 
+        state.scale, 
+        roomHoveredVertex, 
+        roomHoveredWall, 
+        roomHoveredCurve, 
+        isDragging, 
+        showDimensionLabels, 
+        dimensionUnit,
+        isMergeSelected,
+        isMergeable,
+        isMergeTarget,
+        isMergeDimmed
+      );
       
       // Draw fill direction arrow for rooms with roll materials
       if (room.materialId && materialType === 'roll') {
@@ -259,7 +292,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode]);
 
   useEffect(() => {
     render();
@@ -469,7 +502,11 @@ function drawRoom(
   hoveredCurve: HoveredCurveControl | null = null,
   isDragging: boolean = false,
   showDimensionLabels: boolean = true,
-  dimensionUnit: DimensionUnit = 'm'
+  dimensionUnit: DimensionUnit = 'm',
+  isMergeSelected: boolean = false,
+  isMergeable: boolean = false,
+  isMergeTarget: boolean = false,
+  isMergeDimmed: boolean = false
 ) {
   if (room.points.length < 3) return;
 
@@ -489,8 +526,16 @@ function drawRoom(
     }
   };
 
-  // Draw fill with drag target highlighting
-  if (isDragTarget) {
+  // Draw fill with merge mode highlighting
+  if (isMergeTarget) {
+    ctx.fillStyle = 'hsla(142 71% 45% / 0.4)';
+  } else if (isMergeSelected) {
+    ctx.fillStyle = 'hsla(280 70% 50% / 0.35)';
+  } else if (isMergeable) {
+    ctx.fillStyle = 'hsla(217 91% 60% / 0.25)';
+  } else if (isMergeDimmed) {
+    ctx.fillStyle = 'hsla(0 0% 50% / 0.15)';
+  } else if (isDragTarget) {
     ctx.fillStyle = 'hsla(142 71% 45% / 0.3)';
   } else if (isValidDropZone) {
     ctx.fillStyle = 'hsla(217 91% 50% / 0.15)';
@@ -528,7 +573,23 @@ function drawRoom(
     const isTransitionEdge = room.edgeTransitions?.some(t => t.edgeIndex === i);
     
     // Determine stroke style based on state priority
-    if (isDragTarget) {
+    if (isMergeTarget) {
+      ctx.strokeStyle = 'hsl(142 71% 45%)';
+      ctx.lineWidth = 4 / zoom;
+      ctx.setLineDash([]);
+    } else if (isMergeSelected) {
+      ctx.strokeStyle = 'hsl(280 70% 50%)';
+      ctx.lineWidth = 4 / zoom;
+      ctx.setLineDash([]);
+    } else if (isMergeable) {
+      ctx.strokeStyle = 'hsl(217 91% 60%)';
+      ctx.lineWidth = 3 / zoom;
+      ctx.setLineDash([4 / zoom, 4 / zoom]);
+    } else if (isMergeDimmed) {
+      ctx.strokeStyle = 'hsl(0 0% 60%)';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.setLineDash([]);
+    } else if (isDragTarget) {
       ctx.strokeStyle = 'hsl(142 71% 45%)';
       ctx.lineWidth = 4 / zoom;
       ctx.setLineDash([8 / zoom, 4 / zoom]);
