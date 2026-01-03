@@ -36,6 +36,11 @@ interface CanvasRendererProps {
   mergeFirstRoomId?: string | null;
   mergeableRoomIds?: string[];
   isMergeMode?: boolean;
+  // Split mode props
+  splitRoomId?: string | null;
+  splitStartPoint?: CanvasPoint | null;
+  splitPreviewEnd?: CanvasPoint | null;
+  isSplitMode?: boolean;
 }
 
 // Cache for loaded images
@@ -89,6 +94,10 @@ export function CanvasRenderer({
   mergeFirstRoomId,
   mergeableRoomIds = [],
   isMergeMode = false,
+  splitRoomId,
+  splitStartPoint,
+  splitPreviewEnd,
+  isSplitMode = false,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -284,6 +293,60 @@ export function CanvasRenderer({
       ctx.fill();
     }
 
+    // Draw split preview
+    if (isSplitMode && splitRoomId && splitStartPoint) {
+      // Draw start point marker
+      ctx.fillStyle = 'hsl(280 70% 50%)';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2 / zoom;
+      ctx.beginPath();
+      ctx.arc(splitStartPoint.x, splitStartPoint.y, 8 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      
+      // Draw preview line to cursor/end point
+      if (splitPreviewEnd) {
+        ctx.strokeStyle = 'hsl(280 70% 50%)';
+        ctx.lineWidth = 2 / zoom;
+        ctx.setLineDash([6 / zoom, 4 / zoom]);
+        ctx.beginPath();
+        ctx.moveTo(splitStartPoint.x, splitStartPoint.y);
+        ctx.lineTo(splitPreviewEnd.x, splitPreviewEnd.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw end point indicator
+        ctx.fillStyle = 'hsl(280 70% 60%)';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2 / zoom;
+        ctx.beginPath();
+        ctx.arc(splitPreviewEnd.x, splitPreviewEnd.y, 6 / zoom, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+
+    // Highlight split room edges when in split mode but no start point yet
+    if (isSplitMode && splitRoomId && !splitStartPoint) {
+      const splitRoom = state.rooms.find(r => r.id === splitRoomId);
+      if (splitRoom) {
+        ctx.strokeStyle = 'hsl(280 70% 50%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([8 / zoom, 4 / zoom]);
+        ctx.beginPath();
+        splitRoom.points.forEach((p, i) => {
+          if (i === 0) {
+            ctx.moveTo(p.x, p.y);
+          } else {
+            ctx.lineTo(p.x, p.y);
+          }
+        });
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
     ctx.restore();
 
     // Draw ortho indicator (outside transform)
@@ -292,7 +355,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode]);
 
   useEffect(() => {
     render();
