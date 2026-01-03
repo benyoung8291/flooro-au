@@ -686,6 +686,21 @@ function getLinePolygonIntersections(
   return intersections;
 }
 
+// Point-in-polygon test using ray casting algorithm
+function isPointInPolygon(point: { x: number; y: number }, polygon: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    
+    if (((yi > point.y) !== (yj > point.y)) &&
+        (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
 function drawSeamLines(
   ctx: CanvasRenderingContext2D,
   room: Room,
@@ -711,22 +726,55 @@ function drawSeamLines(
     const x2Px = seam.x2 * scale.pixelsPerMm;
     const y2Px = seam.y2 * scale.pixelsPerMm;
     
-    // Get intersection points with room polygon to clip the seam line
-    const intersections = getLinePolygonIntersections(
+    // Get intersection points with outer room polygon
+    let allIntersections = getLinePolygonIntersections(
       x1Px, y1Px, x2Px, y2Px,
       room.points
     );
     
-    // Need at least 2 intersection points to draw a clipped line
-    if (intersections.length >= 2) {
-      // Sort intersections along the seam direction
-      const isVertical = Math.abs(x2Px - x1Px) < Math.abs(y2Px - y1Px);
-      intersections.sort((a, b) => isVertical ? a.y - b.y : a.x - b.x);
+    // Get intersections with each hole polygon
+    room.holes.forEach(hole => {
+      if (hole.points.length >= 3) {
+        const holeIntersections = getLinePolygonIntersections(
+          x1Px, y1Px, x2Px, y2Px,
+          hole.points
+        );
+        allIntersections = [...allIntersections, ...holeIntersections];
+      }
+    });
+    
+    // Need at least 2 intersection points to draw segments
+    if (allIntersections.length < 2) return;
+    
+    // Sort intersections along the seam direction
+    const isVertical = Math.abs(x2Px - x1Px) < Math.abs(y2Px - y1Px);
+    allIntersections.sort((a, b) => isVertical ? a.y - b.y : a.x - b.x);
+    
+    // Draw segments where midpoint is inside the room (not in a hole)
+    for (let i = 0; i < allIntersections.length - 1; i++) {
+      const p1 = allIntersections[i];
+      const p2 = allIntersections[i + 1];
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+      const midPoint = { x: midX, y: midY };
       
-      // Draw line between first and last intersection (entry and exit points)
+      // Check if midpoint is inside outer polygon
+      if (!isPointInPolygon(midPoint, room.points)) continue;
+      
+      // Check if midpoint is inside any hole (if so, skip this segment)
+      let inHole = false;
+      for (const hole of room.holes) {
+        if (hole.points.length >= 3 && isPointInPolygon(midPoint, hole.points)) {
+          inHole = true;
+          break;
+        }
+      }
+      if (inHole) continue;
+      
+      // Draw this valid segment
       ctx.beginPath();
-      ctx.moveTo(intersections[0].x, intersections[0].y);
-      ctx.lineTo(intersections[intersections.length - 1].x, intersections[intersections.length - 1].y);
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     }
   });
