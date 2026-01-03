@@ -26,7 +26,8 @@ import {
   Grid2X2,
   ChevronDown,
   HelpCircle,
-  Combine
+  Combine,
+  Scissors
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -56,6 +57,7 @@ const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut:
   { id: 'scale', icon: Ruler, label: 'Set Scale', shortcut: 'S' },
   { id: 'pan', icon: Move, label: 'Pan', shortcut: 'Space' },
   { id: 'merge', icon: Combine, label: 'Merge Rooms', shortcut: 'M' },
+  { id: 'split', icon: Scissors, label: 'Split Room', shortcut: 'X' },
 ];
 
 const unitLabels: Record<DimensionUnit, string> = {

@@ -20,13 +20,14 @@ import {
 } from '@/lib/canvas/geometry';
 import { detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
 import { mergeRoomsAtSharedEdge, findSharedEdgeBetweenRooms } from '@/lib/canvas/polygonMerge';
+import { splitPolygonWithLine, findEdgeForPoint, assignHolesToPolygons } from '@/lib/canvas/polygonSplit';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
 import { FinishesLegend } from '@/components/reports/FinishesLegend';
 import { Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 
-export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan' | 'merge';
+export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan' | 'merge' | 'split';
 
 interface EditorCanvasProps {
   activeTool: EditorTool;
@@ -96,6 +97,12 @@ export function EditorCanvas({
   // Merge tool state
   const [mergeFirstRoom, setMergeFirstRoom] = useState<Room | null>(null);
   const [mergeableRoomIds, setMergeableRoomIds] = useState<string[]>([]);
+
+  // Split tool state
+  const [splitRoom, setSplitRoom] = useState<Room | null>(null);
+  const [splitStartPoint, setSplitStartPoint] = useState<CanvasPoint | null>(null);
+  const [splitPreviewEnd, setSplitPreviewEnd] = useState<CanvasPoint | null>(null);
+  const [splitStartEdge, setSplitStartEdge] = useState<number | null>(null);
 
   // Detect shared edges for merge tool
   const sharedEdges = useMemo(() => {
@@ -297,6 +304,11 @@ export function EditorCanvas({
         // Cancel merge mode
         setMergeFirstRoom(null);
         setMergeableRoomIds([]);
+        // Cancel split mode
+        setSplitRoom(null);
+        setSplitStartPoint(null);
+        setSplitPreviewEnd(null);
+        setSplitStartEdge(null);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -310,6 +322,12 @@ export function EditorCanvas({
       if (e.key === 'm' || e.key === 'M') {
         if (!e.metaKey && !e.ctrlKey && onToolChange) {
           onToolChange('merge');
+        }
+      }
+      // Keyboard shortcut for split tool
+      if (e.key === 'x' || e.key === 'X') {
+        if (!e.metaKey && !e.ctrlKey && onToolChange) {
+          onToolChange('split');
         }
       }
     };
@@ -334,6 +352,12 @@ export function EditorCanvas({
     if (activeTool !== 'merge') {
       setMergeFirstRoom(null);
       setMergeableRoomIds([]);
+    }
+    if (activeTool !== 'split') {
+      setSplitRoom(null);
+      setSplitStartPoint(null);
+      setSplitPreviewEnd(null);
+      setSplitStartEdge(null);
     }
   }, [activeTool]);
 
@@ -378,6 +402,87 @@ export function EditorCanvas({
     setMergeableRoomIds([]);
     
     toast.success(`Merged "${room1.name}" and "${room2.name}"`);
+  }, [dispatch]);
+
+  // Handle split room
+  const handleSplitRoom = useCallback((
+    room: Room,
+    startPoint: CanvasPoint,
+    endPoint: CanvasPoint,
+    startEdgeIndex: number,
+    endEdgeIndex: number
+  ) => {
+    // Validate we're splitting across different edges
+    if (startEdgeIndex === endEdgeIndex) {
+      toast.error("Split line must cross two different edges");
+      return;
+    }
+    
+    // Perform split
+    const result = splitPolygonWithLine(room.points, startPoint, endPoint);
+    if (!result.success) {
+      toast.error(result.error || "Could not split room");
+      return;
+    }
+    
+    // Assign holes to the appropriate polygon
+    const { holes1, holes2 } = assignHolesToPolygons(
+      room.holes || [],
+      result.polygon1,
+      result.polygon2
+    );
+    
+    // Assign doors based on which polygon contains them
+    const doors1: typeof room.doors = [];
+    const doors2: typeof room.doors = [];
+    for (const door of room.doors || []) {
+      if (isPointInPolygon(door.position, result.polygon1)) {
+        doors1.push(door);
+      } else {
+        doors2.push(door);
+      }
+    }
+    
+    // Create two new rooms
+    const room1: Room = {
+      id: generateRoomId(),
+      name: `${room.name} A`,
+      points: result.polygon1,
+      holes: holes1,
+      doors: doors1,
+      materialId: room.materialId,
+      materialCode: room.materialCode,
+      color: room.color || DEFAULT_ROOM_COLOR,
+      fillDirection: room.fillDirection,
+      accessories: room.accessories,
+    };
+    
+    const room2: Room = {
+      id: generateRoomId(),
+      name: `${room.name} B`,
+      points: result.polygon2,
+      holes: holes2,
+      doors: doors2,
+      materialId: room.materialId,
+      materialCode: room.materialCode,
+      color: room.color || DEFAULT_ROOM_COLOR,
+      fillDirection: room.fillDirection,
+      accessories: room.accessories,
+    };
+    
+    // Delete original, add new rooms
+    dispatch({ type: 'DELETE_ROOM', roomId: room.id });
+    dispatch({ type: 'ADD_ROOM', room: room1 });
+    dispatch({ type: 'ADD_ROOM', room: room2 });
+    dispatch({ type: 'SELECT_ROOM', roomId: room1.id });
+    
+    // Reset split state
+    setSplitRoom(null);
+    setSplitStartPoint(null);
+    setSplitPreviewEnd(null);
+    setSplitStartEdge(null);
+    
+    toast.success(`Split "${room.name}" into two rooms`);
   }, [dispatch]);
 
   // Convert screen coordinates to canvas coordinates
@@ -610,8 +715,50 @@ export function EditorCanvas({
         }
         break;
       }
+
+      case 'split': {
+        // Find clicked room
+        let clickedRoom: Room | null = null;
+        for (const room of state.rooms) {
+          if (isPointInPolygon(point, room.points)) {
+            clickedRoom = room;
+            break;
+          }
+        }
+        
+        if (!splitRoom) {
+          // First click - select room to split
+          if (!clickedRoom) return;
+          setSplitRoom(clickedRoom);
+          dispatch({ type: 'SELECT_ROOM', roomId: clickedRoom.id });
+        } else if (!splitStartPoint) {
+          // Second click - set split start point (must be on edge)
+          const edgeInfo = findEdgeForPoint(point, splitRoom.points, 20 / state.viewTransform.zoom);
+          if (!edgeInfo) {
+            toast.error("Click on a room edge to start the split");
+            return;
+          }
+          setSplitStartPoint(edgeInfo.projectedPoint);
+          setSplitStartEdge(edgeInfo.edgeIndex);
+        } else {
+          // Third click - set split end point and execute split
+          const edgeInfo = findEdgeForPoint(point, splitRoom.points, 20 / state.viewTransform.zoom);
+          if (!edgeInfo) {
+            toast.error("Click on a room edge to complete the split");
+            return;
+          }
+          
+          if (edgeInfo.edgeIndex === splitStartEdge) {
+            toast.error("Split line must cross two different edges");
+            return;
+          }
+          
+          handleSplitRoom(splitRoom, splitStartPoint, edgeInfo.projectedPoint, splitStartEdge!, edgeInfo.edgeIndex);
+        }
+        break;
+      }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
 
   // Handle pointer move
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -642,7 +789,7 @@ export function EditorCanvas({
     }
 
     // Handle hover for select or merge mode (visual feedback)
-    if (activeTool === 'select' || activeTool === 'merge') {
+    if (activeTool === 'select' || activeTool === 'merge' || activeTool === 'split') {
       if (activeTool === 'select') {
         handleHover(point);
       }
@@ -656,8 +803,20 @@ export function EditorCanvas({
         }
       }
       setHoveredRoomId(foundHoveredRoom);
+      
+      // Update split preview
+      if (activeTool === 'split' && splitRoom && splitStartPoint) {
+        // Snap to edge if close
+        const edgeInfo = findEdgeForPoint(point, splitRoom.points, 20 / state.viewTransform.zoom);
+        if (edgeInfo) {
+          setSplitPreviewEnd(edgeInfo.projectedPoint);
+        } else {
+          setSplitPreviewEnd(point);
+        }
+      }
     } else {
       setHoveredRoomId(null);
+      setSplitPreviewEnd(null);
     }
 
     // Update cursor position
@@ -687,7 +846,7 @@ export function EditorCanvas({
     }
 
     setCursorPosition(finalPoint);
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture]);
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
@@ -822,10 +981,16 @@ export function EditorCanvas({
           return 'pointer';
         }
         return 'default';
+      case 'split':
+        if (splitRoom && splitStartPoint) {
+          return 'crosshair';
+        }
+        if (hoveredRoomId) return 'pointer';
+        return 'crosshair';
       default:
         return 'default';
     }
-  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart, hoveredRoomId, mergeFirstRoom, mergeableRoomIds]);
+  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart, hoveredRoomId, mergeFirstRoom, mergeableRoomIds, splitRoom, splitStartPoint]);
 
   // Touch event handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -898,6 +1063,10 @@ export function EditorCanvas({
         mergeFirstRoomId={mergeFirstRoom?.id || null}
         mergeableRoomIds={mergeableRoomIds}
         isMergeMode={activeTool === 'merge'}
+        splitRoomId={splitRoom?.id || null}
+        splitStartPoint={splitStartPoint}
+        splitPreviewEnd={splitPreviewEnd}
+        isSplitMode={activeTool === 'split'}
       />
 
       {/* Material drag indicator */}
@@ -928,6 +1097,18 @@ export function EditorCanvas({
           {mergeFirstRoom 
             ? `Merging: ${mergeFirstRoom.name} • Click adjacent room to merge • Esc to cancel`
             : 'Click first room to merge • Esc to cancel'
+          }
+        </div>
+      )}
+
+      {/* Split mode indicator */}
+      {activeTool === 'split' && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm font-medium">
+          {splitRoom 
+            ? splitStartPoint
+              ? `Splitting: ${splitRoom.name} • Click another edge to complete • Esc to cancel`
+              : `Splitting: ${splitRoom.name} • Click on an edge to start • Esc to cancel`
+            : 'Click a room to split • Esc to cancel'
           }
         </div>
       )}
