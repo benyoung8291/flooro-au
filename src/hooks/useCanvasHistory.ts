@@ -176,6 +176,8 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
         color: room.color || 'hsla(217, 91%, 50%, 0.15)',
         fillDirection: room.fillDirection,
         accessories: room.accessories,
+        seamOptions: room.seamOptions,
+        tilePattern: room.tilePattern,
       }));
       
       // Preserve scale from incoming data - never lose calibration
