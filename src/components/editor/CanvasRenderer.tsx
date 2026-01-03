@@ -1,7 +1,8 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve } from '@/lib/canvas/types';
 import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, getQuadraticBezierPoint, getEdgeMidpoint } from '@/lib/canvas/geometry';
 import { StripPlanResult } from '@/lib/rollGoods/types';
+import { SharedEdge, detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
 
 interface HoveredCurveControl {
   roomId: string;
@@ -30,6 +31,7 @@ interface CanvasRendererProps {
   dimensionUnit?: DimensionUnit;
   stripPlans?: Map<string, StripPlanResult>;
   showSeamLines?: boolean;
+  showSharedEdgeIndicators?: boolean;
 }
 
 // Cache for loaded images
@@ -79,10 +81,16 @@ export function CanvasRenderer({
   dimensionUnit = 'm',
   stripPlans,
   showSeamLines = true,
+  showSharedEdgeIndicators = true,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
+
+  // Detect shared edges between rooms
+  const sharedEdges = useMemo(() => {
+    return detectSharedEdges(state.rooms);
+  }, [state.rooms]);
 
   // Load background image when URL changes
   useEffect(() => {
@@ -199,6 +207,11 @@ export function CanvasRenderer({
       }
     });
 
+    // Draw shared edge indicators (unlinked adjacent rooms)
+    if (showSharedEdgeIndicators && sharedEdges.length > 0) {
+      drawSharedEdgeIndicators(ctx, sharedEdges, state.rooms, zoom);
+    }
+
     // Draw current drawing in progress
     if (isDrawing && drawingPoints.length > 0) {
       ctx.strokeStyle = 'hsl(217 91% 50%)';
@@ -246,7 +259,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges]);
 
   useEffect(() => {
     render();
@@ -288,6 +301,114 @@ function drawBackgroundImage(
   // Draw image centered at origin
   ctx.drawImage(img, -img.width / 2, -img.height / 2);
   
+  ctx.restore();
+}
+
+/**
+ * Draw indicators for shared edges between rooms that are not yet linked as transitions
+ */
+function drawSharedEdgeIndicators(
+  ctx: CanvasRenderingContext2D,
+  sharedEdges: SharedEdge[],
+  rooms: Room[],
+  zoom: number
+) {
+  for (const shared of sharedEdges) {
+    const room1 = rooms.find(r => r.id === shared.room1Id);
+    const room2 = rooms.find(r => r.id === shared.room2Id);
+    if (!room1 || !room2) continue;
+
+    // Check if this edge is already marked as a transition in either room
+    const isTransitionInRoom1 = room1.edgeTransitions?.some(
+      t => t.edgeIndex === shared.room1EdgeIndex
+    );
+    const isTransitionInRoom2 = room2.edgeTransitions?.some(
+      t => t.edgeIndex === shared.room2EdgeIndex
+    );
+
+    // Only show indicator if not already a transition
+    if (isTransitionInRoom1 || isTransitionInRoom2) continue;
+
+    // Get edge midpoints
+    const p1Start = room1.points[shared.room1EdgeIndex];
+    const p1End = room1.points[(shared.room1EdgeIndex + 1) % room1.points.length];
+    const mid1X = (p1Start.x + p1End.x) / 2;
+    const mid1Y = (p1Start.y + p1End.y) / 2;
+
+    const p2Start = room2.points[shared.room2EdgeIndex];
+    const p2End = room2.points[(shared.room2EdgeIndex + 1) % room2.points.length];
+    const mid2X = (p2Start.x + p2End.x) / 2;
+    const mid2Y = (p2Start.y + p2End.y) / 2;
+
+    // Draw connection line between midpoints
+    ctx.save();
+    ctx.strokeStyle = 'hsl(217 91% 60%)';
+    ctx.lineWidth = 2 / zoom;
+    ctx.setLineDash([4 / zoom, 4 / zoom]);
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(mid1X, mid1Y);
+    ctx.lineTo(mid2X, mid2Y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+
+    // Draw link indicator at the connection midpoint
+    const connMidX = (mid1X + mid2X) / 2;
+    const connMidY = (mid1Y + mid2Y) / 2;
+
+    // Draw diamond indicator
+    ctx.save();
+    ctx.fillStyle = 'hsl(217 91% 55%)';
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = 1.5 / zoom;
+    
+    const size = 6 / zoom;
+    ctx.beginPath();
+    ctx.moveTo(connMidX, connMidY - size);
+    ctx.lineTo(connMidX + size, connMidY);
+    ctx.lineTo(connMidX, connMidY + size);
+    ctx.lineTo(connMidX - size, connMidY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Draw small link icons at the edge midpoints
+    drawLinkIcon(ctx, mid1X, mid1Y, zoom);
+    drawLinkIcon(ctx, mid2X, mid2Y, zoom);
+  }
+}
+
+/**
+ * Draw a small link icon at a position
+ */
+function drawLinkIcon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  zoom: number
+) {
+  const size = 5 / zoom;
+  
+  ctx.save();
+  ctx.fillStyle = 'hsl(217 91% 50%)';
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.arc(x, y, size, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Draw chain link symbol
+  ctx.strokeStyle = 'white';
+  ctx.lineWidth = 1.2 / zoom;
+  ctx.beginPath();
+  // Left link
+  ctx.arc(x - size * 0.3, y, size * 0.4, Math.PI * 0.5, Math.PI * 1.5);
+  ctx.stroke();
+  ctx.beginPath();
+  // Right link
+  ctx.arc(x + size * 0.3, y, size * 0.4, -Math.PI * 0.5, Math.PI * 0.5);
+  ctx.stroke();
   ctx.restore();
 }
 

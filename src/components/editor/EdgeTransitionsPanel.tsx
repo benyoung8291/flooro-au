@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Room, ScaleCalibration, EdgeTransition } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
+import { SharedEdge, getSharedEdgeForEdge } from '@/lib/canvas/sharedEdgeDetector';
+import { useSharedEdges } from '@/hooks/useSharedEdges';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -22,8 +24,9 @@ import {
   ArrowLeftRight,
   ChevronDown,
   AlertTriangle,
-  Check,
+  Link2,
   Layers,
+  Sparkles,
 } from 'lucide-react';
 import {
   calculateRoomStackHeight,
@@ -34,6 +37,7 @@ import {
   RoomStackHeight,
 } from '@/lib/transitions';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface EdgeTransitionsPanelProps {
   room: Room;
@@ -51,6 +55,9 @@ export function EdgeTransitionsPanel({
   onUpdateRoom,
 }: EdgeTransitionsPanelProps) {
   const [expandedEdge, setExpandedEdge] = useState<number | null>(null);
+
+  // Shared edge detection
+  const { sharedEdges, autoLinkSharedEdges, getSharedEdge } = useSharedEdges(allRooms);
 
   // Calculate this room's stack height
   const roomMaterial = materials.find((m) => m.id === room.materialId);
@@ -71,9 +78,54 @@ export function EdgeTransitionsPanel({
     });
   }, [room.points, scale]);
 
+  // Count unlinked shared edges
+  const unlinkedSharedCount = useMemo(() => {
+    let count = 0;
+    for (let i = 0; i < room.points.length; i++) {
+      const sharedEdge = getSharedEdge(room.id, i);
+      const transition = room.edgeTransitions?.find(t => t.edgeIndex === i);
+      if (sharedEdge && !transition) {
+        count++;
+      }
+    }
+    return count;
+  }, [room, getSharedEdge]);
+
+  // Handle auto-link all shared edges
+  const handleAutoLinkAll = () => {
+    const linkedCount = autoLinkSharedEdges(room, allRooms, onUpdateRoom);
+    if (linkedCount > 0) {
+      toast.success(`Linked ${linkedCount} adjacent room${linkedCount !== 1 ? 's' : ''}`);
+    } else {
+      toast.info('No new rooms to link');
+    }
+  };
+
   // Get transition for an edge
   const getEdgeTransition = (edgeIndex: number): EdgeTransition | undefined => {
     return room.edgeTransitions?.find((t) => t.edgeIndex === edgeIndex);
+  };
+
+  // Auto-link a single shared edge
+  const autoLinkEdge = (edgeIndex: number) => {
+    const sharedEdge = getSharedEdge(room.id, edgeIndex);
+    if (!sharedEdge) return;
+
+    const otherRoom = allRooms.find(r => r.id === sharedEdge.otherRoomId);
+    const existing = room.edgeTransitions || [];
+    
+    const newTransition: EdgeTransition = {
+      edgeIndex,
+      adjacentRoomId: sharedEdge.otherRoomId,
+      adjacentRoomName: otherRoom?.name,
+      transitionType: 'auto',
+    };
+
+    onUpdateRoom(room.id, {
+      edgeTransitions: [...existing, newTransition],
+    });
+    
+    toast.success(`Linked to ${otherRoom?.name || 'adjacent room'}`);
   };
 
   // Toggle edge between wall and transition
@@ -163,9 +215,22 @@ export function EdgeTransitionsPanel({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label className="text-xs">Edges ({room.points.length})</Label>
-          <Badge variant="secondary" className="text-[10px]">
-            {transitionCount} transition{transitionCount !== 1 ? 's' : ''}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {unlinkedSharedCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px] gap-1 text-blue-600 border-blue-300 hover:bg-blue-50"
+                onClick={handleAutoLinkAll}
+              >
+                <Link2 className="w-3 h-3" />
+                Link All ({unlinkedSharedCount})
+              </Button>
+            )}
+            <Badge variant="secondary" className="text-[10px]">
+              {transitionCount} transition{transitionCount !== 1 ? 's' : ''}
+            </Badge>
+          </div>
         </div>
 
         <ScrollArea className="max-h-[400px]">
@@ -184,6 +249,13 @@ export function EdgeTransitionsPanel({
                 isTransition && heightDiff > 0
                   ? recommendTransitionType(heightDiff)
                   : null;
+              
+              // Check for shared edge (adjacent room detected)
+              const sharedEdge = getSharedEdge(room.id, edgeIndex);
+              const hasUnlinkedSharedEdge = sharedEdge && !isTransition;
+              const sharedRoomName = sharedEdge 
+                ? allRooms.find(r => r.id === sharedEdge.otherRoomId)?.name 
+                : null;
 
               return (
                 <Collapsible
@@ -198,6 +270,8 @@ export function EdgeTransitionsPanel({
                       'rounded-lg border transition-colors',
                       isTransition
                         ? 'border-amber-500/50 bg-amber-500/5'
+                        : hasUnlinkedSharedEdge
+                        ? 'border-blue-400/50 bg-blue-500/5'
                         : 'border-border bg-background'
                     )}
                   >
@@ -208,7 +282,9 @@ export function EdgeTransitionsPanel({
                         className={cn(
                           'h-7 w-7 p-0',
                           isTransition &&
-                            'text-amber-600 hover:text-amber-700 hover:bg-amber-500/10'
+                            'text-amber-600 hover:text-amber-700 hover:bg-amber-500/10',
+                          hasUnlinkedSharedEdge &&
+                            'text-blue-600 hover:text-blue-700 hover:bg-blue-500/10'
                         )}
                         onClick={() => toggleEdgeType(edgeIndex)}
                         title={
@@ -236,10 +312,38 @@ export function EdgeTransitionsPanel({
                               Transition
                             </Badge>
                           )}
+                          {hasUnlinkedSharedEdge && (
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-blue-600 border-blue-400/50 gap-0.5"
+                            >
+                              <Sparkles className="w-2.5 h-2.5" />
+                              Adjacent
+                            </Badge>
+                          )}
                         </div>
                         {isTransition && transition.adjacentRoomName && (
                           <div className="text-[10px] text-muted-foreground truncate">
                             → {transition.adjacentRoomName}
+                          </div>
+                        )}
+                        {hasUnlinkedSharedEdge && sharedRoomName && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="text-[10px] text-blue-600">
+                              Shares edge with {sharedRoomName}
+                            </span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px] text-blue-600 hover:text-blue-700 hover:bg-blue-500/10"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                autoLinkEdge(edgeIndex);
+                              }}
+                            >
+                              <Link2 className="w-3 h-3 mr-0.5" />
+                              Link
+                            </Button>
                           </div>
                         )}
                       </div>
