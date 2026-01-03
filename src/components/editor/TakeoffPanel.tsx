@@ -33,11 +33,13 @@ import {
   Scissors,
   LayoutGrid,
   ArrowRight,
+  Pencil,
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { calculatePolygonArea } from '@/lib/canvas/geometry';
+import { RoomDetailView } from './RoomDetailView';
 import { cn } from '@/lib/utils';
 
 interface TakeoffPanelProps {
@@ -82,7 +84,10 @@ export function TakeoffPanel({
   const { data: materials, isLoading } = useMaterials();
   const navigate = useNavigate();
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
+  const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
 
+  // Get the room being edited
+  const editingRoom = editingRoomId ? rooms.find(r => r.id === editingRoomId) : null;
   // Calculate totals
   const totals = useMemo(() => {
     if (!scale) return { area: 0, cost: 0, roomsWithMaterial: 0 };
@@ -171,6 +176,16 @@ export function TakeoffPanel({
     return count;
   };
 
+  // Handler for editing a room
+  const handleEditRoom = (roomId: string) => {
+    setEditingRoomId(roomId);
+    onSelectRoom?.(roomId);
+  };
+
+  const handleBackFromDetail = () => {
+    setEditingRoomId(null);
+  };
+
   return (
     <div 
       className={cn(
@@ -193,6 +208,21 @@ export function TakeoffPanel({
             TAKEOFF
           </div>
         </div>
+      ) : editingRoom ? (
+        // Room Detail View
+        <RoomDetailView
+          room={editingRoom}
+          scale={scale}
+          materials={materials || []}
+          stripPlan={stripPlans?.get(editingRoom.id) || null}
+          onBack={handleBackFromDetail}
+          onUpdateRoom={(roomId, updates) => onUpdateRoom?.(roomId, updates)}
+          onDeleteRoom={(roomId) => {
+            onDeleteRoom?.(roomId);
+            setEditingRoomId(null);
+          }}
+          onMaterialSelect={(material, roomId) => onMaterialSelect?.(material, roomId)}
+        />
       ) : (
         <>
           {/* Header with Summary */}
@@ -474,19 +504,32 @@ export function TakeoffPanel({
                               </div>
                             )}
                             
-                            {/* Delete Room Button */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 mt-2"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDeleteRoom?.(room.id);
-                              }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5 mr-1.5" />
-                              Delete Room
-                            </Button>
+                            {/* Action Buttons */}
+                            <div className="flex gap-2 mt-3 pt-2 border-t border-border">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="flex-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleEditRoom(room.id);
+                                }}
+                              >
+                                <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                                Edit Details
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteRoom?.(room.id);
+                                }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
                           </div>
                         </CollapsibleContent>
                       </Collapsible>
