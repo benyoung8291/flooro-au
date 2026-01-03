@@ -249,17 +249,19 @@ export function calculateStripPlan(
     let finalY = yPos;
     
     if (isDiagonal) {
-      // Convert back from mm to pixels for rotation, then back to mm
-      const toPixels = (mm: number) => scale && scale.pixelsPerMm > 0 ? mm * scale.pixelsPerMm : mm;
-      const toMm = (pixels: number) => scale && scale.pixelsPerMm > 0 ? pixels / scale.pixelsPerMm : pixels;
+      // Use mm-based centroid for rotation (same coordinate space as positions)
+      const centroidMm = {
+        x: (bbox.minX + bbox.maxX) / 2,
+        y: (bbox.minY + bbox.maxY) / 2,
+      };
       
       const rotatedPos = rotatePoint(
-        { x: toPixels(xPos), y: toPixels(yPos) },
-        centroid,
+        { x: xPos, y: yPos },
+        centroidMm,
         fillAngle
       );
-      finalX = toMm(rotatedPos.x);
-      finalY = toMm(rotatedPos.y);
+      finalX = rotatedPos.x;
+      finalY = rotatedPos.y;
     }
 
     const strip: Strip = {
@@ -298,16 +300,19 @@ export function calculateStripPlan(
 
       // For diagonal layouts, rotate seam line back to original coordinate space
       if (isDiagonal) {
-        const toPixels = (mm: number) => scale && scale.pixelsPerMm > 0 ? mm * scale.pixelsPerMm : mm;
-        const toMm = (pixels: number) => scale && scale.pixelsPerMm > 0 ? pixels / scale.pixelsPerMm : pixels;
+        // Use mm-based centroid for rotation (same coordinate space as seam positions)
+        const centroidMm = {
+          x: (bbox.minX + bbox.maxX) / 2,
+          y: (bbox.minY + bbox.maxY) / 2,
+        };
         
-        const rotatedP1 = rotatePoint({ x: toPixels(seamX1), y: toPixels(seamY1) }, centroid, fillAngle);
-        const rotatedP2 = rotatePoint({ x: toPixels(seamX2), y: toPixels(seamY2) }, centroid, fillAngle);
+        const rotatedP1 = rotatePoint({ x: seamX1, y: seamY1 }, centroidMm, fillAngle);
+        const rotatedP2 = rotatePoint({ x: seamX2, y: seamY2 }, centroidMm, fillAngle);
         
-        seamX1 = toMm(rotatedP1.x);
-        seamY1 = toMm(rotatedP1.y);
-        seamX2 = toMm(rotatedP2.x);
-        seamY2 = toMm(rotatedP2.y);
+        seamX1 = rotatedP1.x;
+        seamY1 = rotatedP1.y;
+        seamX2 = rotatedP2.x;
+        seamY2 = rotatedP2.y;
       }
 
       seamLines.push({

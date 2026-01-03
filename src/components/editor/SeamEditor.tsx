@@ -200,40 +200,73 @@ export function SeamEditor({
     onRecalculate();
   };
 
-  // Auto-optimize seams (avoid doors)
+  // Auto-optimize seams (avoid doors and zones, or center if nothing to avoid)
   const handleAutoOptimize = () => {
-    // Simple optimization: shift first seam to avoid doors
-    if (!stripPlan || room.doors.length === 0) return;
+    if (!stripPlan) return;
 
-    const isHorizontal = stripPlan.layoutDirection === 'horizontal';
+    const isHorizontal = stripPlan.layoutDirection === 'horizontal' || stripPlan.layoutDirection === 'diagonal';
     const pixelsPerMm = scale?.pixelsPerMm || 1;
 
-    // Find door positions
-    const doorPositions = room.doors.map(door => {
+    // Collect all positions to avoid (doors + avoid zones)
+    const avoidPositions: { pos: number; radius: number }[] = [];
+
+    // Add door positions
+    room.doors.forEach(door => {
       const pos = isHorizontal ? door.position.y : door.position.x;
-      return pos / pixelsPerMm;
+      avoidPositions.push({
+        pos: pos / pixelsPerMm,
+        radius: door.width / 2 + 150, // Door half-width + buffer
+      });
     });
 
-    // Try different offsets and find one that avoids doors
+    // Add avoid zone centers
+    avoidZones.forEach(zone => {
+      const pos = isHorizontal
+        ? zone.y + zone.height / 2
+        : zone.x + zone.width / 2;
+      const radius = isHorizontal ? zone.height / 2 : zone.width / 2;
+      avoidPositions.push({ pos, radius: radius + 100 });
+    });
+
+    // If nothing to avoid, center the seams in the room
+    if (avoidPositions.length === 0) {
+      const roomSize = isHorizontal
+        ? stripPlan.roomBoundingBox.height
+        : stripPlan.roomBoundingBox.width;
+      const numStrips = Math.ceil(roomSize / materialWidth);
+      const totalStripWidth = numStrips * materialWidth;
+      const bestOffset = (totalStripWidth - roomSize) / 2;
+      
+      onFirstSeamOffsetChange(Math.max(0, Math.min(bestOffset, materialWidth - 1)));
+      onRecalculate();
+      return;
+    }
+
+    // Try different offsets and find one that minimizes proximity to obstacles
     let bestOffset = 0;
     let bestScore = Infinity;
 
-    for (let offset = 0; offset < materialWidth; offset += 50) {
+    const roomSize = isHorizontal
+      ? stripPlan.roomBoundingBox.height
+      : stripPlan.roomBoundingBox.width;
+    const minPos = isHorizontal
+      ? stripPlan.roomBoundingBox.minY
+      : stripPlan.roomBoundingBox.minX;
+
+    for (let offset = 0; offset < materialWidth; offset += 25) {
       let score = 0;
-      
-      // Check each potential seam position
-      const roomSize = isHorizontal ? stripPlan.roomBoundingBox.height : stripPlan.roomBoundingBox.width;
-      const minPos = isHorizontal ? stripPlan.roomBoundingBox.minY : stripPlan.roomBoundingBox.minX;
-      
+
+      // Check each potential seam position against all obstacles
       for (let pos = minPos + offset; pos < minPos + roomSize; pos += materialWidth) {
-        for (const doorPos of doorPositions) {
-          const distance = Math.abs(pos - doorPos);
-          if (distance < 300) {
-            score += (300 - distance);
+        for (const avoid of avoidPositions) {
+          const distance = Math.abs(pos - avoid.pos);
+          if (distance < avoid.radius) {
+            // Penalize more heavily the closer to center
+            score += (avoid.radius - distance) * 2;
           }
         }
       }
-      
+
       if (score < bestScore) {
         bestScore = score;
         bestOffset = offset;
