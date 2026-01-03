@@ -15,6 +15,7 @@ import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
 import { MobileSidebarDrawer } from '@/components/editor/MobileSidebarDrawer';
 import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
+import { PageTabs } from '@/components/editor/PageTabs';
 import { ProjectProgressBar } from '@/components/editor/ProjectProgressBar';
 import { RoomsOverviewDialog } from '@/components/editor/RoomsOverviewDialog';
 import { SaveStatusIndicator, SaveStatus } from '@/components/editor/SaveStatusIndicator';
@@ -29,7 +30,7 @@ import { FinishesScheduleDialog } from '@/components/reports/FinishesScheduleDia
 import { generateReport } from '@/lib/reports/calculations';
 import { calculateStripPlan, extractRollMaterialSpecs } from '@/lib/rollGoods';
 import { StripPlanResult } from '@/lib/rollGoods/types';
-import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit, FloorPlanPage } from '@/lib/canvas/types';
 import { AccessoryQuickAddDialog } from '@/components/materials/AccessoryQuickAddDialog';
 import { 
   ArrowLeft, 
@@ -107,11 +108,31 @@ export default function ProjectEditor() {
   }, [dimensionUnit]);
 
   // Sync local data with project data - only on initial load
+  // Also handles migration from legacy single-page format to multi-page
   const hasLoadedProjectRef = useRef(false);
   useEffect(() => {
     if (project?.json_data && !hasLoadedProjectRef.current) {
       hasLoadedProjectRef.current = true;
-      setLocalData(project.json_data as Record<string, unknown>);
+      let data = project.json_data as Record<string, unknown>;
+      
+      // Migrate legacy format (rooms at root) to multi-page format
+      if (data.rooms && !data.pages) {
+        const legacyPage: FloorPlanPage = {
+          id: crypto.randomUUID(),
+          name: 'Floor Plan 1',
+          sortOrder: 0,
+          backgroundImage: (data.backgroundImage as BackgroundImage) || null,
+          rooms: (data.rooms as Room[]) || [],
+          scale: (data.scale as ScaleCalibration) || null,
+        };
+        data = {
+          ...data,
+          pages: [legacyPage],
+          activePageId: legacyPage.id,
+        };
+      }
+      
+      setLocalData(data);
     }
   }, [project?.json_data]);
 
@@ -247,10 +268,15 @@ export default function ProjectEditor() {
     }
   };
 
-  // Extract rooms, scale, and background image from localData for report generation
-  const rooms = (localData.rooms as Room[]) || [];
-  const scale = (localData.scale as ScaleCalibration) || null;
-  const backgroundImage = (localData.backgroundImage as BackgroundImage) || null;
+  // Get pages and active page data
+  const pages = (localData.pages as FloorPlanPage[]) || [];
+  const activePageId = (localData.activePageId as string | null) || (pages.length > 0 ? pages[0]?.id : null);
+  const activePage = pages.find(p => p.id === activePageId) || null;
+  
+  // Extract rooms, scale, and background image from active page (or legacy root data)
+  const rooms = activePage?.rooms || (localData.rooms as Room[]) || [];
+  const scale = activePage?.scale || (localData.scale as ScaleCalibration) || null;
+  const backgroundImage = activePage?.backgroundImage || (localData.backgroundImage as BackgroundImage) || null;
   const selectedRoomId = (localData.selectedRoomId as string | null) || null;
   const dropAllocations = (localData.dropAllocations as Record<string, unknown>) || {};
 
@@ -329,23 +355,65 @@ export default function ProjectEditor() {
 
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
     setLocalData(prev => {
-      const currentRooms = (prev.rooms as Room[]) || [];
-      const updatedRooms = currentRooms.map(room => 
-        room.id === roomId ? { ...room, ...updates } : room
-      );
-      return { ...prev, rooms: updatedRooms };
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+      
+      if (pages.length > 0 && activePageId) {
+        // Multi-page mode: update room in active page
+        const updatedPages = pages.map(page => {
+          if (page.id === activePageId) {
+            return {
+              ...page,
+              rooms: page.rooms.map(room => 
+                room.id === roomId ? { ...room, ...updates } : room
+              ),
+            };
+          }
+          return page;
+        });
+        return { ...prev, pages: updatedPages };
+      } else {
+        // Legacy mode: update root-level rooms
+        const currentRooms = (prev.rooms as Room[]) || [];
+        const updatedRooms = currentRooms.map(room => 
+          room.id === roomId ? { ...room, ...updates } : room
+        );
+        return { ...prev, rooms: updatedRooms };
+      }
     });
     setHasUnsavedChanges(true);
   }, []);
 
   const handleDeleteRoom = useCallback((roomId: string) => {
     setLocalData(prev => {
-      const currentRooms = (prev.rooms as Room[]) || [];
-      return { 
-        ...prev, 
-        rooms: currentRooms.filter(room => room.id !== roomId),
-        selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
-      };
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+      
+      if (pages.length > 0 && activePageId) {
+        // Multi-page mode
+        const updatedPages = pages.map(page => {
+          if (page.id === activePageId) {
+            return {
+              ...page,
+              rooms: page.rooms.filter(room => room.id !== roomId),
+            };
+          }
+          return page;
+        });
+        return { 
+          ...prev, 
+          pages: updatedPages,
+          selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
+        };
+      } else {
+        // Legacy mode
+        const currentRooms = (prev.rooms as Room[]) || [];
+        return { 
+          ...prev, 
+          rooms: currentRooms.filter(room => room.id !== roomId),
+          selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
+        };
+      }
     });
     setHasUnsavedChanges(true);
   }, []);
@@ -477,44 +545,100 @@ export default function ProjectEditor() {
     // This is triggered by updating room data which already happens
   }, []);
 
-  // Background image handlers
+  // Background image handlers - work with active page
   const handleSetBackgroundImage = useCallback((image: BackgroundImage) => {
-    setLocalData(prev => ({ ...prev, backgroundImage: image }));
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+      
+      if (pages.length > 0 && activePageId) {
+        const updatedPages = pages.map(page => 
+          page.id === activePageId ? { ...page, backgroundImage: image } : page
+        );
+        return { ...prev, pages: updatedPages };
+      }
+      return { ...prev, backgroundImage: image };
+    });
     setHasUnsavedChanges(true);
   }, []);
 
   const handleUpdateBackgroundImage = useCallback((updates: Partial<BackgroundImage>) => {
-    setLocalData(prev => ({
-      ...prev,
-      backgroundImage: prev.backgroundImage
-        ? { ...(prev.backgroundImage as BackgroundImage), ...updates }
-        : null,
-    }));
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+      
+      if (pages.length > 0 && activePageId) {
+        const updatedPages = pages.map(page => {
+          if (page.id === activePageId && page.backgroundImage) {
+            return { ...page, backgroundImage: { ...page.backgroundImage, ...updates } };
+          }
+          return page;
+        });
+        return { ...prev, pages: updatedPages };
+      }
+      
+      return {
+        ...prev,
+        backgroundImage: prev.backgroundImage
+          ? { ...(prev.backgroundImage as BackgroundImage), ...updates }
+          : null,
+      };
+    });
     setHasUnsavedChanges(true);
   }, []);
 
   const handleRemoveBackgroundImage = useCallback(() => {
-    setLocalData(prev => ({ ...prev, backgroundImage: null }));
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+      
+      if (pages.length > 0 && activePageId) {
+        const updatedPages = pages.map(page => 
+          page.id === activePageId ? { ...page, backgroundImage: null } : page
+        );
+        return { ...prev, pages: updatedPages };
+      }
+      return { ...prev, backgroundImage: null };
+    });
     setHasUnsavedChanges(true);
   }, []);
 
-  // Handle AI auto-takeoff results
+  // Handle AI auto-takeoff results - ALWAYS creates a new page
   const handleAutoTakeoffResults = useCallback((
     detectedRooms: Room[], 
     detectedScale?: ScaleCalibration, 
     detectedBackgroundImage?: BackgroundImage
   ) => {
     setLocalData(prev => {
-      const existingRooms = (prev.rooms as Room[]) || [];
+      const existingPages = (prev.pages as FloorPlanPage[]) || [];
+      
+      // Create a new page for the auto-takeoff results
+      const newPage: FloorPlanPage = {
+        id: crypto.randomUUID(),
+        name: `Floor Plan ${existingPages.length + 1}`,
+        sortOrder: existingPages.length,
+        backgroundImage: detectedBackgroundImage ? {
+          ...detectedBackgroundImage,
+          locked: true, // Always lock floor plan
+        } : null,
+        rooms: detectedRooms,
+        scale: detectedScale || null,
+      };
+      
       return {
         ...prev,
-        rooms: [...existingRooms, ...detectedRooms],
-        ...(detectedScale ? { scale: detectedScale } : {}),
-        ...(detectedBackgroundImage ? { backgroundImage: detectedBackgroundImage } : {}),
+        pages: [...existingPages, newPage],
+        activePageId: newPage.id,
+        selectedRoomId: null,
       };
     });
     setHasUnsavedChanges(true);
-  }, []);
+    
+    toast({
+      title: 'New floor plan page created',
+      description: `${detectedRooms.length} rooms detected and added to a new page.`,
+    });
+  }, [toast]);
 
   // Bulk assign material to multiple rooms
   const handleBulkAssignMaterial = useCallback((roomIds: string[], materialId: string) => {
@@ -530,6 +654,85 @@ export default function ProjectEditor() {
       title: 'Materials assigned',
       description: `Applied to ${roomIds.length} room${roomIds.length !== 1 ? 's' : ''}`,
     });
+  }, [toast]);
+
+  // Page management handlers
+  const handleSelectPage = useCallback((pageId: string) => {
+    setLocalData(prev => ({ ...prev, activePageId: pageId, selectedRoomId: null }));
+  }, []);
+
+  const handleAddPage = useCallback(() => {
+    const newPage: FloorPlanPage = {
+      id: crypto.randomUUID(),
+      name: `Floor Plan ${pages.length + 1}`,
+      sortOrder: pages.length,
+      backgroundImage: null,
+      rooms: [],
+      scale: null,
+    };
+    setLocalData(prev => ({
+      ...prev,
+      pages: [...(prev.pages as FloorPlanPage[] || []), newPage],
+      activePageId: newPage.id,
+      selectedRoomId: null,
+    }));
+    setHasUnsavedChanges(true);
+    toast({ title: 'New page added' });
+  }, [pages.length, toast]);
+
+  const handleRenamePage = useCallback((pageId: string, newName: string) => {
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      return {
+        ...prev,
+        pages: pages.map(p => p.id === pageId ? { ...p, name: newName } : p),
+      };
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleDeletePage = useCallback((pageId: string) => {
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      if (pages.length <= 1) return prev; // Don't delete last page
+      
+      const remaining = pages.filter(p => p.id !== pageId);
+      const newActiveId = prev.activePageId === pageId ? remaining[0]?.id : prev.activePageId;
+      
+      return {
+        ...prev,
+        pages: remaining,
+        activePageId: newActiveId,
+        selectedRoomId: null,
+      };
+    });
+    setHasUnsavedChanges(true);
+    toast({ title: 'Page deleted' });
+  }, [toast]);
+
+  const handleDuplicatePage = useCallback((pageId: string) => {
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const sourcePage = pages.find(p => p.id === pageId);
+      if (!sourcePage) return prev;
+      
+      const newPage: FloorPlanPage = {
+        ...sourcePage,
+        id: crypto.randomUUID(),
+        name: `${sourcePage.name} (Copy)`,
+        sortOrder: pages.length,
+        rooms: sourcePage.rooms.map(r => ({ ...r, id: crypto.randomUUID() })),
+      };
+      
+      return {
+        ...prev,
+        pages: [...pages, newPage],
+        activePageId: newPage.id,
+        selectedRoomId: null,
+      };
+    });
+    setHasUnsavedChanges(true);
+    toast({ title: 'Page duplicated' });
   }, [toast]);
 
   // Handle progress bar step clicks
@@ -714,6 +917,19 @@ export default function ProjectEditor() {
           </DropdownMenu>
         </div>
       </header>
+
+      {/* Page Tabs - only show when multiple pages exist */}
+      {!isMobile && pages.length > 1 && (
+        <PageTabs
+          pages={pages}
+          activePageId={activePageId}
+          onSelectPage={handleSelectPage}
+          onAddPage={handleAddPage}
+          onRenamePage={handleRenamePage}
+          onDeletePage={handleDeletePage}
+          onDuplicatePage={handleDuplicatePage}
+        />
+      )}
 
       {/* Main Editor Area */}
       <div className={`flex-1 flex overflow-hidden ${isMobile ? 'pb-16' : ''}`}>

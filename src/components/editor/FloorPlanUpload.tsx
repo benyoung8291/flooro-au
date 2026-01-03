@@ -128,7 +128,7 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
             rotation: 0,
             offsetX: 0,
             offsetY: 0,
-            locked: false,
+            locked: true, // Lock by default to keep rooms aligned
           };
           onImageUploaded(backgroundImage);
           setIsOpen(false);
@@ -148,7 +148,7 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
           rotation: 0,
           offsetX: 0,
           offsetY: 0,
-          locked: false,
+          locked: true, // Lock by default to keep rooms aligned
         };
 
         onImageUploaded(backgroundImage);
@@ -175,7 +175,7 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
       rotation: 0,
       offsetX: 0,
       offsetY: 0,
-      locked: false,
+      locked: true, // Lock by default to keep rooms aligned
     };
 
     // Pass the analysis with dimensions to the parent

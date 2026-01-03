@@ -138,7 +138,22 @@ export interface BackgroundImage {
   locked: boolean;
 }
 
+// Floor plan page - each page contains its own rooms, background, and scale
+export interface FloorPlanPage {
+  id: string;
+  name: string;
+  sortOrder: number;
+  backgroundImage: BackgroundImage | null;
+  rooms: Room[];
+  scale: ScaleCalibration | null;
+}
+
 export interface CanvasState {
+  // Multi-page support
+  pages?: FloorPlanPage[];
+  activePageId?: string | null;
+  
+  // Legacy/active page data (maintained for compatibility)
   rooms: Room[];
   scale: ScaleCalibration | null;
   selectedRoomId: string | null;
