@@ -64,6 +64,8 @@ export function EditorCanvas({
   const hasInitializedRef = useRef(false);
   const hasAppliedZoomRef = useRef(false);
   const lastJsonDataRef = useRef<Record<string, unknown> | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastExportedDataRef = useRef<string>('');
   const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform } = useCanvasHistory();
   
   const [isDrawing, setIsDrawing] = useState(false);
@@ -148,13 +150,22 @@ export function EditorCanvas({
   }, [onCanvasReady]);
   
   // Reset initialization state when jsonData identity changes (project switch)
+  // Use deep comparison for room IDs to detect actual project changes vs echoed state
   useEffect(() => {
-    if (jsonData !== lastJsonDataRef.current) {
+    const incomingRooms = jsonData?.rooms as Room[] | undefined;
+    const currentRoomIds = state.rooms.map(r => r.id).sort().join(',');
+    const incomingRoomIds = incomingRooms?.map((r: Room) => r.id).sort().join(',') || '';
+    
+    // Only reset if this is truly new project data (different room structure)
+    const isNewProject = jsonData !== lastJsonDataRef.current && 
+                         (state.rooms.length === 0 || currentRoomIds !== incomingRoomIds);
+    
+    if (isNewProject) {
       hasInitializedRef.current = false;
       hasAppliedZoomRef.current = false;
       lastJsonDataRef.current = jsonData || null;
     }
-  }, [jsonData]);
+  }, [jsonData, state.rooms]);
 
   // Load data when we have jsonData and valid canvas size
   useEffect(() => {
@@ -181,11 +192,31 @@ export function EditorCanvas({
     }
   }, [state.rooms, canvasSize, fitToView]);
 
-  // Notify parent of changes (including backgroundImage)
+  // Notify parent of changes with debounce to prevent rapid-fire updates
   useEffect(() => {
-    const data = exportToJson();
-    onDataChange?.(data);
-  }, [state.rooms, state.scale, state.backgroundImage]);
+    // Clear any pending save
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Debounce the data change notification
+    saveTimeoutRef.current = setTimeout(() => {
+      const data = exportToJson();
+      const dataString = JSON.stringify(data);
+      
+      // Only notify if data actually changed
+      if (dataString !== lastExportedDataRef.current) {
+        lastExportedDataRef.current = dataString;
+        onDataChange?.(data);
+      }
+    }, 100);
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [state.rooms, state.scale, state.backgroundImage, exportToJson, onDataChange]);
 
 
   // Handle keyboard events

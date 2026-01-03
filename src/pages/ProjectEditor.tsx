@@ -101,12 +101,19 @@ export default function ProjectEditor() {
     localStorage.setItem('flooro_dimension_unit', dimensionUnit);
   }, [dimensionUnit]);
 
-  // Sync local data with project data
+  // Sync local data with project data - only on initial load
+  const hasLoadedProjectRef = useRef(false);
   useEffect(() => {
-    if (project?.json_data) {
+    if (project?.json_data && !hasLoadedProjectRef.current) {
+      hasLoadedProjectRef.current = true;
       setLocalData(project.json_data as Record<string, unknown>);
     }
   }, [project?.json_data]);
+
+  // Reset load flag when project ID changes
+  useEffect(() => {
+    hasLoadedProjectRef.current = false;
+  }, [projectId]);
 
   // Keyboard shortcuts
   useEffect(() => {
