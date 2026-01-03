@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit } from '@/lib/canvas/types';
 import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea } from '@/lib/canvas/geometry';
+import { StripPlanResult } from '@/lib/rollGoods/types';
 
 interface CanvasRendererProps {
   state: CanvasState;
@@ -20,6 +21,8 @@ interface CanvasRendererProps {
   onFillDirectionClick?: (roomId: string) => void;
   showDimensionLabels?: boolean;
   dimensionUnit?: DimensionUnit;
+  stripPlans?: Map<string, StripPlanResult>;
+  showSeamLines?: boolean;
 }
 
 // Cache for loaded images
@@ -66,6 +69,8 @@ export function CanvasRenderer({
   onFillDirectionClick,
   showDimensionLabels = true,
   dimensionUnit = 'm',
+  stripPlans,
+  showSeamLines = true,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -177,6 +182,12 @@ export function CanvasRenderer({
       if (room.materialId && materialType === 'roll') {
         drawFillDirectionArrow(ctx, room, zoom, state.selectedRoomId === room.id);
       }
+      
+      // Draw seam lines overlay for rooms with strip plans
+      if (showSeamLines && room.materialId && materialType === 'roll' && stripPlans?.has(room.id)) {
+        const stripPlan = stripPlans.get(room.id)!;
+        drawSeamLines(ctx, room, stripPlan, state.scale, zoom, state.selectedRoomId === room.id);
+      }
     });
 
     // Draw current drawing in progress
@@ -226,7 +237,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines]);
 
   useEffect(() => {
     render();
@@ -632,5 +643,45 @@ function drawFillDirectionArrow(
   ctx.arc(centerX, centerY, 5 / zoom, 0, Math.PI * 2);
   ctx.fill();
   
+  ctx.restore();
+}
+
+function drawSeamLines(
+  ctx: CanvasRenderingContext2D,
+  room: Room,
+  stripPlan: StripPlanResult,
+  scale: CanvasState['scale'],
+  zoom: number,
+  isSelected: boolean
+) {
+  if (!scale || !stripPlan.seamLines || stripPlan.seamLines.length === 0) return;
+  
+  // Calculate room bounding box minimum point in pixels
+  const roomMinX = Math.min(...room.points.map(p => p.x));
+  const roomMinY = Math.min(...room.points.map(p => p.y));
+  
+  ctx.save();
+  
+  // Set seam line style - purple/magenta to distinguish from other elements
+  ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 50% 60%)';
+  ctx.lineWidth = 2 / zoom;
+  ctx.setLineDash([6 / zoom, 4 / zoom]);
+  ctx.lineCap = 'round';
+  
+  stripPlan.seamLines.forEach(seam => {
+    // Convert mm coordinates back to pixels
+    // Seam coordinates are in mm relative to room bounding box
+    const x1Px = roomMinX + (seam.x1 * scale.pixelsPerMm);
+    const y1Px = roomMinY + (seam.y1 * scale.pixelsPerMm);
+    const x2Px = roomMinX + (seam.x2 * scale.pixelsPerMm);
+    const y2Px = roomMinY + (seam.y2 * scale.pixelsPerMm);
+    
+    ctx.beginPath();
+    ctx.moveTo(x1Px, y1Px);
+    ctx.lineTo(x2Px, y2Px);
+    ctx.stroke();
+  });
+  
+  ctx.setLineDash([]);
   ctx.restore();
 }

@@ -6,6 +6,7 @@ import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
 import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
+import { StripPlanResult } from '@/lib/rollGoods/types';
 import {
   findSnapPoint,
   applyOrthoLock,
@@ -42,6 +43,8 @@ interface EditorCanvasProps {
   showFinishesLegend?: boolean;
   showDimensionLabels?: boolean;
   dimensionUnit?: DimensionUnit;
+  stripPlans?: Map<string, StripPlanResult>;
+  showSeamLines?: boolean;
 }
 
 export function EditorCanvas({
@@ -58,6 +61,8 @@ export function EditorCanvas({
   showFinishesLegend = false,
   showDimensionLabels = true,
   dimensionUnit = 'm',
+  stripPlans,
+  showSeamLines = true,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -700,6 +705,8 @@ export function EditorCanvas({
         dragTargetRoomId={dragTargetRoomId}
         showDimensionLabels={showDimensionLabels}
         dimensionUnit={dimensionUnit}
+        stripPlans={stripPlans}
+        showSeamLines={showSeamLines}
       />
 
       {/* Material drag indicator */}

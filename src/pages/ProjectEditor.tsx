@@ -791,6 +791,8 @@ export default function ProjectEditor() {
               showFinishesLegend={showFinishesLegend}
               showDimensionLabels={showDimensionLabels}
               dimensionUnit={dimensionUnit}
+              stripPlans={stripPlans}
+              showSeamLines={true}
             />
           )}
         </div>
