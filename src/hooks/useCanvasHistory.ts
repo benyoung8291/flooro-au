@@ -174,8 +174,11 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
         materialId: room.materialId || null,
         materialCode: room.materialCode,
         color: room.color || 'hsla(217, 91%, 50%, 0.15)',
+        fillDirection: room.fillDirection,
+        accessories: room.accessories,
       }));
       
+      // Preserve scale from incoming data - never lose calibration
       const scale = jsonData.scale as ScaleCalibration | null;
       const backgroundImage = jsonData.backgroundImage as BackgroundImage | null;
       
