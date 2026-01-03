@@ -1,7 +1,101 @@
-import { CanvasPoint, Room, Hole, ScaleCalibration } from './types';
+import { CanvasPoint, Room, Hole, ScaleCalibration, EdgeCurve } from './types';
 
 /**
- * Calculate polygon area using Shoelace formula
+ * Get point on quadratic Bezier curve at parameter t (0-1)
+ */
+export function getQuadraticBezierPoint(
+  p1: CanvasPoint,
+  control: CanvasPoint,
+  p2: CanvasPoint,
+  t: number
+): CanvasPoint {
+  const oneMinusT = 1 - t;
+  return {
+    x: oneMinusT * oneMinusT * p1.x + 2 * oneMinusT * t * control.x + t * t * p2.x,
+    y: oneMinusT * oneMinusT * p1.y + 2 * oneMinusT * t * control.y + t * t * p2.y,
+  };
+}
+
+/**
+ * Calculate length of a quadratic Bezier curve (approximation via subdivision)
+ */
+export function calculateQuadraticBezierLength(
+  p1: CanvasPoint,
+  control: CanvasPoint,
+  p2: CanvasPoint,
+  segments: number = 20
+): number {
+  let length = 0;
+  let prevPoint = p1;
+  
+  for (let i = 1; i <= segments; i++) {
+    const t = i / segments;
+    const currentPoint = getQuadraticBezierPoint(p1, control, p2, t);
+    length += distance(prevPoint, currentPoint);
+    prevPoint = currentPoint;
+  }
+  
+  return length;
+}
+
+/**
+ * Subdivide a curve into points for area calculation
+ */
+export function subdivideCurveToPoints(
+  p1: CanvasPoint,
+  p2: CanvasPoint,
+  curve?: EdgeCurve,
+  segments: number = 10
+): CanvasPoint[] {
+  if (!curve || curve.type === 'straight' || !curve.controlPoint) {
+    return [p1, p2];
+  }
+  
+  const points: CanvasPoint[] = [p1];
+  for (let i = 1; i < segments; i++) {
+    const t = i / segments;
+    points.push(getQuadraticBezierPoint(p1, curve.controlPoint, p2, t));
+  }
+  points.push(p2);
+  return points;
+}
+
+/**
+ * Calculate polygon area with curve support using Shoelace formula
+ * Subdivides curved edges into segments for accurate calculation
+ */
+export function calculatePolygonAreaWithCurves(
+  points: CanvasPoint[],
+  edgeCurves?: EdgeCurve[]
+): number {
+  if (points.length < 3) return 0;
+  
+  // Build array of all points including subdivided curve points
+  const allPoints: CanvasPoint[] = [];
+  
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    const curve = edgeCurves?.[i];
+    const subdivided = subdivideCurveToPoints(points[i], points[j], curve);
+    // Add all points except the last one (which is the start of next edge)
+    allPoints.push(...subdivided.slice(0, -1));
+  }
+  
+  // Apply Shoelace formula
+  let area = 0;
+  const n = allPoints.length;
+  
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += allPoints[i].x * allPoints[j].y;
+    area -= allPoints[j].x * allPoints[i].y;
+  }
+  
+  return Math.abs(area) / 2;
+}
+
+/**
+ * Calculate polygon area using Shoelace formula (straight edges only)
  * Returns area in square pixels (positive for clockwise, negative for counter-clockwise)
  */
 export function calculatePolygonArea(points: CanvasPoint[]): number {
@@ -20,11 +114,14 @@ export function calculatePolygonArea(points: CanvasPoint[]): number {
 }
 
 /**
- * Calculate room net area (gross area minus holes)
+ * Calculate room net area (gross area minus holes) with curve support
  */
 export function calculateRoomNetArea(room: Room): number {
-  const grossArea = calculatePolygonArea(room.points);
-  const holesArea = room.holes.reduce((sum, hole) => sum + calculatePolygonArea(hole.points), 0);
+  const grossArea = calculatePolygonAreaWithCurves(room.points, room.edgeCurves);
+  const holesArea = room.holes.reduce(
+    (sum, hole) => sum + calculatePolygonAreaWithCurves(hole.points, hole.edgeCurves),
+    0
+  );
   return grossArea - holesArea;
 }
 
@@ -45,7 +142,7 @@ export function mmSquaredToMSquared(mmSquared: number): number {
 }
 
 /**
- * Calculate perimeter of a polygon in pixels
+ * Calculate perimeter of a polygon in pixels (straight edges only)
  */
 export function calculatePerimeter(points: CanvasPoint[]): number {
   if (points.length < 2) return 0;
@@ -59,10 +156,74 @@ export function calculatePerimeter(points: CanvasPoint[]): number {
 }
 
 /**
+ * Calculate perimeter with curve support
+ */
+export function calculatePerimeterWithCurves(
+  points: CanvasPoint[],
+  edgeCurves?: EdgeCurve[]
+): number {
+  if (points.length < 2) return 0;
+  
+  let perimeter = 0;
+  for (let i = 0; i < points.length; i++) {
+    const j = (i + 1) % points.length;
+    const curve = edgeCurves?.[i];
+    
+    if (curve?.type === 'quadratic' && curve.controlPoint) {
+      perimeter += calculateQuadraticBezierLength(points[i], curve.controlPoint, points[j]);
+    } else {
+      perimeter += distance(points[i], points[j]);
+    }
+  }
+  return perimeter;
+}
+
+/**
  * Distance between two points
  */
 export function distance(p1: CanvasPoint, p2: CanvasPoint): number {
   return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2));
+}
+
+/**
+ * Calculate midpoint of an edge (accounting for curves)
+ */
+export function getEdgeMidpoint(
+  p1: CanvasPoint,
+  p2: CanvasPoint,
+  curve?: EdgeCurve
+): CanvasPoint {
+  if (curve?.type === 'quadratic' && curve.controlPoint) {
+    return getQuadraticBezierPoint(p1, curve.controlPoint, p2, 0.5);
+  }
+  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+}
+
+/**
+ * Calculate default control point for a straight edge (at midpoint, perpendicular offset)
+ */
+export function calculateDefaultControlPoint(p1: CanvasPoint, p2: CanvasPoint): CanvasPoint {
+  const midX = (p1.x + p2.x) / 2;
+  const midY = (p1.y + p2.y) / 2;
+  
+  // Get perpendicular direction and offset by a reasonable amount
+  const dx = p2.x - p1.x;
+  const dy = p2.y - p1.y;
+  const length = Math.sqrt(dx * dx + dy * dy);
+  
+  if (length === 0) return { x: midX, y: midY };
+  
+  // Perpendicular unit vector
+  const perpX = -dy / length;
+  const perpY = dx / length;
+  
+  // Offset by 20% of edge length (reasonable default curve)
+  const offset = length * 0.2;
+  
+  return {
+    x: midX + perpX * offset,
+    y: midY + perpY * offset,
+  };
 }
 
 /**

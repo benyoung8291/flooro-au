@@ -1,7 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
-import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit } from '@/lib/canvas/types';
-import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea } from '@/lib/canvas/geometry';
+import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve } from '@/lib/canvas/types';
+import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, getQuadraticBezierPoint, getEdgeMidpoint } from '@/lib/canvas/geometry';
 import { StripPlanResult } from '@/lib/rollGoods/types';
+
+interface HoveredCurveControl {
+  roomId: string;
+  edgeIndex: number;
+  isHandle: boolean;
+}
 
 interface CanvasRendererProps {
   state: CanvasState;
@@ -14,6 +20,7 @@ interface CanvasRendererProps {
   materialTypes?: Map<string, string>;
   hoveredVertex?: { roomId: string; index: number } | null;
   hoveredWall?: { roomId: string; index: number } | null;
+  hoveredCurveControl?: HoveredCurveControl | null;
   hoveredRoomId?: string | null;
   isDragging?: boolean;
   isDraggingMaterial?: boolean;
@@ -62,6 +69,7 @@ export function CanvasRenderer({
   materialTypes = new Map(),
   hoveredVertex,
   hoveredWall,
+  hoveredCurveControl,
   hoveredRoomId,
   isDragging,
   isDraggingMaterial = false,
@@ -172,11 +180,12 @@ export function CanvasRenderer({
     state.rooms.forEach(room => {
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
       const roomHoveredWall = hoveredWall?.roomId === room.id ? hoveredWall.index : null;
+      const roomHoveredCurve = hoveredCurveControl?.roomId === room.id ? hoveredCurveControl : null;
       const isRoomHovered = hoveredRoomId === room.id && state.selectedRoomId !== room.id;
       const isDragTarget = isDraggingMaterial && dragTargetRoomId === room.id;
       const isValidDropZone = isDraggingMaterial && !isDragTarget;
       const materialType = room.materialId ? materialTypes.get(room.materialId) : undefined;
-      drawRoom(ctx, room, state.selectedRoomId === room.id, isRoomHovered, isDragTarget, isValidDropZone, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, isDragging, showDimensionLabels, dimensionUnit);
+      drawRoom(ctx, room, state.selectedRoomId === room.id, isRoomHovered, isDragTarget, isValidDropZone, getRoomColor(room), zoom, state.scale, roomHoveredVertex, roomHoveredWall, roomHoveredCurve, isDragging, showDimensionLabels, dimensionUnit);
       
       // Draw fill direction arrow for rooms with roll materials
       if (room.materialId && materialType === 'roll') {
@@ -237,7 +246,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines]);
 
   useEffect(() => {
     render();
@@ -336,27 +345,39 @@ function drawRoom(
   scale: CanvasState['scale'],
   hoveredVertexIndex: number | null = null,
   hoveredWallIndex: number | null = null,
+  hoveredCurve: HoveredCurveControl | null = null,
   isDragging: boolean = false,
   showDimensionLabels: boolean = true,
   dimensionUnit: DimensionUnit = 'm'
 ) {
   if (room.points.length < 3) return;
 
+  // Helper to draw path with curves
+  const drawPathWithCurves = (points: CanvasPoint[], edgeCurves?: EdgeCurve[]) => {
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 0; i < points.length; i++) {
+      const j = (i + 1) % points.length;
+      const p2 = points[j];
+      const curve = edgeCurves?.[i];
+      
+      if (curve?.type === 'quadratic' && curve.controlPoint) {
+        ctx.quadraticCurveTo(curve.controlPoint.x, curve.controlPoint.y, p2.x, p2.y);
+      } else {
+        ctx.lineTo(p2.x, p2.y);
+      }
+    }
+  };
+
   // Draw fill with drag target highlighting
   if (isDragTarget) {
-    // Highlight as active drop target
     ctx.fillStyle = 'hsla(142 71% 45% / 0.3)';
   } else if (isValidDropZone) {
-    // Subtle highlight for valid drop zones
     ctx.fillStyle = 'hsla(217 91% 50% / 0.15)';
   } else {
     ctx.fillStyle = fillColor;
   }
   ctx.beginPath();
-  ctx.moveTo(room.points[0].x, room.points[0].y);
-  room.points.slice(1).forEach(point => {
-    ctx.lineTo(point.x, point.y);
-  });
+  drawPathWithCurves(room.points, room.edgeCurves);
   ctx.closePath();
   ctx.fill();
 
@@ -367,10 +388,7 @@ function drawRoom(
       ctx.globalCompositeOperation = 'destination-out';
       ctx.fillStyle = 'white';
       ctx.beginPath();
-      ctx.moveTo(hole.points[0].x, hole.points[0].y);
-      hole.points.slice(1).forEach(point => {
-        ctx.lineTo(point.x, point.y);
-      });
+      drawPathWithCurves(hole.points, hole.edgeCurves);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
@@ -382,21 +400,28 @@ function drawRoom(
     const j = (i + 1) % room.points.length;
     const p1 = room.points[i];
     const p2 = room.points[j];
+    const curve = room.edgeCurves?.[i];
     
     const isWallHovered = hoveredWallIndex === i && !isDragging;
+    const isCurved = curve?.type === 'quadratic' && curve.controlPoint;
     
     // Determine stroke style based on state priority
     if (isDragTarget) {
-      ctx.strokeStyle = 'hsl(142 71% 45%)'; // Green for active drop target
+      ctx.strokeStyle = 'hsl(142 71% 45%)';
       ctx.lineWidth = 4 / zoom;
-      ctx.setLineDash([8 / zoom, 4 / zoom]); // Dashed for emphasis
+      ctx.setLineDash([8 / zoom, 4 / zoom]);
     } else if (isValidDropZone) {
-      ctx.strokeStyle = 'hsl(217 91% 60%)'; // Brighter blue for valid zones
+      ctx.strokeStyle = 'hsl(217 91% 60%)';
       ctx.lineWidth = 2.5 / zoom;
-      ctx.setLineDash([4 / zoom, 4 / zoom]); // Subtle dashed
+      ctx.setLineDash([4 / zoom, 4 / zoom]);
     } else if (isWallHovered) {
       ctx.strokeStyle = 'hsl(45 93% 47%)';
       ctx.lineWidth = 4 / zoom;
+      ctx.setLineDash([]);
+    } else if (isCurved) {
+      // Curved edges get a distinct color
+      ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 60% 55%)';
+      ctx.lineWidth = 3 / zoom;
       ctx.setLineDash([]);
     } else if (isSelected) {
       ctx.strokeStyle = 'hsl(142 71% 45%)';
@@ -414,27 +439,94 @@ function drawRoom(
     
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
+    if (curve?.type === 'quadratic' && curve.controlPoint) {
+      ctx.quadraticCurveTo(curve.controlPoint.x, curve.controlPoint.y, p2.x, p2.y);
+    } else {
+      ctx.lineTo(p2.x, p2.y);
+    }
     ctx.stroke();
-    ctx.setLineDash([]); // Reset dash
+    ctx.setLineDash([]);
+  }
+
+  // Draw curve control points and midpoint indicators
+  if (isSelected) {
+    for (let i = 0; i < room.points.length; i++) {
+      const j = (i + 1) % room.points.length;
+      const p1 = room.points[i];
+      const p2 = room.points[j];
+      const curve = room.edgeCurves?.[i];
+      
+      const isControlHovered = hoveredCurve?.edgeIndex === i && hoveredCurve.isHandle;
+      const isMidpointHovered = hoveredCurve?.edgeIndex === i && !hoveredCurve.isHandle;
+      
+      if (curve?.type === 'quadratic' && curve.controlPoint) {
+        // Draw control point handle
+        const cp = curve.controlPoint;
+        
+        // Draw guide lines from control point to edge endpoints
+        ctx.strokeStyle = 'hsla(280 60% 50% / 0.4)';
+        ctx.lineWidth = 1 / zoom;
+        ctx.setLineDash([3 / zoom, 3 / zoom]);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(cp.x, cp.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        // Draw control point diamond
+        const size = (isControlHovered ? 10 : 7) / zoom;
+        ctx.save();
+        ctx.translate(cp.x, cp.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.fillStyle = isControlHovered ? 'hsl(280 70% 55%)' : 'hsl(280 60% 65%)';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2 / zoom;
+        ctx.fillRect(-size / 2, -size / 2, size, size);
+        ctx.strokeRect(-size / 2, -size / 2, size, size);
+        ctx.restore();
+      } else {
+        // Draw "+" indicator at edge midpoint for adding curve
+        const midX = (p1.x + p2.x) / 2;
+        const midY = (p1.y + p2.y) / 2;
+        
+        // Only show if edge is long enough
+        const edgeLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+        if (edgeLength > 40 / zoom) {
+          const size = (isMidpointHovered ? 12 : 8) / zoom;
+          
+          ctx.fillStyle = isMidpointHovered ? 'hsl(280 70% 50%)' : 'hsla(280 50% 60% / 0.6)';
+          ctx.beginPath();
+          ctx.arc(midX, midY, size / 2, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Draw "+" symbol
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 1.5 / zoom;
+          ctx.beginPath();
+          ctx.moveTo(midX - size / 4, midY);
+          ctx.lineTo(midX + size / 4, midY);
+          ctx.moveTo(midX, midY - size / 4);
+          ctx.lineTo(midX, midY + size / 4);
+          ctx.stroke();
+        }
+      }
+    }
   }
 
   // Draw dimension labels on each wall (if enabled)
   if (showDimensionLabels) {
-    drawDimensionLabels(ctx, room.points, zoom, scale, dimensionUnit);
+    drawDimensionLabels(ctx, room.points, room.edgeCurves, zoom, scale, dimensionUnit);
   }
 
-  // Draw hole outlines
+  // Draw hole outlines with curve support
   room.holes.forEach(hole => {
     if (hole.points.length >= 3) {
       ctx.strokeStyle = 'hsl(0 84% 60%)';
       ctx.lineWidth = 2 / zoom;
       ctx.setLineDash([4 / zoom, 4 / zoom]);
       ctx.beginPath();
-      ctx.moveTo(hole.points[0].x, hole.points[0].y);
-      hole.points.slice(1).forEach(point => {
-        ctx.lineTo(point.x, point.y);
-      });
+      drawPathWithCurves(hole.points, hole.edgeCurves);
       ctx.closePath();
       ctx.stroke();
       ctx.setLineDash([]);
@@ -501,6 +593,7 @@ function drawRoom(
 function drawDimensionLabels(
   ctx: CanvasRenderingContext2D,
   points: CanvasPoint[],
+  edgeCurves: EdgeCurve[] | undefined,
   zoom: number,
   scale: CanvasState['scale'],
   dimensionUnit: DimensionUnit = 'm'
@@ -511,21 +604,46 @@ function drawDimensionLabels(
     const j = (i + 1) % points.length;
     const p1 = points[i];
     const p2 = points[j];
+    const curve = edgeCurves?.[i];
 
-    // Calculate wall length
-    const dx = p2.x - p1.x;
-    const dy = p2.y - p1.y;
-    const pixelLength = Math.sqrt(dx * dx + dy * dy);
+    // Calculate wall/edge length (accounting for curves)
+    let pixelLength: number;
+    let midX: number;
+    let midY: number;
+    let angle: number;
+
+    if (curve?.type === 'quadratic' && curve.controlPoint) {
+      // For curved edges, calculate arc length and use curve midpoint
+      const cp = curve.controlPoint;
+      // Approximate arc length using chord + 2*height method
+      const chordLength = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+      const chordMidX = (p1.x + p2.x) / 2;
+      const chordMidY = (p1.y + p2.y) / 2;
+      const height = Math.sqrt((cp.x - chordMidX) ** 2 + (cp.y - chordMidY) ** 2);
+      pixelLength = chordLength + (4 * height * height) / (3 * chordLength + 0.001);
+      
+      // Use curve midpoint for label position
+      const curveMid = getQuadraticBezierPoint(p1, cp, p2, 0.5);
+      midX = curveMid.x;
+      midY = curveMid.y;
+      
+      // Angle at curve midpoint (tangent)
+      const t = 0.5;
+      const tangentX = 2 * (1 - t) * (cp.x - p1.x) + 2 * t * (p2.x - cp.x);
+      const tangentY = 2 * (1 - t) * (cp.y - p1.y) + 2 * t * (p2.y - cp.y);
+      angle = Math.atan2(tangentY, tangentX);
+    } else {
+      // Straight edge
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      pixelLength = Math.sqrt(dx * dx + dy * dy);
+      midX = (p1.x + p2.x) / 2;
+      midY = (p1.y + p2.y) / 2;
+      angle = Math.atan2(dy, dx);
+    }
 
     // Skip very short walls
     if (pixelLength < 20) continue;
-
-    // Calculate midpoint
-    const midX = (p1.x + p2.x) / 2;
-    const midY = (p1.y + p2.y) / 2;
-
-    // Calculate wall angle
-    const angle = Math.atan2(dy, dx);
 
     // Format dimension text using user's selected unit
     let dimensionText: string;

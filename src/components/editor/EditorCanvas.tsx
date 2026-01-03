@@ -4,7 +4,7 @@ import { Minimap } from './Minimap';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
-import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit } from '@/lib/canvas/types';
+import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import {
@@ -96,10 +96,12 @@ export function EditorCanvas({
   const {
     hoveredVertex,
     hoveredWall,
+    hoveredCurveControl,
     handleHover,
     startDrag,
     updateDrag,
     endDrag,
+    handleDoubleClick,
     getEditCursor,
     isDragging,
   } = useCanvasEditing({
@@ -577,6 +579,17 @@ export function EditorCanvas({
     }
   }, [isDragging, endDrag]);
 
+  // Handle double-click (for removing curves)
+  const handleDoubleClickEvent = useCallback((e: React.MouseEvent) => {
+    if (activeTool !== 'select') return;
+    
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const point = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top);
+    handleDoubleClick(point);
+  }, [activeTool, screenToCanvas, handleDoubleClick]);
+
   // Handle wheel for zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -724,6 +737,7 @@ export function EditorCanvas({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
+      onDoubleClick={handleDoubleClickEvent}
       onWheel={handleWheel}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
@@ -743,6 +757,7 @@ export function EditorCanvas({
         materialTypes={materialTypes}
         hoveredVertex={hoveredVertex}
         hoveredWall={hoveredWall}
+        hoveredCurveControl={hoveredCurveControl}
         hoveredRoomId={hoveredRoomId}
         isDragging={isDragging}
         isDraggingMaterial={isDraggingMaterial}
