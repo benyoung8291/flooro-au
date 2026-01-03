@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
 import { Minimap } from './Minimap';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
@@ -18,15 +18,19 @@ import {
   generateDoorId,
   angleBetweenPoints,
 } from '@/lib/canvas/geometry';
+import { detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
+import { mergeRoomsAtSharedEdge, findSharedEdgeBetweenRooms } from '@/lib/canvas/polygonMerge';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
 import { FinishesLegend } from '@/components/reports/FinishesLegend';
 import { Maximize2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 
-export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan';
+export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan' | 'merge';
 
 interface EditorCanvasProps {
   activeTool: EditorTool;
+  onToolChange?: (tool: EditorTool) => void;
   onCanvasReady?: () => void;
   jsonData?: Record<string, unknown>;
   onDataChange?: (data: Record<string, unknown>) => void;
@@ -49,6 +53,7 @@ interface EditorCanvasProps {
 
 export function EditorCanvas({
   activeTool,
+  onToolChange,
   onCanvasReady,
   jsonData,
   onDataChange,
@@ -87,6 +92,15 @@ export function EditorCanvas({
   const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
   const [isDraggingMaterial, setIsDraggingMaterial] = useState(false);
   const [dragTargetRoomId, setDragTargetRoomId] = useState<string | null>(null);
+  
+  // Merge tool state
+  const [mergeFirstRoom, setMergeFirstRoom] = useState<Room | null>(null);
+  const [mergeableRoomIds, setMergeableRoomIds] = useState<string[]>([]);
+
+  // Detect shared edges for merge tool
+  const sharedEdges = useMemo(() => {
+    return detectSharedEdges(state.rooms);
+  }, [state.rooms]);
 
   // Canvas editing hook for vertex and wall dragging
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
@@ -280,6 +294,9 @@ export function EditorCanvas({
         setIsDrawing(false);
         setDrawingPoints([]);
         setScaleStart(null);
+        // Cancel merge mode
+        setMergeFirstRoom(null);
+        setMergeableRoomIds([]);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -287,6 +304,12 @@ export function EditorCanvas({
           redo();
         } else {
           undo();
+        }
+      }
+      // Keyboard shortcut for merge tool
+      if (e.key === 'm' || e.key === 'M') {
+        if (!e.metaKey && !e.ctrlKey && onToolChange) {
+          onToolChange('merge');
         }
       }
     };
@@ -304,7 +327,58 @@ export function EditorCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [undo, redo]);
+  }, [undo, redo, onToolChange]);
+
+  // Reset merge state when tool changes
+  useEffect(() => {
+    if (activeTool !== 'merge') {
+      setMergeFirstRoom(null);
+      setMergeableRoomIds([]);
+    }
+  }, [activeTool]);
+
+  // Handle merge rooms
+  const handleMergeRooms = useCallback((room1: Room, room2: Room) => {
+    // Find shared edge
+    const sharedEdge = findSharedEdgeBetweenRooms(room1, room2);
+    if (!sharedEdge) {
+      toast.error("These rooms don't share a wall");
+      return;
+    }
+    
+    // Merge polygons
+    const result = mergeRoomsAtSharedEdge(room1, room2, sharedEdge);
+    if (!result.success) {
+      toast.error(result.error || "Could not merge rooms");
+      return;
+    }
+    
+    // Create merged room
+    const mergedRoom: Room = {
+      id: generateRoomId(),
+      name: `${room1.name} + ${room2.name}`,
+      points: result.mergedPoints,
+      holes: [...(room1.holes || []), ...(room2.holes || [])],
+      doors: [...(room1.doors || []), ...(room2.doors || [])],
+      materialId: room1.materialId || room2.materialId,
+      materialCode: room1.materialCode || room2.materialCode,
+      color: room1.color || room2.color || DEFAULT_ROOM_COLOR,
+      fillDirection: room1.fillDirection || room2.fillDirection,
+      accessories: room1.accessories || room2.accessories,
+    };
+    
+    // Delete old rooms, add merged
+    dispatch({ type: 'DELETE_ROOM', roomId: room1.id });
+    dispatch({ type: 'DELETE_ROOM', roomId: room2.id });
+    dispatch({ type: 'ADD_ROOM', room: mergedRoom });
+    dispatch({ type: 'SELECT_ROOM', roomId: mergedRoom.id });
+    
+    // Reset merge state
+    setMergeFirstRoom(null);
+    setMergeableRoomIds([]);
+    
+    toast.success(`Merged "${room1.name}" and "${room2.name}"`);
+  }, [dispatch]);
 
   // Convert screen coordinates to canvas coordinates
   const screenToCanvas = useCallback((screenX: number, screenY: number): CanvasPoint => {
@@ -491,8 +565,53 @@ export function EditorCanvas({
         }
         break;
       }
+
+      case 'merge': {
+        // Find clicked room
+        let clickedRoom: Room | null = null;
+        for (const room of state.rooms) {
+          if (isPointInPolygon(point, room.points)) {
+            clickedRoom = room;
+            break;
+          }
+        }
+        
+        if (!clickedRoom) return;
+        
+        if (!mergeFirstRoom) {
+          // First room selection
+          setMergeFirstRoom(clickedRoom);
+          
+          // Find which rooms are adjacent (share an edge)
+          const adjacentRoomIds: string[] = [];
+          for (const se of sharedEdges) {
+            if (se.room1Id === clickedRoom.id) {
+              adjacentRoomIds.push(se.room2Id);
+            } else if (se.room2Id === clickedRoom.id) {
+              adjacentRoomIds.push(se.room1Id);
+            }
+          }
+          setMergeableRoomIds([...new Set(adjacentRoomIds)]);
+          dispatch({ type: 'SELECT_ROOM', roomId: clickedRoom.id });
+        } else {
+          // Second room selection
+          if (clickedRoom.id === mergeFirstRoom.id) {
+            // Clicked same room - deselect
+            setMergeFirstRoom(null);
+            setMergeableRoomIds([]);
+            dispatch({ type: 'SELECT_ROOM', roomId: null });
+          } else if (mergeableRoomIds.includes(clickedRoom.id)) {
+            // Valid merge target
+            handleMergeRooms(mergeFirstRoom, clickedRoom);
+          } else {
+            // Not adjacent - start new selection
+            toast.error("Rooms are not adjacent. Select a room that shares a wall.");
+          }
+        }
+        break;
+      }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms]);
 
   // Handle pointer move
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -522,9 +641,11 @@ export function EditorCanvas({
       return;
     }
 
-    // Handle hover for select mode (visual feedback)
-    if (activeTool === 'select') {
-      handleHover(point);
+    // Handle hover for select or merge mode (visual feedback)
+    if (activeTool === 'select' || activeTool === 'merge') {
+      if (activeTool === 'select') {
+        handleHover(point);
+      }
       
       // Check for room hover
       let foundHoveredRoom: string | null = null;
@@ -693,10 +814,18 @@ export function EditorCanvas({
         return scaleStart ? 'crosshair' : 'help';
       case 'door':
         return 'pointer';
+      case 'merge':
+        if (hoveredRoomId) {
+          if (mergeFirstRoom && mergeableRoomIds.includes(hoveredRoomId)) {
+            return 'copy';
+          }
+          return 'pointer';
+        }
+        return 'default';
       default:
         return 'default';
     }
-  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart, hoveredRoomId]);
+  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart, hoveredRoomId, mergeFirstRoom, mergeableRoomIds]);
 
   // Touch event handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -766,6 +895,9 @@ export function EditorCanvas({
         dimensionUnit={dimensionUnit}
         stripPlans={stripPlans}
         showSeamLines={showSeamLines}
+        mergeFirstRoomId={mergeFirstRoom?.id || null}
+        mergeableRoomIds={mergeableRoomIds}
+        isMergeMode={activeTool === 'merge'}
       />
 
       {/* Material drag indicator */}
@@ -787,6 +919,16 @@ export function EditorCanvas({
       {activeTool === 'scale' && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium">
           {scaleStart ? 'Click second point to set scale' : 'Click first point of reference line'}
+        </div>
+      )}
+
+      {/* Merge mode indicator */}
+      {activeTool === 'merge' && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm font-medium">
+          {mergeFirstRoom 
+            ? `Merging: ${mergeFirstRoom.name} • Click adjacent room to merge • Esc to cancel`
+            : 'Click first room to merge • Esc to cancel'
+          }
         </div>
       )}
 
