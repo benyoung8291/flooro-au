@@ -212,6 +212,7 @@ export function TakeoffPanel({
         // Room Detail View
         <RoomDetailView
           room={editingRoom}
+          allRooms={rooms || []}
           scale={scale}
           materials={materials || []}
           stripPlan={stripPlans?.get(editingRoom.id) || null}
