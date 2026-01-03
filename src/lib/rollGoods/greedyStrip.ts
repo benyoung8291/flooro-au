@@ -284,10 +284,17 @@ export function calculateStripPlan(
     if (i > 0) {
       // Seam position accounts for offset (in working/rotated coordinate space)
       const seamPos = (i * rollWidth) - normalizedOffset;
-      let seamX1 = calcDirection === 'horizontal' ? bbox.minX : bbox.minX + seamPos;
-      let seamY1 = calcDirection === 'horizontal' ? bbox.minY + seamPos : bbox.minY;
-      let seamX2 = calcDirection === 'horizontal' ? bbox.maxX : bbox.minX + seamPos;
-      let seamY2 = calcDirection === 'horizontal' ? bbox.minY + seamPos : bbox.maxY;
+      
+      // Extend seam lines far beyond bounding box for proper clipping
+      // This ensures the line-polygon intersection algorithm finds correct entry/exit points
+      const extensionFactor = 10;
+      const extensionX = bbox.width * extensionFactor;
+      const extensionY = bbox.height * extensionFactor;
+      
+      let seamX1 = calcDirection === 'horizontal' ? bbox.minX - extensionX : bbox.minX + seamPos;
+      let seamY1 = calcDirection === 'horizontal' ? bbox.minY + seamPos : bbox.minY - extensionY;
+      let seamX2 = calcDirection === 'horizontal' ? bbox.maxX + extensionX : bbox.minX + seamPos;
+      let seamY2 = calcDirection === 'horizontal' ? bbox.minY + seamPos : bbox.maxY + extensionY;
 
       // For diagonal layouts, rotate seam line back to original coordinate space
       if (isDiagonal) {
