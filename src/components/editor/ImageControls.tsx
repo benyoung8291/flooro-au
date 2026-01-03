@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -7,7 +8,10 @@ import {
   Lock, 
   Unlock, 
   Trash2,
-  Eye
+  Eye,
+  ChevronDown,
+  ChevronUp,
+  Image as ImageIcon
 } from 'lucide-react';
 import {
   Tooltip,
@@ -15,6 +19,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { BackgroundImage } from '@/lib/canvas/types';
+import { cn } from '@/lib/utils';
 
 interface ImageControlsProps {
   image: BackgroundImage;
@@ -23,30 +28,78 @@ interface ImageControlsProps {
 }
 
 export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps) {
+  const [isMinimized, setIsMinimized] = useState(false);
+  
   const handleRotate = (delta: number) => {
     const newRotation = (image.rotation + delta + 360) % 360;
     onUpdate({ rotation: newRotation });
   };
 
-  return (
-    <div className="glass-panel p-3 space-y-4 min-w-[200px]">
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">Floor Plan</span>
+  // Minimized view - compact button
+  if (isMinimized) {
+    return (
+      <div className="glass-panel p-1.5 inline-flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
               variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
-              onClick={onRemove}
+              size="sm"
+              className="h-7 px-2 gap-1.5"
+              onClick={() => setIsMinimized(false)}
             >
-              <Trash2 className="w-4 h-4" />
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span className="text-xs font-medium">Floor Plan</span>
+              <ChevronDown className="w-3 h-3" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="left">
-            <p>Remove floor plan</p>
+          <TooltipContent>
+            <p>Expand floor plan controls</p>
           </TooltipContent>
         </Tooltip>
+        
+        {image.locked && (
+          <Lock className="w-3 h-3 text-muted-foreground" />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="glass-panel p-3 space-y-4 min-w-[200px]">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">Floor Plan</span>
+        <div className="flex items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setIsMinimized(true)}
+              >
+                <ChevronUp className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Minimize panel</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={onRemove}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Remove floor plan</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
 
       {/* Opacity Slider */}
@@ -85,6 +138,7 @@ export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps)
           step={5}
           onValueChange={([value]) => onUpdate({ scale: value / 100 })}
           className="w-full"
+          disabled={image.locked}
         />
       </div>
 
@@ -99,6 +153,7 @@ export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps)
                 size="sm"
                 className="flex-1 h-8"
                 onClick={() => handleRotate(-90)}
+                disabled={image.locked}
               >
                 <RotateCcw className="w-3 h-3 mr-1" />
                 -90°
@@ -115,6 +170,7 @@ export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps)
                 size="sm"
                 className="flex-1 h-8"
                 onClick={() => handleRotate(90)}
+                disabled={image.locked}
               >
                 <RotateCw className="w-3 h-3 mr-1" />
                 +90°
@@ -153,6 +209,12 @@ export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps)
           <p>{image.locked ? 'Unlock to move/resize' : 'Lock position to prevent accidental changes'}</p>
         </TooltipContent>
       </Tooltip>
+      
+      {image.locked && (
+        <p className="text-xs text-muted-foreground text-center">
+          Floor plan is locked to keep rooms aligned
+        </p>
+      )}
     </div>
   );
 }

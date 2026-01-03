@@ -269,7 +269,7 @@ export function AutoTakeoffDialog({ projectId, onRoomsDetected }: AutoTakeoffDia
         rotation: 0,
         offsetX: 0,
         offsetY: 0,
-        locked: false,
+        locked: true, // Always lock floor plan by default to keep rooms aligned
       };
     }
 
