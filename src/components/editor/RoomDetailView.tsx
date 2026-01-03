@@ -26,15 +26,18 @@ import {
   Square,
   Circle,
   Minus,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { calculatePolygonArea, calculatePerimeter } from '@/lib/canvas/geometry';
 import { AccessoriesPanel } from './AccessoriesPanel';
 import { SeamEditor } from './SeamEditor';
 import { TilePatternViewer } from './TilePatternViewer';
+import { EdgeTransitionsPanel } from './EdgeTransitionsPanel';
 import { cn } from '@/lib/utils';
 
 interface RoomDetailViewProps {
   room: Room;
+  allRooms?: Room[];
   scale: ScaleCalibration | null;
   materials: Material[];
   stripPlan: StripPlanResult | null;
@@ -52,6 +55,7 @@ const typeIcons: Record<string, React.ElementType> = {
 
 export function RoomDetailView({
   room,
+  allRooms = [],
   scale,
   materials,
   stripPlan,
@@ -122,6 +126,7 @@ export function RoomDetailView({
   // Build available tabs based on material type
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Info },
+    { id: 'transitions', label: 'Transitions', icon: ArrowLeftRight },
     { id: 'accessories', label: 'Accessories', icon: Wrench },
   ];
 
@@ -132,6 +137,9 @@ export function RoomDetailView({
   if (isTileMaterial) {
     tabs.push({ id: 'pattern', label: 'Pattern', icon: LayoutGrid });
   }
+
+  // Transition count for badge
+  const transitionCount = room.edgeTransitions?.length || 0;
 
   return (
     <div className="h-full flex flex-col">
@@ -297,6 +305,17 @@ export function RoomDetailView({
                 </div>
               </div>
             )}
+          </TabsContent>
+
+          {/* Transitions Tab */}
+          <TabsContent value="transitions" className="mt-0">
+            <EdgeTransitionsPanel
+              room={room}
+              allRooms={allRooms}
+              scale={scale}
+              materials={materials}
+              onUpdateRoom={onUpdateRoom}
+            />
           </TabsContent>
 
           {/* Accessories Tab */}

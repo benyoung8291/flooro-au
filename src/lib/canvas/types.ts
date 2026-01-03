@@ -54,6 +54,17 @@ export interface AdhesiveConfig {
   materialId?: string;        // Linked adhesive material
 }
 
+// Edge transition configuration for material-to-material boundaries
+export interface EdgeTransition {
+  edgeIndex: number;              // Which edge (0-based, matches points array)
+  adjacentRoomId?: string;        // Optional: linked room on other side
+  adjacentRoomName?: string;      // Display name (for cases where room isn't drawn)
+  transitionType: 'reducer' | 'threshold' | 't-molding' | 'end-cap' | 'ramp' | 'auto';
+  materialId?: string;            // Transition strip material
+  heightDifferenceMm?: number;    // Override calculated height diff
+  notes?: string;                 // Installer notes
+}
+
 export interface RoomAccessories {
   coving?: CovingConfig;
   weldRod?: WeldRodConfig;
@@ -75,6 +86,7 @@ export interface Room {
   accessories?: RoomAccessories;
   fillDirection?: number; // Lay direction in degrees (0 = horizontal, 90 = vertical)
   tilePattern?: 'grid' | 'brick' | 'thirds' | 'herringbone' | 'basketweave' | 'diagonal'; // For tile materials
+  edgeTransitions?: EdgeTransition[]; // Edges that are transitions, not walls
   edgeCurves?: EdgeCurve[]; // Curve data per edge, indexed same as points
   
   // Seam management options

@@ -40,6 +40,10 @@ export interface MaterialSpecs {
   sku?: string;              // Product SKU/code
   manufacturer?: string;     // Brand name
   
+  // Thickness for height calculations
+  thicknessMm?: number;           // Material thickness (e.g., 2.5mm LVT, 8mm tile)
+  installedHeightMm?: number;     // Total installed height including any built-in underlay
+  
   // Legacy fields for backwards compatibility
   price?: number;
   width?: number;

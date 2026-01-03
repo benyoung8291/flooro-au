@@ -145,14 +145,22 @@ export const TRANSITION_TYPES = {
   'stair-nose': { label: 'Stair Nose', description: 'Step edge protection' },
 } as const;
 
-// Underlayment type options
+// Underlayment type options with thickness data
 export const UNDERLAYMENT_TYPES = {
-  foam: { label: 'Foam', description: 'Standard foam underlay' },
-  cork: { label: 'Cork', description: 'Natural cork underlay' },
-  rubber: { label: 'Rubber', description: 'Acoustic rubber underlay' },
-  plywood: { label: 'Plywood', description: 'Plywood subfloor' },
-  'self-leveler': { label: 'Self-Leveler', description: 'Leveling compound' },
-  none: { label: 'None', description: 'No underlayment required' },
+  foam: { label: 'Foam', description: 'Standard foam underlay', thicknessMm: 3 },
+  cork: { label: 'Cork', description: 'Natural cork underlay', thicknessMm: 6 },
+  rubber: { label: 'Rubber', description: 'Acoustic rubber underlay', thicknessMm: 5 },
+  plywood: { label: 'Plywood', description: 'Plywood subfloor', thicknessMm: 6 },
+  'self-leveler': { label: 'Self-Leveler', description: 'Leveling compound', thicknessMm: 3 },
+  none: { label: 'None', description: 'No underlayment required', thicknessMm: 0 },
+} as const;
+
+// Transition type recommendations based on height difference
+export const TRANSITION_HEIGHT_THRESHOLDS = {
+  't-molding': { maxMm: 2, label: 'T-Molding', description: 'Same height transition' },
+  reducer: { maxMm: 6, label: 'Reducer', description: 'Small height difference' },
+  threshold: { maxMm: 12, label: 'Threshold', description: 'Medium height difference' },
+  ramp: { maxMm: Infinity, label: 'Ramp', description: 'Large height difference - ramp required' },
 } as const;
 
 // Adhesive type options

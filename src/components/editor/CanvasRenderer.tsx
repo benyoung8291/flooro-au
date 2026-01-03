@@ -395,7 +395,7 @@ function drawRoom(
     }
   });
 
-  // Draw outline with wall highlighting, hover effect, and drag target effect
+  // Draw outline with wall highlighting, hover effect, drag target effect, and transition edges
   for (let i = 0; i < room.points.length; i++) {
     const j = (i + 1) % room.points.length;
     const p1 = room.points[i];
@@ -404,6 +404,7 @@ function drawRoom(
     
     const isWallHovered = hoveredWallIndex === i && !isDragging;
     const isCurved = curve?.type === 'quadratic' && curve.controlPoint;
+    const isTransitionEdge = room.edgeTransitions?.some(t => t.edgeIndex === i);
     
     // Determine stroke style based on state priority
     if (isDragTarget) {
@@ -418,6 +419,11 @@ function drawRoom(
       ctx.strokeStyle = 'hsl(45 93% 47%)';
       ctx.lineWidth = 4 / zoom;
       ctx.setLineDash([]);
+    } else if (isTransitionEdge) {
+      // Transition edges get amber/orange dashed style
+      ctx.strokeStyle = isSelected ? 'hsl(35 90% 50%)' : 'hsl(35 80% 55%)';
+      ctx.lineWidth = 3 / zoom;
+      ctx.setLineDash([6 / zoom, 4 / zoom]);
     } else if (isCurved) {
       // Curved edges get a distinct color
       ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 60% 55%)';
@@ -446,6 +452,25 @@ function drawRoom(
     }
     ctx.stroke();
     ctx.setLineDash([]);
+    
+    // Draw transition indicator "T" at edge midpoint
+    if (isTransitionEdge && !isDragTarget && !isValidDropZone) {
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+      
+      // Draw circle background
+      ctx.fillStyle = 'hsl(35 90% 50%)';
+      ctx.beginPath();
+      ctx.arc(midX, midY, 8 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Draw "T" letter
+      ctx.fillStyle = 'white';
+      ctx.font = `bold ${10 / zoom}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('T', midX, midY);
+    }
   }
 
   // Draw curve control points and midpoint indicators
