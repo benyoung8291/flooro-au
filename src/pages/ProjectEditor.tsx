@@ -452,8 +452,7 @@ export default function ProjectEditor() {
       try {
         const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
         const plan = calculateStripPlan(room, rollSpecs, scale, {
-          forcedDirection: room.fillDirection === 0 || room.fillDirection === 180 ? 'horizontal' : 
-                           room.fillDirection === 90 || room.fillDirection === 270 ? 'vertical' : undefined,
+          fillDirection: room.fillDirection || 0,
           firstSeamOffset: room.seamOptions?.firstSeamOffset || 0,
           manualSeams: room.seamOptions?.manualSeams || [],
           avoidSeamZones: room.seamOptions?.avoidZones || [],
