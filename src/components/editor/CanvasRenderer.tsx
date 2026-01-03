@@ -646,6 +646,46 @@ function drawFillDirectionArrow(
   ctx.restore();
 }
 
+// Line-line intersection calculation
+function lineLineIntersection(
+  x1: number, y1: number, x2: number, y2: number,
+  x3: number, y3: number, x4: number, y4: number
+): { x: number; y: number } | null {
+  const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+  if (Math.abs(denom) < 0.0001) return null; // Parallel lines
+  
+  const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+  const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+  
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+    return {
+      x: x1 + t * (x2 - x1),
+      y: y1 + t * (y2 - y1)
+    };
+  }
+  return null;
+}
+
+// Find intersection points of a line with polygon edges
+function getLinePolygonIntersections(
+  x1: number, y1: number, x2: number, y2: number,
+  polygon: { x: number; y: number }[]
+): { x: number; y: number }[] {
+  const intersections: { x: number; y: number }[] = [];
+  
+  for (let i = 0; i < polygon.length; i++) {
+    const p1 = polygon[i];
+    const p2 = polygon[(i + 1) % polygon.length];
+    
+    const intersection = lineLineIntersection(x1, y1, x2, y2, p1.x, p1.y, p2.x, p2.y);
+    if (intersection) {
+      intersections.push(intersection);
+    }
+  }
+  
+  return intersections;
+}
+
 function drawSeamLines(
   ctx: CanvasRenderingContext2D,
   room: Room,
@@ -665,17 +705,30 @@ function drawSeamLines(
   ctx.lineCap = 'round';
   
   stripPlan.seamLines.forEach(seam => {
-    // Convert mm coordinates directly to pixels
-    // Seam coordinates from stripPlan are absolute mm coordinates
+    // Convert mm coordinates to pixels
     const x1Px = seam.x1 * scale.pixelsPerMm;
     const y1Px = seam.y1 * scale.pixelsPerMm;
     const x2Px = seam.x2 * scale.pixelsPerMm;
     const y2Px = seam.y2 * scale.pixelsPerMm;
     
-    ctx.beginPath();
-    ctx.moveTo(x1Px, y1Px);
-    ctx.lineTo(x2Px, y2Px);
-    ctx.stroke();
+    // Get intersection points with room polygon to clip the seam line
+    const intersections = getLinePolygonIntersections(
+      x1Px, y1Px, x2Px, y2Px,
+      room.points
+    );
+    
+    // Need at least 2 intersection points to draw a clipped line
+    if (intersections.length >= 2) {
+      // Sort intersections along the seam direction
+      const isVertical = Math.abs(x2Px - x1Px) < Math.abs(y2Px - y1Px);
+      intersections.sort((a, b) => isVertical ? a.y - b.y : a.x - b.x);
+      
+      // Draw line between first and last intersection (entry and exit points)
+      ctx.beginPath();
+      ctx.moveTo(intersections[0].x, intersections[0].y);
+      ctx.lineTo(intersections[intersections.length - 1].x, intersections[intersections.length - 1].y);
+      ctx.stroke();
+    }
   });
   
   ctx.setLineDash([]);
