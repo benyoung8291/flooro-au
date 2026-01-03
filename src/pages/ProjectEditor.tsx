@@ -17,6 +17,7 @@ import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
 import { ProjectProgressBar } from '@/components/editor/ProjectProgressBar';
 import { RoomsOverviewDialog } from '@/components/editor/RoomsOverviewDialog';
+import { SaveStatusIndicator, SaveStatus } from '@/components/editor/SaveStatusIndicator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,6 +73,9 @@ export default function ProjectEditor() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   const [quoteSummaryOpen, setQuoteSummaryOpen] = useState(false);
   const [roomsOverviewOpen, setRoomsOverviewOpen] = useState(false);
@@ -164,17 +168,66 @@ export default function ProjectEditor() {
     setHasUnsavedChanges(true);
   }, []);
 
-  const handleSave = async () => {
-    if (!projectId || isViewer) return;
+  // Auto-save with debounce
+  useEffect(() => {
+    if (!hasUnsavedChanges || !projectId || isViewer) return;
+    
+    setSaveStatus('unsaved');
+    
+    // Clear existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Set new timeout for auto-save (2 second debounce)
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        await updateProject.mutateAsync({
+          id: projectId,
+          updates: { json_data: localData as any },
+        });
+        setSaveStatus('saved');
+        setLastSaved(new Date());
+        setHasUnsavedChanges(false);
+        
+        // Reset to idle after showing "Saved" for 3 seconds
+        setTimeout(() => setSaveStatus('idle'), 3000);
+      } catch (error: any) {
+        setSaveStatus('unsaved');
+        toast({ title: 'Auto-save failed', description: error.message, variant: 'destructive' });
+      }
+    }, 2000);
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [hasUnsavedChanges, localData, projectId, isViewer, updateProject, toast]);
 
+  const handleSave = async () => {
+    if (!projectId || isViewer || !hasUnsavedChanges) return;
+
+    // Cancel any pending auto-save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    setSaveStatus('saving');
     try {
       await updateProject.mutateAsync({
         id: projectId,
         updates: { json_data: localData as any },
       });
+      setSaveStatus('saved');
+      setLastSaved(new Date());
       setHasUnsavedChanges(false);
-      toast({ title: 'Project saved' });
+      
+      // Reset to idle after showing "Saved" for 3 seconds
+      setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error: any) {
+      setSaveStatus('unsaved');
       toast({ title: 'Failed to save', description: error.message, variant: 'destructive' });
     }
   };
@@ -498,11 +551,7 @@ export default function ProjectEditor() {
                 <Badge variant="secondary" className={`text-xs ${status.className}`}>
                   {status.label}
                 </Badge>
-                {hasUnsavedChanges && (
-                  <Badge variant="outline" className="text-xs">
-                    Unsaved
-                  </Badge>
-                )}
+                <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />
               </>
             )}
           </div>
@@ -567,14 +616,16 @@ export default function ProjectEditor() {
             </Button>
           )}
 
-          {/* Save Button */}
+          {/* Save Button - Manual/Immediate save */}
           {!isViewer && (
             <Button 
               size={isMobile ? 'icon' : 'sm'}
+              variant={hasUnsavedChanges ? 'default' : 'ghost'}
               onClick={handleSave}
-              disabled={updateProject.isPending || !hasUnsavedChanges}
+              disabled={saveStatus === 'saving' || !hasUnsavedChanges}
+              title="Save now (Ctrl+S)"
             >
-              {updateProject.isPending ? (
+              {saveStatus === 'saving' ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
@@ -584,6 +635,9 @@ export default function ProjectEditor() {
               )}
             </Button>
           )}
+
+          {/* Mobile Save Status */}
+          {isMobile && <SaveStatusIndicator status={saveStatus} lastSaved={lastSaved} />}
 
           {!isMobile && <ThemeToggle />}
 
