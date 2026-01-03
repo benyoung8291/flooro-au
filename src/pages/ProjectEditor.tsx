@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject, useUpdateProject, useRequestService } from '@/hooks/useProjects';
 import { useHasRole } from '@/hooks/useUserProfile';
-import { useMaterials } from '@/hooks/useMaterials';
+import { useMaterials, Material } from '@/hooks/useMaterials';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
-import { EditorSidebar } from '@/components/editor/EditorSidebar';
+import { TakeoffPanel } from '@/components/editor/TakeoffPanel';
 import { FloorPlanUpload } from '@/components/editor/FloorPlanUpload';
 import { AutoTakeoffDialog } from '@/components/editor/AutoTakeoffDialog';
 import { ImageControls } from '@/components/editor/ImageControls';
@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
 import { QuoteSummaryDialog } from '@/components/reports/QuoteSummaryDialog';
+import { FinishesScheduleDialog } from '@/components/reports/FinishesScheduleDialog';
 import { generateReport } from '@/lib/reports/calculations';
 import { calculateStripPlan, extractRollMaterialSpecs } from '@/lib/rollGoods';
 import { StripPlanResult } from '@/lib/rollGoods/types';
@@ -36,9 +37,6 @@ import {
   MoreVertical,
   Phone,
   Loader2,
-  PanelRightClose,
-  PanelRight,
-  ClipboardList,
   LayoutGrid,
   FileText,
 } from 'lucide-react';
@@ -81,6 +79,7 @@ export default function ProjectEditor() {
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   const [quoteSummaryOpen, setQuoteSummaryOpen] = useState(false);
   const [roomsOverviewOpen, setRoomsOverviewOpen] = useState(false);
+  const [finishesScheduleOpen, setFinishesScheduleOpen] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
   const [showFinishesLegend, setShowFinishesLegend] = useState(false);
   const [accessoryDialogOpen, setAccessoryDialogOpen] = useState(false);
@@ -365,21 +364,26 @@ export default function ProjectEditor() {
       return;
     }
     
+    handleMaterialSelectForRoom(material, selectedRoomId);
+  }, [selectedRoomId, toast]);
+
+  // Handler for TakeoffPanel that receives roomId directly
+  const handleMaterialSelectForRoom = useCallback((material: { id: string }, roomId: string) => {
     // Assign material immediately
-    handleUpdateRoom(selectedRoomId, { materialId: material.id });
+    handleUpdateRoom(roomId, { materialId: material.id });
     
     // Check "don't ask again" preference
     const skipAccessories = localStorage.getItem('flooro_skip_accessory_prompt') === 'true';
     
     // Find full material data
     const fullMaterial = materials?.find(m => m.id === material.id);
-    const roomName = rooms.find(r => r.id === selectedRoomId)?.name || 'room';
+    const roomName = rooms.find(r => r.id === roomId)?.name || 'room';
     
     // Show accessory dialog for roll/tile materials unless skipped
     if (fullMaterial && !skipAccessories && (fullMaterial.type === 'roll' || fullMaterial.type === 'tile')) {
       const specs = fullMaterial.specs as any;
       setPendingMaterialRoom({
-        roomId: selectedRoomId,
+        roomId: roomId,
         material: {
           id: fullMaterial.id,
           name: fullMaterial.name,
@@ -394,7 +398,7 @@ export default function ProjectEditor() {
         description: `Material applied to ${roomName}`,
       });
     }
-  }, [selectedRoomId, handleUpdateRoom, toast, rooms, materials]);
+  }, [handleUpdateRoom, toast, rooms, materials]);
 
   const handleApplyAccessories = useCallback((accessories: Partial<RoomAccessories>) => {
     if (pendingMaterialRoom) {
@@ -755,20 +759,6 @@ export default function ProjectEditor() {
             </div>
           )}
 
-          {/* Desktop Finishes Legend Toggle - positioned to avoid sidebar overlap */}
-          {!isMobile && rooms.some(r => r.materialCode) && !is3DMode && (
-            <div className={`absolute top-4 z-10 transition-all duration-200 ${sidebarCollapsed ? 'right-16' : 'right-[19rem]'}`}>
-              <Button
-                variant={showFinishesLegend ? 'default' : 'secondary'}
-                size="icon"
-                onClick={() => setShowFinishesLegend(!showFinishesLegend)}
-                title="Toggle Finishes Legend"
-              >
-                <ClipboardList className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
-
           {/* Canvas or 3D View */}
           {is3DMode ? (
             <ThreeDViewer
@@ -796,9 +786,9 @@ export default function ProjectEditor() {
           )}
         </div>
 
-        {/* Desktop Right Sidebar */}
+        {/* Desktop Right Sidebar - TakeoffPanel */}
         {!isMobile && (
-          <EditorSidebar 
+          <TakeoffPanel 
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             rooms={rooms}
@@ -808,15 +798,11 @@ export default function ProjectEditor() {
             onDeleteRoom={handleDeleteRoom}
             onRenameRoom={handleRenameRoom}
             onUpdateRoom={handleUpdateRoom}
-            onNavigatePrevRoom={handleNavigatePrevRoom}
-            onNavigateNextRoom={handleNavigateNextRoom}
-            onMaterialSelect={handleMaterialSelect}
+            onMaterialSelect={handleMaterialSelectForRoom}
             projectName={project.name}
-            projectAddress={project.address || undefined}
             stripPlans={stripPlans}
-            onRecalculateStripPlan={handleRecalculateStripPlan}
-            dropAllocations={dropAllocations as any}
-            onDropAllocationsChange={handleDropAllocationsChange as any}
+            onOpenFinishesSchedule={() => setFinishesScheduleOpen(true)}
+            onOpenQuoteSummary={() => setQuoteSummaryOpen(true)}
           />
         )}
       </div>
@@ -914,6 +900,14 @@ export default function ProjectEditor() {
       <KeyboardShortcutsPanel
         open={shortcutsPanelOpen}
         onOpenChange={setShortcutsPanelOpen}
+      />
+
+      {/* Finishes Schedule Dialog */}
+      <FinishesScheduleDialog
+        open={finishesScheduleOpen}
+        onOpenChange={setFinishesScheduleOpen}
+        roomCalculations={report.roomCalculations}
+        materials={materials || []}
       />
     </div>
   );
