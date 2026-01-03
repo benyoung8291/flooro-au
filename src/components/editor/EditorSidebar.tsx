@@ -411,6 +411,7 @@ export function EditorSidebar({
                 onUpdateAccessories={(accessories: RoomAccessories) => {
                   onUpdateRoom?.(selectedRoom.id, { accessories });
                 }}
+                stripPlan={selectedRoomStripPlan}
               />
             ) : (
               <ScrollArea className="h-full">

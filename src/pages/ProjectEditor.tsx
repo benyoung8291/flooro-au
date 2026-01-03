@@ -26,6 +26,8 @@ import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
 import { QuoteSummaryDialog } from '@/components/reports/QuoteSummaryDialog';
 import { generateReport } from '@/lib/reports/calculations';
+import { calculateStripPlan, extractRollMaterialSpecs } from '@/lib/rollGoods';
+import { StripPlanResult } from '@/lib/rollGoods/types';
 import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit } from '@/lib/canvas/types';
 import { AccessoryQuickAddDialog } from '@/components/materials/AccessoryQuickAddDialog';
 import { 
@@ -435,6 +437,43 @@ export default function ProjectEditor() {
     [rooms, materials, scale]
   );
 
+  // Calculate strip plans for rooms with roll materials
+  const stripPlans = useMemo(() => {
+    const plans = new Map<string, StripPlanResult>();
+    
+    if (!scale || !materials) return plans;
+    
+    rooms.forEach(room => {
+      if (!room.materialId) return;
+      
+      const material = materials.find(m => m.id === room.materialId);
+      if (!material || material.type !== 'roll') return;
+      
+      try {
+        const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
+        const plan = calculateStripPlan(room, rollSpecs, scale, {
+          forcedDirection: room.fillDirection === 0 || room.fillDirection === 180 ? 'horizontal' : 
+                           room.fillDirection === 90 || room.fillDirection === 270 ? 'vertical' : undefined,
+          firstSeamOffset: room.seamOptions?.firstSeamOffset || 0,
+          manualSeams: room.seamOptions?.manualSeams || [],
+          avoidSeamZones: room.seamOptions?.avoidZones || [],
+        });
+        
+        plans.set(room.id, plan);
+      } catch (error) {
+        console.warn(`Failed to calculate strip plan for room ${room.id}:`, error);
+      }
+    });
+    
+    return plans;
+  }, [rooms, materials, scale]);
+
+  // Recalculate strip plan callback (triggers via room update)
+  const handleRecalculateStripPlan = useCallback((roomId: string) => {
+    // The useMemo will automatically recalculate when room data changes
+    // This is triggered by updating room data which already happens
+  }, []);
+
   // Background image handlers
   const handleSetBackgroundImage = useCallback((image: BackgroundImage) => {
     setLocalData(prev => ({ ...prev, backgroundImage: image }));
@@ -773,6 +812,8 @@ export default function ProjectEditor() {
             onMaterialSelect={handleMaterialSelect}
             projectName={project.name}
             projectAddress={project.address || undefined}
+            stripPlans={stripPlans}
+            onRecalculateStripPlan={handleRecalculateStripPlan}
             dropAllocations={dropAllocations as any}
             onDropAllocationsChange={handleDropAllocationsChange as any}
           />
