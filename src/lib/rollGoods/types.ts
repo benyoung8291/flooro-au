@@ -39,7 +39,7 @@ export interface Strip {
   width: number; // Strip width (roll width) in mm
   length: number; // Strip length (cut length) in mm
   patternOffset: number; // Offset for pattern matching in mm
-  rotation: 0 | 90; // 0 = parallel to length, 90 = perpendicular
+  rotation: number; // Rotation angle in degrees (0-359)
 }
 
 /**
@@ -64,7 +64,8 @@ export interface StripPlanResult {
   // Layout
   strips: Strip[];
   seamLines: SeamLine[];
-  layoutDirection: 'horizontal' | 'vertical';
+  layoutDirection: 'horizontal' | 'vertical' | 'diagonal';
+  fillAngle?: number; // The actual angle used (0-359 degrees)
   
   // Measurements (all in mm unless specified)
   roomBoundingBox: BoundingBox;

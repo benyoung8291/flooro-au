@@ -66,6 +66,49 @@ function generateId(prefix: string): string {
 }
 
 /**
+ * Rotate a point around a center point
+ */
+function rotatePoint(
+  point: { x: number; y: number },
+  center: { x: number; y: number },
+  angleDegrees: number
+): { x: number; y: number } {
+  const angleRad = (angleDegrees * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  return {
+    x: center.x + dx * cos - dy * sin,
+    y: center.y + dx * sin + dy * cos,
+  };
+}
+
+/**
+ * Calculate centroid of a polygon
+ */
+function calculateCentroid(points: CanvasPoint[]): { x: number; y: number } {
+  if (points.length === 0) return { x: 0, y: 0 };
+  const sumX = points.reduce((sum, p) => sum + p.x, 0);
+  const sumY = points.reduce((sum, p) => sum + p.y, 0);
+  return { x: sumX / points.length, y: sumY / points.length };
+}
+
+/**
+ * Rotate all points of a polygon around a center
+ */
+function rotatePolygon(
+  points: CanvasPoint[],
+  center: { x: number; y: number },
+  angleDegrees: number
+): CanvasPoint[] {
+  return points.map(p => {
+    const rotated = rotatePoint(p, center, angleDegrees);
+    return { ...p, x: rotated.x, y: rotated.y };
+  });
+}
+
+/**
  * Greedy Strip Algorithm
  * 
  * This algorithm divides a room into parallel strips of roll material,
@@ -84,32 +127,52 @@ export function calculateStripPlan(
   scale: ScaleCalibration | null,
   options: StripPlanOptions = {}
 ): StripPlanResult {
-  const bbox = calculateBoundingBox(room.points, scale);
+  // Get fill direction angle (0 = horizontal strips running left-right)
+  const fillAngle = options.fillDirection ?? 0;
+  const isDiagonal = fillAngle !== 0 && fillAngle !== 90 && fillAngle !== 180 && fillAngle !== 270;
   
-  // Calculate room area in mm²
+  // Calculate room centroid for rotation
+  const centroid = calculateCentroid(room.points);
+  
+  // For diagonal layouts, rotate room points so fill direction becomes horizontal
+  // Then calculate as if horizontal, then rotate results back
+  const workingPoints = isDiagonal 
+    ? rotatePolygon(room.points, centroid, -fillAngle) 
+    : room.points;
+  
+  const bbox = calculateBoundingBox(workingPoints, scale);
+  
+  // Calculate room area in mm² (use original points for actual area)
   const roomAreaPixels = calculateRoomNetArea(room);
   const roomAreaMm2 = pixelAreaToRealArea(roomAreaPixels, scale);
   const roomAreaM2 = mmSquaredToMSquared(roomAreaMm2);
 
-  // Determine layout direction
-  // Default: run strips along the longest dimension to minimize seams
-  let layoutDirection: 'horizontal' | 'vertical';
+  // Determine layout direction for the calculation
+  // For diagonal, we always calculate as 'horizontal' in rotated space
+  let calcDirection: 'horizontal' | 'vertical';
   
-  if (options.forcedDirection) {
-    layoutDirection = options.forcedDirection;
+  if (isDiagonal) {
+    calcDirection = 'horizontal'; // Always horizontal in rotated coordinate space
+  } else if (options.forcedDirection) {
+    calcDirection = options.forcedDirection;
+  } else if (fillAngle === 90 || fillAngle === 270) {
+    calcDirection = 'vertical';
   } else if (options.optimizeFor === 'seams') {
     // Minimize seams = run along longest dimension
-    layoutDirection = bbox.width >= bbox.height ? 'horizontal' : 'vertical';
+    calcDirection = bbox.width >= bbox.height ? 'horizontal' : 'vertical';
   } else {
     // Default: minimize waste by running perpendicular to shortest side
-    // This often means fewer partial strips
-    layoutDirection = bbox.width >= bbox.height ? 'horizontal' : 'vertical';
+    calcDirection = bbox.width >= bbox.height ? 'horizontal' : 'vertical';
   }
-
-  // Dimensions based on layout direction
-  const roomLength = layoutDirection === 'horizontal' ? bbox.width : bbox.height;
-  const roomWidth = layoutDirection === 'horizontal' ? bbox.height : bbox.width;
   
+  // Determine the final layout direction label
+  const layoutDirection: 'horizontal' | 'vertical' | 'diagonal' = isDiagonal 
+    ? 'diagonal' 
+    : calcDirection;
+
+  // Dimensions based on calculation direction (not layout direction which may be 'diagonal')
+  const roomLength = calcDirection === 'horizontal' ? bbox.width : bbox.height;
+  const roomWidth = calcDirection === 'horizontal' ? bbox.height : bbox.width;
   const rollWidth = material.width;
   const patternRepeat = material.patternRepeat || 0;
 
@@ -169,9 +232,9 @@ export function calculateStripPlan(
       stripLength = options.maxStripLength;
     }
 
-    // Position calculation with offset
-    const xPos = layoutDirection === 'horizontal' ? bbox.minX : bbox.minX + stripStartPos;
-    const yPos = layoutDirection === 'horizontal' ? bbox.minY + stripStartPos : bbox.minY;
+    // Position calculation with offset (in working/rotated coordinate space)
+    const xPos = calcDirection === 'horizontal' ? bbox.minX : bbox.minX + stripStartPos;
+    const yPos = calcDirection === 'horizontal' ? bbox.minY + stripStartPos : bbox.minY;
 
     // Calculate pattern offset for this strip
     let patternOffset = 0;
@@ -181,14 +244,32 @@ export function calculateStripPlan(
       cumulativePatternOffset = (cumulativePatternOffset + stripLength) % patternRepeat;
     }
 
+    // For diagonal layouts, rotate strip position back to original coordinate space
+    let finalX = xPos;
+    let finalY = yPos;
+    
+    if (isDiagonal) {
+      // Convert back from mm to pixels for rotation, then back to mm
+      const toPixels = (mm: number) => scale && scale.pixelsPerMm > 0 ? mm * scale.pixelsPerMm : mm;
+      const toMm = (pixels: number) => scale && scale.pixelsPerMm > 0 ? pixels / scale.pixelsPerMm : pixels;
+      
+      const rotatedPos = rotatePoint(
+        { x: toPixels(xPos), y: toPixels(yPos) },
+        centroid,
+        fillAngle
+      );
+      finalX = toMm(rotatedPos.x);
+      finalY = toMm(rotatedPos.y);
+    }
+
     const strip: Strip = {
       id: generateId('strip'),
-      x: xPos,
-      y: yPos,
+      x: finalX,
+      y: finalY,
       width: stripWidth,
       length: stripLength,
       patternOffset,
-      rotation: layoutDirection === 'horizontal' ? 0 : 90,
+      rotation: isDiagonal ? fillAngle : (calcDirection === 'horizontal' ? 0 : 90),
     };
 
     strips.push(strip);
@@ -201,12 +282,26 @@ export function calculateStripPlan(
 
     // Generate seam line between this strip and the previous one
     if (i > 0) {
-      // Seam position accounts for offset
+      // Seam position accounts for offset (in working/rotated coordinate space)
       const seamPos = (i * rollWidth) - normalizedOffset;
-      const seamX1 = layoutDirection === 'horizontal' ? bbox.minX : bbox.minX + seamPos;
-      const seamY1 = layoutDirection === 'horizontal' ? bbox.minY + seamPos : bbox.minY;
-      const seamX2 = layoutDirection === 'horizontal' ? bbox.maxX : bbox.minX + seamPos;
-      const seamY2 = layoutDirection === 'horizontal' ? bbox.minY + seamPos : bbox.maxY;
+      let seamX1 = calcDirection === 'horizontal' ? bbox.minX : bbox.minX + seamPos;
+      let seamY1 = calcDirection === 'horizontal' ? bbox.minY + seamPos : bbox.minY;
+      let seamX2 = calcDirection === 'horizontal' ? bbox.maxX : bbox.minX + seamPos;
+      let seamY2 = calcDirection === 'horizontal' ? bbox.minY + seamPos : bbox.maxY;
+
+      // For diagonal layouts, rotate seam line back to original coordinate space
+      if (isDiagonal) {
+        const toPixels = (mm: number) => scale && scale.pixelsPerMm > 0 ? mm * scale.pixelsPerMm : mm;
+        const toMm = (pixels: number) => scale && scale.pixelsPerMm > 0 ? pixels / scale.pixelsPerMm : pixels;
+        
+        const rotatedP1 = rotatePoint({ x: toPixels(seamX1), y: toPixels(seamY1) }, centroid, fillAngle);
+        const rotatedP2 = rotatePoint({ x: toPixels(seamX2), y: toPixels(seamY2) }, centroid, fillAngle);
+        
+        seamX1 = toMm(rotatedP1.x);
+        seamY1 = toMm(rotatedP1.y);
+        seamX2 = toMm(rotatedP2.x);
+        seamY2 = toMm(rotatedP2.y);
+      }
 
       seamLines.push({
         id: generateId('seam'),
@@ -283,7 +378,7 @@ export function calculateStripPlan(
     strips,
     seamLines,
     layoutDirection,
-    
+    fillAngle,
     roomBoundingBox: bbox,
     roomAreaMm2,
     roomAreaM2,
