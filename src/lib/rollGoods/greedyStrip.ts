@@ -113,10 +113,17 @@ export function calculateStripPlan(
   const rollWidth = material.width;
   const patternRepeat = material.patternRepeat || 0;
 
-  // Calculate number of strips needed
-  const numFullStrips = Math.floor(roomWidth / rollWidth);
-  const remainingWidth = roomWidth - (numFullStrips * rollWidth);
-  const hasPartialStrip = remainingWidth > 0;
+  // Get first seam offset - shifts where strips start within the room
+  const firstSeamOffset = options.firstSeamOffset || 0;
+  // Normalize offset to be within one material width (can be negative or positive)
+  const normalizedOffset = ((firstSeamOffset % rollWidth) + rollWidth) % rollWidth;
+
+  // Calculate number of strips needed (accounting for offset)
+  // With offset, we may need an extra strip at the beginning
+  const effectiveRoomWidth = roomWidth + normalizedOffset;
+  const numFullStrips = Math.floor(effectiveRoomWidth / rollWidth);
+  const remainingWidth = effectiveRoomWidth - (numFullStrips * rollWidth);
+  const hasPartialStrip = remainingWidth > 10; // Small tolerance
   const totalStrips = numFullStrips + (hasPartialStrip ? 1 : 0);
 
   // Calculate strip length with pattern matching
@@ -132,7 +139,19 @@ export function calculateStripPlan(
 
   for (let i = 0; i < totalStrips; i++) {
     const isLastStrip = i === totalStrips - 1 && hasPartialStrip;
-    const stripWidth = isLastStrip ? remainingWidth : rollWidth;
+    
+    // Calculate strip position with offset
+    // First strip starts at (bbox edge - offset), subsequent strips follow
+    const stripStartPos = (i * rollWidth) - normalizedOffset;
+    
+    // Calculate strip width (may be partial at start or end)
+    let stripWidth = rollWidth;
+    if (i === 0 && normalizedOffset > 0) {
+      // First strip might be partial due to offset
+      stripWidth = rollWidth - normalizedOffset;
+    } else if (isLastStrip) {
+      stripWidth = remainingWidth;
+    }
     
     // Calculate strip length considering pattern repeat
     // Each strip needs to be long enough to match the pattern with the previous strip
@@ -150,9 +169,9 @@ export function calculateStripPlan(
       stripLength = options.maxStripLength;
     }
 
-    // Position calculation
-    const xPos = layoutDirection === 'horizontal' ? bbox.minX : bbox.minX + (i * rollWidth);
-    const yPos = layoutDirection === 'horizontal' ? bbox.minY + (i * rollWidth) : bbox.minY;
+    // Position calculation with offset
+    const xPos = layoutDirection === 'horizontal' ? bbox.minX : bbox.minX + stripStartPos;
+    const yPos = layoutDirection === 'horizontal' ? bbox.minY + stripStartPos : bbox.minY;
 
     // Calculate pattern offset for this strip
     let patternOffset = 0;
@@ -176,16 +195,18 @@ export function calculateStripPlan(
 
     // Calculate material area for this strip
     // Use roll width (not actual strip width for partial) since that's what we cut from
-    const actualCutWidth = isLastStrip ? rollWidth : stripWidth; // Full roll width even for partial
+    const actualCutWidth = rollWidth; // Full roll width even for partial
     totalMaterialMm2 += actualCutWidth * stripLength;
     totalRollLengthMm += stripLength;
 
     // Generate seam line between this strip and the previous one
     if (i > 0) {
-      const seamX1 = layoutDirection === 'horizontal' ? bbox.minX : xPos;
-      const seamY1 = layoutDirection === 'horizontal' ? yPos : bbox.minY;
-      const seamX2 = layoutDirection === 'horizontal' ? bbox.maxX : xPos;
-      const seamY2 = layoutDirection === 'horizontal' ? yPos : bbox.maxY;
+      // Seam position accounts for offset
+      const seamPos = (i * rollWidth) - normalizedOffset;
+      const seamX1 = layoutDirection === 'horizontal' ? bbox.minX : bbox.minX + seamPos;
+      const seamY1 = layoutDirection === 'horizontal' ? bbox.minY + seamPos : bbox.minY;
+      const seamX2 = layoutDirection === 'horizontal' ? bbox.maxX : bbox.minX + seamPos;
+      const seamY2 = layoutDirection === 'horizontal' ? bbox.minY + seamPos : bbox.maxY;
 
       seamLines.push({
         id: generateId('seam'),
