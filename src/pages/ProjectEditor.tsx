@@ -739,6 +739,22 @@ export default function ProjectEditor() {
     toast({ title: 'Page duplicated' });
   }, [toast]);
 
+  const handleReorderPages = useCallback((pageIds: string[]) => {
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const reorderedPages = pageIds.map((id, index) => {
+        const page = pages.find(p => p.id === id);
+        return page ? { ...page, sortOrder: index } : null;
+      }).filter(Boolean) as FloorPlanPage[];
+      
+      return {
+        ...prev,
+        pages: reorderedPages,
+      };
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   // Handle progress bar step clicks
   const handleProgressStepClick = useCallback((stepId: string) => {
     switch (stepId) {
@@ -932,6 +948,7 @@ export default function ProjectEditor() {
           onRenamePage={handleRenamePage}
           onDeletePage={handleDeletePage}
           onDuplicatePage={handleDuplicatePage}
+          onReorderPages={handleReorderPages}
         />
       )}
 
