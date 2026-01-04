@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProject, useUpdateProject, useRequestService } from '@/hooks/useProjects';
 import { useHasRole } from '@/hooks/useUserProfile';
-import { useMaterials, Material } from '@/hooks/useMaterials';
+import { useMaterials, Material, useCreateMaterial, MaterialSubtype } from '@/hooks/useMaterials';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
@@ -307,6 +307,17 @@ export default function ProjectEditor() {
     setLocalData(prev => ({ ...prev, projectMaterials: materials }));
     setHasUnsavedChanges(true);
   }, []);
+
+  // Save project material to library
+  const createMaterial = useCreateMaterial();
+  const handleSaveProjectMaterialToLibrary = useCallback(async (pm: ProjectMaterial) => {
+    await createMaterial.mutateAsync({
+      name: pm.name,
+      type: pm.type,
+      subtype: pm.subtype as MaterialSubtype | undefined,
+      specs: pm.specs,
+    });
+  }, [createMaterial]);
 
   // Create page-specific data to pass to EditorCanvas
   const canvasData = useMemo(() => {
@@ -1144,12 +1155,18 @@ export default function ProjectEditor() {
         onOpenChange={setShortcutsPanelOpen}
       />
 
-      {/* Finishes Schedule Dialog */}
+      {/* Finishes Schedule Dialog - Project Materials Management */}
       <FinishesScheduleDialog
         open={finishesScheduleOpen}
         onOpenChange={setFinishesScheduleOpen}
         roomCalculations={report.roomCalculations}
         materials={materials || []}
+        projectMaterials={projectMaterials}
+        onProjectMaterialsChange={handleProjectMaterialsChange}
+        libraryMaterials={materials || []}
+        rooms={rooms}
+        scale={scale}
+        onSaveToLibrary={handleSaveProjectMaterialToLibrary}
       />
     </div>
   );
