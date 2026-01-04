@@ -3,8 +3,5 @@ project_id = "votaocemakxceecgbwxg"
 [functions.extract-product]
 verify_jwt = false
 
-[functions.auto-takeoff]
-verify_jwt = false
-
 [functions.parse-pdf]
 verify_jwt = false
