@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +22,6 @@ import {
   Square,
   Circle,
   Minus,
-  Settings2,
   Trash2,
   RotateCw,
   FileText,
@@ -87,7 +85,6 @@ export function TakeoffPanel({
   projectMaterials = [],
 }: TakeoffPanelProps) {
   const { data: materials, isLoading } = useMaterials();
-  const navigate = useNavigate();
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
 
@@ -593,34 +590,23 @@ export function TakeoffPanel({
 
           {/* Footer Actions */}
           <div className="p-3 border-t border-border bg-muted/30 space-y-2">
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="flex-1"
-                onClick={onOpenFinishesSchedule}
-              >
-                <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
-                Schedule
-              </Button>
-              <Button 
-                variant="default" 
-                size="sm" 
-                className="flex-1"
-                onClick={onOpenQuoteSummary}
-              >
-                <FileText className="w-3.5 h-3.5 mr-1.5" />
-                Quote
-              </Button>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => navigate('/materials')}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={onOpenFinishesSchedule}
             >
-              <Settings2 className="w-3 h-3 mr-1.5" />
-              Manage Materials
+              <Library className="w-3.5 h-3.5 mr-1.5" />
+              Project Materials
+            </Button>
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="w-full"
+              onClick={onOpenQuoteSummary}
+            >
+              <FileText className="w-3.5 h-3.5 mr-1.5" />
+              Generate Quote
             </Button>
           </div>
         </>
