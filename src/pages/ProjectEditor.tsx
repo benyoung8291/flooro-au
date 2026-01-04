@@ -8,7 +8,6 @@ import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { TakeoffPanel } from '@/components/editor/TakeoffPanel';
 import { FloorPlanUpload } from '@/components/editor/FloorPlanUpload';
-import { AutoTakeoffDialog } from '@/components/editor/AutoTakeoffDialog';
 import { ImageControls } from '@/components/editor/ImageControls';
 import { MobileNav } from '@/components/editor/MobileNav';
 import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
@@ -643,42 +642,7 @@ export default function ProjectEditor() {
     setHasUnsavedChanges(true);
   }, []);
 
-  // Handle AI auto-takeoff results - ALWAYS creates a new page
-  const handleAutoTakeoffResults = useCallback((
-    detectedRooms: Room[], 
-    detectedScale?: ScaleCalibration, 
-    detectedBackgroundImage?: BackgroundImage
-  ) => {
-    setLocalData(prev => {
-      const existingPages = (prev.pages as FloorPlanPage[]) || [];
-      
-      // Create a new page for the auto-takeoff results
-      const newPage: FloorPlanPage = {
-        id: crypto.randomUUID(),
-        name: `Floor Plan ${existingPages.length + 1}`,
-        sortOrder: existingPages.length,
-        backgroundImage: detectedBackgroundImage ? {
-          ...detectedBackgroundImage,
-          locked: true, // Always lock floor plan
-        } : null,
-        rooms: detectedRooms,
-        scale: detectedScale || null,
-      };
-      
-      return {
-        ...prev,
-        pages: [...existingPages, newPage],
-        activePageId: newPage.id,
-        selectedRoomId: null,
-      };
-    });
-    setHasUnsavedChanges(true);
-    
-    toast({
-      title: 'New floor plan page created',
-      description: `${detectedRooms.length} rooms detected and added to a new page.`,
-    });
-  }, [toast]);
+  // Bulk assign material to multiple rooms
 
   // Bulk assign material to multiple rooms
   const handleBulkAssignMaterial = useCallback((roomIds: string[], materialId: string) => {
@@ -994,10 +958,6 @@ export default function ProjectEditor() {
                   <FloorPlanUpload
                     projectId={projectId!}
                     onImageUploaded={handleSetBackgroundImage}
-                  />
-                  <AutoTakeoffDialog
-                    projectId={projectId!}
-                    onRoomsDetected={handleAutoTakeoffResults}
                   />
                 </>
               )}
