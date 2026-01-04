@@ -214,3 +214,52 @@ export function getSharedEdgeForEdge(
   }
   return null;
 }
+
+/**
+ * Shared edge info for a newly created room
+ */
+export interface NewRoomSharedEdge {
+  newRoomEdgeIndex: number;
+  existingRoomId: string;
+  existingRoomName: string;
+  existingRoomEdgeIndex: number;
+}
+
+/**
+ * Detect shared edges between a newly created room and existing rooms
+ * Used to auto-mark shared boundaries as transitions
+ */
+export function detectSharedEdgesForNewRoom(
+  newRoom: Room,
+  existingRooms: Room[],
+  tolerance: number = 5
+): NewRoomSharedEdge[] {
+  const results: NewRoomSharedEdge[] = [];
+  
+  for (const existingRoom of existingRooms) {
+    // Compare each edge of newRoom with each edge of existingRoom
+    for (let e1 = 0; e1 < newRoom.points.length; e1++) {
+      const p1Start = newRoom.points[e1];
+      const p1End = newRoom.points[(e1 + 1) % newRoom.points.length];
+      
+      for (let e2 = 0; e2 < existingRoom.points.length; e2++) {
+        const p2Start = existingRoom.points[e2];
+        const p2End = existingRoom.points[(e2 + 1) % existingRoom.points.length];
+        
+        const overlap = edgesOverlap(p1Start, p1End, p2Start, p2End, tolerance);
+        
+        // Require at least 30% overlap for a meaningful shared edge
+        if (overlap && overlap.overlapPercentage > 0.3) {
+          results.push({
+            newRoomEdgeIndex: e1,
+            existingRoomId: existingRoom.id,
+            existingRoomName: existingRoom.name,
+            existingRoomEdgeIndex: e2,
+          });
+        }
+      }
+    }
+  }
+  
+  return results;
+}
