@@ -75,88 +75,87 @@ export function PageTabs({
     }
   };
 
-  if (pages.length === 0) {
-    return null;
-  }
-
-  // Only show tabs if there's more than one page
-  if (pages.length === 1) {
-    return null;
-  }
+  // Always show the tab bar to allow adding pages (even with 0 or 1 page)
+  const showTabs = pages.length > 1;
 
   return (
     <>
       <div className="flex items-center gap-1 bg-card/80 backdrop-blur-sm border-b border-border px-2 py-1">
-        <ScrollArea className="flex-1">
-          <div className="flex items-center gap-1">
-            {pages.sort((a, b) => a.sortOrder - b.sortOrder).map((page) => (
-              <div
-                key={page.id}
-                className={cn(
-                  'group flex items-center gap-1 px-3 py-1.5 rounded-md text-sm transition-colors cursor-pointer min-w-0',
-                  activePageId === page.id
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                )}
-                onClick={() => onSelectPage(page.id)}
-              >
-                <FileText className="w-3.5 h-3.5 flex-shrink-0" />
-                
-                {editingPageId === page.id ? (
-                  <Input
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={handleFinishRename}
-                    onKeyDown={handleKeyDown}
-                    className="h-5 w-24 text-xs px-1"
-                    autoFocus
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                ) : (
-                  <span className="truncate max-w-[100px]">{page.name}</span>
-                )}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+        {showTabs && (
+          <ScrollArea className="flex-1">
+            <div className="flex items-center gap-1">
+              {pages.sort((a, b) => a.sortOrder - b.sortOrder).map((page) => (
+                <div
+                  key={page.id}
+                  className={cn(
+                    'group flex items-center gap-1 px-3 py-1.5 rounded-md text-sm transition-colors cursor-pointer min-w-0',
+                    activePageId === page.id
+                      ? 'bg-primary/10 text-primary font-medium'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                  onClick={() => onSelectPage(page.id)}
+                >
+                  <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                  
+                  {editingPageId === page.id ? (
+                    <Input
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onBlur={handleFinishRename}
+                      onKeyDown={handleKeyDown}
+                      className="h-5 w-24 text-xs px-1"
+                      autoFocus
                       onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreHorizontal className="w-3 h-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="w-40">
-                    <DropdownMenuItem onClick={() => handleStartRename(page)}>
-                      <Edit2 className="w-3.5 h-3.5 mr-2" />
-                      Rename
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onDuplicatePage(page.id)}>
-                      <Copy className="w-3.5 h-3.5 mr-2" />
-                      Duplicate
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
-                      onClick={() => setDeletePageId(page.id)}
-                      disabled={pages.length <= 1}
-                    >
-                      <Trash2 className="w-3.5 h-3.5 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))}
-          </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
+                    />
+                  ) : (
+                    <span className="truncate max-w-[100px]">{page.name}</span>
+                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="w-3 h-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-40">
+                      <DropdownMenuItem onClick={() => handleStartRename(page)}>
+                        <Edit2 className="w-3.5 h-3.5 mr-2" />
+                        Rename
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDuplicatePage(page.id)}>
+                        <Copy className="w-3.5 h-3.5 mr-2" />
+                        Duplicate
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive"
+                        onClick={() => setDeletePageId(page.id)}
+                        disabled={pages.length <= 1}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ))}
+            </div>
+            <ScrollBar orientation="horizontal" />
+          </ScrollArea>
+        )}
 
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-muted-foreground hover:text-foreground"
+          className={cn(
+            "h-7 px-2 text-muted-foreground hover:text-foreground",
+            !showTabs && "ml-auto"
+          )}
           onClick={onAddPage}
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
