@@ -1104,6 +1104,7 @@ export default function ProjectEditor() {
         report={report}
         rooms={rooms}
         materials={materials || []}
+        projectMaterials={projectMaterials}
       />
 
       {/* Quote Summary Dialog */}
@@ -1127,6 +1128,7 @@ export default function ProjectEditor() {
         onOpenChange={setRoomsOverviewOpen}
         rooms={rooms}
         materials={materials || []}
+        projectMaterials={projectMaterials}
         scale={scale}
         selectedRoomId={selectedRoomId}
         onSelectRoom={handleSelectRoom}

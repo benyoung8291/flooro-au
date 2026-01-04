@@ -204,11 +204,6 @@ export function QuoteSummaryDialog({
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-medium truncate">{calc.roomName}</span>
-                              {calc.materialCode && (
-                                <Badge variant="outline" className="text-xs font-mono">
-                                  {calc.materialCode}
-                                </Badge>
-                              )}
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {formatArea(calc.netAreaM2)}

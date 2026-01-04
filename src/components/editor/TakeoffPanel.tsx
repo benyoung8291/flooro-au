@@ -405,16 +405,15 @@ export function TakeoffPanel({
                             </SelectContent>
                           </Select>
                           
-                          <Input
-                            value={room.materialCode || ''}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              onUpdateRoom?.(room.id, { materialCode: e.target.value.toUpperCase() });
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            placeholder="Code"
-                            className="w-14 h-7 text-xs font-mono uppercase px-1.5"
-                          />
+                          {/* Show material code from project material (read-only) */}
+                          {room.materialId && (() => {
+                            const pm = projectMaterials.find(pm => pm.id === room.materialId);
+                            return pm?.materialCode ? (
+                              <Badge variant="outline" className="h-7 px-2 text-xs font-mono">
+                                {pm.materialCode}
+                              </Badge>
+                            ) : null;
+                          })()}
                           
                           {cost !== null && (
                             <span className="text-xs font-mono text-muted-foreground shrink-0 w-14 text-right">

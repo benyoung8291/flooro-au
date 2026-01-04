@@ -325,26 +325,7 @@ export function EditorSidebar({
                   </Button>
                 </div>
                 
-                {/* Selected Room Material Code */}
-                {selectedRoom && selectedRoomMaterial && (
-                  <div className="mb-4 p-3 rounded-lg border border-border bg-muted/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Tag className="w-3.5 h-3.5 text-muted-foreground" />
-                      <Label className="text-xs">Finishes Schedule Code</Label>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        value={selectedRoom.materialCode || ''}
-                        onChange={(e) => onUpdateRoom?.(selectedRoom.id, { materialCode: e.target.value.toUpperCase() })}
-                        placeholder="e.g., CP01"
-                        className="h-8 text-xs font-mono uppercase"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1.5">
-                      {selectedRoom.name}: {selectedRoomMaterial.name}
-                    </p>
-                  </div>
-                )}
+                {/* Material code info - codes are now managed in Project Materials */}
                 {isLoading ? (
                   <div className="space-y-2">
                     {[1, 2, 3].map(i => (

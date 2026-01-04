@@ -152,11 +152,6 @@ export function LayersPanel({
                         {material.type}
                       </Badge>
                     )}
-                    {room.materialCode && (
-                      <Badge variant="outline" className="text-[10px] h-4 px-1 font-mono">
-                        {room.materialCode}
-                      </Badge>
-                    )}
                   </div>
                 </div>
                 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Room, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR } from '@/lib/canvas/types';
+import { Room, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, ProjectMaterial } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 interface FinishesLegendProps {
   rooms: Room[];
   materials: Material[];
+  projectMaterials?: ProjectMaterial[];
   onClose?: () => void;
   compact?: boolean;
 }
@@ -20,36 +21,44 @@ interface LegendEntry {
   fillColor: string;
 }
 
-export function FinishesLegend({ rooms, materials, onClose, compact = false }: FinishesLegendProps) {
+export function FinishesLegend({ rooms, materials, projectMaterials = [], onClose, compact = false }: FinishesLegendProps) {
   const legendEntries = useMemo(() => {
-    const materialMap = new Map(materials.map(m => [m.id, m]));
+    const projectMaterialMap = new Map(projectMaterials.map(pm => [pm.id, pm]));
+    const libraryMaterialMap = new Map(materials.map(m => [m.id, m]));
     const entriesMap = new Map<string, LegendEntry>();
 
     for (const room of rooms) {
-      if (!room.materialCode || !room.materialId) continue;
+      if (!room.materialId) continue;
 
-      const material = materialMap.get(room.materialId);
-      if (!material) continue;
+      // Get project material for the code
+      const projectMaterial = projectMaterialMap.get(room.materialId);
+      const libraryMaterial = libraryMaterialMap.get(room.materialId);
+      
+      // Code comes from project material only
+      const materialCode = projectMaterial?.materialCode;
+      if (!materialCode) continue;
 
-      const key = room.materialCode;
+      const key = materialCode;
       if (entriesMap.has(key)) continue;
 
-      const fillColor = MATERIAL_TYPE_COLORS[material.type] || DEFAULT_ROOM_COLOR;
+      const materialType = projectMaterial?.type || libraryMaterial?.type || 'roll';
+      const specs = projectMaterial?.specs || libraryMaterial?.specs;
+      const fillColor = MATERIAL_TYPE_COLORS[materialType] || DEFAULT_ROOM_COLOR;
       // Convert HSLa to solid color for swatch
       const solidColor = fillColor.replace(/hsla?\(([^)]+),\s*[\d.]+\)/, 'hsl($1)');
 
       entriesMap.set(key, {
-        code: room.materialCode,
-        materialName: material.name,
-        range: material.specs.range,
-        colour: material.specs.colour,
-        type: material.type,
+        code: materialCode,
+        materialName: projectMaterial?.name || libraryMaterial?.name || 'Unknown',
+        range: (specs as any)?.range,
+        colour: (specs as any)?.colour,
+        type: materialType,
         fillColor: solidColor,
       });
     }
 
     return Array.from(entriesMap.values()).sort((a, b) => a.code.localeCompare(b.code));
-  }, [rooms, materials]);
+  }, [rooms, materials, projectMaterials]);
 
   if (legendEntries.length === 0) {
     return null;
@@ -117,25 +126,33 @@ function getSwatchColor(type: string): string {
 export function generateFinishesLegendSvg(
   rooms: Room[],
   materials: Material[],
+  projectMaterials: ProjectMaterial[] = [],
   width: number = 220
 ): string {
-  const materialMap = new Map(materials.map(m => [m.id, m]));
+  const projectMaterialMap = new Map(projectMaterials.map(pm => [pm.id, pm]));
+  const libraryMaterialMap = new Map(materials.map(m => [m.id, m]));
   const entriesMap = new Map<string, LegendEntry>();
 
   for (const room of rooms) {
-    if (!room.materialCode || !room.materialId) continue;
-    const material = materialMap.get(room.materialId);
-    if (!material) continue;
-    const key = room.materialCode;
+    if (!room.materialId) continue;
+    
+    const projectMaterial = projectMaterialMap.get(room.materialId);
+    const libraryMaterial = libraryMaterialMap.get(room.materialId);
+    const materialCode = projectMaterial?.materialCode;
+    if (!materialCode) continue;
+    
+    const key = materialCode;
     if (entriesMap.has(key)) continue;
 
+    const materialType = projectMaterial?.type || libraryMaterial?.type || 'roll';
+
     entriesMap.set(key, {
-      code: room.materialCode,
-      materialName: material.name,
-      range: material.specs.range,
-      colour: material.specs.colour,
-      type: material.type,
-      fillColor: getSwatchColor(material.type),
+      code: materialCode,
+      materialName: projectMaterial?.name || libraryMaterial?.name || 'Unknown',
+      range: (projectMaterial?.specs as any)?.range || (libraryMaterial?.specs as any)?.range,
+      colour: (projectMaterial?.specs as any)?.colour || (libraryMaterial?.specs as any)?.colour,
+      type: materialType,
+      fillColor: getSwatchColor(materialType),
     });
   }
 

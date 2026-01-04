@@ -311,7 +311,6 @@ export function EditorCanvas({
       const propsChanged = (
         internalRoom.fillDirection !== externalRoom.fillDirection ||
         internalRoom.materialId !== externalRoom.materialId ||
-        internalRoom.materialCode !== externalRoom.materialCode ||
         internalRoom.name !== externalRoom.name ||
         internalRoom.color !== externalRoom.color ||
         internalRoom.tilePattern !== externalRoom.tilePattern ||
@@ -327,7 +326,6 @@ export function EditorCanvas({
           updates: {
             fillDirection: externalRoom.fillDirection,
             materialId: externalRoom.materialId,
-            materialCode: externalRoom.materialCode,
             name: externalRoom.name,
             color: externalRoom.color,
             tilePattern: externalRoom.tilePattern,
@@ -448,7 +446,6 @@ export function EditorCanvas({
       holes: [...(room1.holes || []), ...(room2.holes || [])],
       doors: [...(room1.doors || []), ...(room2.doors || [])],
       materialId: room1.materialId || room2.materialId,
-      materialCode: room1.materialCode || room2.materialCode,
       color: room1.color || room2.color || DEFAULT_ROOM_COLOR,
       fillDirection: room1.fillDirection || room2.fillDirection,
       accessories: room1.accessories || room2.accessories,
@@ -514,7 +511,6 @@ export function EditorCanvas({
       holes: holes1,
       doors: doors1,
       materialId: room.materialId,
-      materialCode: room.materialCode,
       color: room.color || DEFAULT_ROOM_COLOR,
       fillDirection: room.fillDirection,
       accessories: room.accessories,
@@ -527,7 +523,6 @@ export function EditorCanvas({
       holes: holes2,
       doors: doors2,
       materialId: room.materialId,
-      materialCode: room.materialCode,
       color: room.color || DEFAULT_ROOM_COLOR,
       fillDirection: room.fillDirection,
       accessories: room.accessories,
@@ -1319,8 +1314,8 @@ export function EditorCanvas({
         }}
       />
 
-      {/* Finishes Legend */}
-      {showFinishesLegend && state.rooms.some(r => r.materialCode) && (
+      {/* Finishes Legend - show if any room has a material from projectMaterials with a code */}
+      {showFinishesLegend && state.rooms.some(r => r.materialId) && (
         <div className="absolute top-4 right-4 z-10">
           <FinishesLegend 
             rooms={state.rooms}

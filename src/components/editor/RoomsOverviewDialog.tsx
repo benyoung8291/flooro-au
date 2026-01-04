@@ -35,7 +35,7 @@ import {
   Circle,
   Minus,
 } from 'lucide-react';
-import { Room, ScaleCalibration } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, ProjectMaterial } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, calculatePerimeter } from '@/lib/canvas/geometry';
 import { cn } from '@/lib/utils';
@@ -51,6 +51,7 @@ interface RoomsOverviewDialogProps {
   onOpenChange: (open: boolean) => void;
   rooms: Room[];
   materials: Material[];
+  projectMaterials?: ProjectMaterial[];
   scale: ScaleCalibration | null;
   selectedRoomId: string | null;
   onSelectRoom: (roomId: string | null) => void;
@@ -64,6 +65,7 @@ export function RoomsOverviewDialog({
   onOpenChange,
   rooms,
   materials,
+  projectMaterials = [],
   scale,
   selectedRoomId,
   onSelectRoom,
@@ -76,15 +78,22 @@ export function RoomsOverviewDialog({
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
   const [bulkMaterialOpen, setBulkMaterialOpen] = useState(false);
 
+  // Build a lookup from materialId to projectMaterial code
+  const projectMaterialMap = useMemo(() => 
+    new Map(projectMaterials.map(pm => [pm.id, pm])),
+    [projectMaterials]
+  );
+
   // Filter rooms by search query
   const filteredRooms = useMemo(() => {
     if (!searchQuery) return rooms;
     const query = searchQuery.toLowerCase();
-    return rooms.filter(room => 
-      room.name.toLowerCase().includes(query) ||
-      room.materialCode?.toLowerCase().includes(query)
-    );
-  }, [rooms, searchQuery]);
+    return rooms.filter(room => {
+      const pm = room.materialId ? projectMaterialMap.get(room.materialId) : null;
+      return room.name.toLowerCase().includes(query) ||
+        pm?.materialCode?.toLowerCase().includes(query);
+    });
+  }, [rooms, searchQuery, projectMaterialMap]);
 
   // Stats
   const roomsWithMaterial = rooms.filter(r => r.materialId).length;
@@ -312,11 +321,14 @@ export function RoomsOverviewDialog({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{room.name}</span>
-                        {room.materialCode && (
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {room.materialCode}
-                          </Badge>
-                        )}
+                        {(() => {
+                          const pm = room.materialId ? projectMaterialMap.get(room.materialId) : null;
+                          return pm?.materialCode ? (
+                            <Badge variant="outline" className="text-xs font-mono">
+                              {pm.materialCode}
+                            </Badge>
+                          ) : null;
+                        })()}
                       </div>
                     </div>
                     <span className="w-24 text-right text-sm tabular-nums">

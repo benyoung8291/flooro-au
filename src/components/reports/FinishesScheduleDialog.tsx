@@ -70,6 +70,7 @@ export function FinishesScheduleDialog({
             <FinishesSchedule 
               roomCalculations={roomCalculations}
               materials={materials}
+              projectMaterials={projectMaterials}
             />
           </TabsContent>
         </Tabs>
