@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
-import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve } from '@/lib/canvas/types';
+import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve, ProjectMaterial } from '@/lib/canvas/types';
 import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, getQuadraticBezierPoint, getEdgeMidpoint } from '@/lib/canvas/geometry';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { SharedEdge, detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
@@ -45,6 +45,8 @@ interface CanvasRendererProps {
   splitStartPoint?: CanvasPoint | null;
   splitPreviewEnd?: CanvasPoint | null;
   isSplitMode?: boolean;
+  // Project materials for code badges
+  projectMaterials?: ProjectMaterial[];
 }
 
 // Cache for loaded images
@@ -105,6 +107,7 @@ export function CanvasRenderer({
   splitStartPoint,
   splitPreviewEnd,
   isSplitMode = false,
+  projectMaterials = [],
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -246,7 +249,8 @@ export function CanvasRenderer({
         isMergeSelected,
         isMergeable,
         isMergeTarget,
-        isMergeDimmed
+        isMergeDimmed,
+        projectMaterials
       );
       
       // Draw fill direction arrow for rooms with roll materials
@@ -396,7 +400,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, projectMaterials]);
 
   useEffect(() => {
     render();
@@ -610,7 +614,8 @@ function drawRoom(
   isMergeSelected: boolean = false,
   isMergeable: boolean = false,
   isMergeTarget: boolean = false,
-  isMergeDimmed: boolean = false
+  isMergeDimmed: boolean = false,
+  projectMaterials: ProjectMaterial[] = []
 ) {
   if (room.points.length < 3) return;
 
@@ -899,6 +904,36 @@ function drawRoom(
   ctx.fillText(room.name, centerX, centerY - 10 / zoom);
   ctx.font = `${12 / zoom}px Inter, sans-serif`;
   ctx.fillText(areaText, centerX, centerY + 10 / zoom);
+
+  // Draw material code badge if room has a project material
+  if (room.materialId && projectMaterials.length > 0) {
+    const projectMaterial = projectMaterials.find(pm => pm.id === room.materialId);
+    if (projectMaterial?.materialCode) {
+      const code = projectMaterial.materialCode;
+      const codeY = centerY + 30 / zoom;
+      
+      // Measure text for badge background
+      ctx.font = `bold ${10 / zoom}px ui-monospace, monospace`;
+      const textMetrics = ctx.measureText(code);
+      const badgeWidth = textMetrics.width + 8 / zoom;
+      const badgeHeight = 14 / zoom;
+      
+      // Draw badge background (rounded rect)
+      ctx.fillStyle = 'hsl(217 91% 50%)';
+      const radius = 3 / zoom;
+      const badgeX = centerX - badgeWidth / 2;
+      const badgeY = codeY - badgeHeight / 2;
+      ctx.beginPath();
+      ctx.roundRect(badgeX, badgeY, badgeWidth, badgeHeight, radius);
+      ctx.fill();
+      
+      // Draw text
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(code, centerX, codeY);
+    }
+  }
 }
 
 function drawDimensionLabels(

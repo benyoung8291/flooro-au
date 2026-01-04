@@ -1034,6 +1034,7 @@ export default function ProjectEditor() {
               dimensionUnit={dimensionUnit}
               stripPlans={stripPlans}
               showSeamLines={true}
+              projectMaterials={projectMaterials}
             />
           )}
         </div>

@@ -5,7 +5,7 @@ import { DimensionInputOverlay } from './DimensionInputOverlay';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
-import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve, SnapSettings, DEFAULT_SNAP_SETTINGS, EdgeTransition } from '@/lib/canvas/types';
+import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve, SnapSettings, DEFAULT_SNAP_SETTINGS, EdgeTransition, ProjectMaterial } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import {
@@ -59,6 +59,8 @@ interface EditorCanvasProps {
   // Snap settings - controlled by parent via toolbar
   snapSettings?: SnapSettings;
   onSnapSettingsChange?: (settings: SnapSettings) => void;
+  // Project materials for canvas badges
+  projectMaterials?: ProjectMaterial[];
 }
 
 export function EditorCanvas({
@@ -80,6 +82,7 @@ export function EditorCanvas({
   showSeamLines = true,
   snapSettings: externalSnapSettings,
   onSnapSettingsChange,
+  projectMaterials = [],
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -1183,6 +1186,7 @@ export function EditorCanvas({
         splitStartPoint={splitStartPoint}
         splitPreviewEnd={splitPreviewEnd}
         isSplitMode={activeTool === 'split'}
+        projectMaterials={projectMaterials}
       />
 
       {/* Material drag indicator */}

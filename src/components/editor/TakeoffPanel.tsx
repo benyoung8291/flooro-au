@@ -316,7 +316,7 @@ export function TakeoffPanel({
                         className="p-2.5 cursor-pointer"
                         onClick={() => onSelectRoom?.(room.id)}
                       >
-                        {/* Top row: Color, Name, Area */}
+                        {/* Top row: Color, Name, Code Badge, Area */}
                         <div className="flex items-center gap-2 mb-1.5">
                           <div 
                             className="w-3 h-3 rounded-sm shrink-0" 
@@ -331,6 +331,15 @@ export function TakeoffPanel({
                             onClick={(e) => e.stopPropagation()}
                             className="flex-1 min-w-0 text-sm font-medium bg-transparent border-none focus:outline-none focus:ring-0 p-0"
                           />
+                          {/* Material code badge */}
+                          {room.materialId && (() => {
+                            const pm = projectMaterials.find(pm => pm.id === room.materialId);
+                            return pm?.materialCode ? (
+                              <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-mono shrink-0">
+                                {pm.materialCode}
+                              </Badge>
+                            ) : null;
+                          })()}
                           <span className="text-xs text-muted-foreground font-mono shrink-0">
                             {formatArea(room)}
                           </span>
@@ -405,15 +414,6 @@ export function TakeoffPanel({
                             </SelectContent>
                           </Select>
                           
-                          {/* Show material code from project material (read-only) */}
-                          {room.materialId && (() => {
-                            const pm = projectMaterials.find(pm => pm.id === room.materialId);
-                            return pm?.materialCode ? (
-                              <Badge variant="outline" className="h-7 px-2 text-xs font-mono">
-                                {pm.materialCode}
-                              </Badge>
-                            ) : null;
-                          })()}
                           
                           {cost !== null && (
                             <span className="text-xs font-mono text-muted-foreground shrink-0 w-14 text-right">
