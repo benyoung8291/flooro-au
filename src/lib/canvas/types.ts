@@ -148,10 +148,30 @@ export interface FloorPlanPage {
   scale: ScaleCalibration | null;
 }
 
+// Project-specific material with optional overrides from source
+export interface ProjectMaterial {
+  id: string;                           // Unique ID for this project material
+  sourceMaterialId?: string;            // Reference to original material (if imported from library)
+  name: string;
+  type: 'roll' | 'tile' | 'linear';
+  subtype?: string;
+  specs: Record<string, unknown>;       // Full specs (MaterialSpecs compatible)
+  materialCode: string;                 // Project-specific code (e.g., "CP01", "FC02")
+  isCustom: boolean;                    // True if created in project (not from database)
+  overrides?: {                         // Track which fields were overridden from source
+    price?: boolean;
+    colour?: boolean;
+    name?: boolean;
+  };
+}
+
 export interface CanvasState {
   // Multi-page support
   pages?: FloorPlanPage[];
   activePageId?: string | null;
+  
+  // Project materials (per-project customized materials)
+  projectMaterials?: ProjectMaterial[];
   
   // Legacy/active page data (maintained for compatibility)
   rooms: Room[];

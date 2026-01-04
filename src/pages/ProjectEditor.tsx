@@ -29,7 +29,7 @@ import { FinishesScheduleDialog } from '@/components/reports/FinishesScheduleDia
 import { generateReport } from '@/lib/reports/calculations';
 import { calculateStripPlan, extractRollMaterialSpecs } from '@/lib/rollGoods';
 import { StripPlanResult } from '@/lib/rollGoods/types';
-import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit, FloorPlanPage } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, BackgroundImage, RoomAccessories, DimensionUnit, FloorPlanPage, ProjectMaterial } from '@/lib/canvas/types';
 import { AccessoryQuickAddDialog } from '@/components/materials/AccessoryQuickAddDialog';
 import { 
   ArrowLeft, 
@@ -300,6 +300,13 @@ export default function ProjectEditor() {
   const backgroundImage = activePage?.backgroundImage || (localData.backgroundImage as BackgroundImage) || null;
   const selectedRoomId = (localData.selectedRoomId as string | null) || null;
   const dropAllocations = (localData.dropAllocations as Record<string, unknown>) || {};
+  const projectMaterials = (localData.projectMaterials as ProjectMaterial[]) || [];
+
+  // Project materials change handler
+  const handleProjectMaterialsChange = useCallback((materials: ProjectMaterial[]) => {
+    setLocalData(prev => ({ ...prev, projectMaterials: materials }));
+    setHasUnsavedChanges(true);
+  }, []);
 
   // Create page-specific data to pass to EditorCanvas
   const canvasData = useMemo(() => {
@@ -1037,6 +1044,7 @@ export default function ProjectEditor() {
             stripPlans={stripPlans}
             onOpenFinishesSchedule={() => setFinishesScheduleOpen(true)}
             onOpenQuoteSummary={() => setQuoteSummaryOpen(true)}
+            projectMaterials={projectMaterials}
           />
         )}
       </div>

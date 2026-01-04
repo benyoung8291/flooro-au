@@ -9,8 +9,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { FileText, Download, AlertCircle, Scissors, Maximize2, ArrowUpCircle, ArrowDownCircle, Circle } from 'lucide-react';
-import { Room, ScaleCalibration } from '@/lib/canvas/types';
+import { FileText, Download, AlertCircle, Scissors, Maximize2, ArrowUpCircle, ArrowDownCircle, Circle, ClipboardList } from 'lucide-react';
+import { Room, ScaleCalibration, ProjectMaterial } from '@/lib/canvas/types';
 import { Material, QuantityRoundingMode } from '@/hooks/useMaterials';
 import { generateReport, WasteOverrides } from '@/lib/reports/calculations';
 import { CostSummaryCard } from './CostSummaryCard';
@@ -22,9 +22,13 @@ import { FinishesSchedule } from './FinishesSchedule';
 import { WasteSuggestionCard } from './WasteSuggestionCard';
 import { CrossRoomOptimizer, PersistedDropAllocation } from './CrossRoomOptimizer';
 import { LaborCostPanel } from './LaborCostPanel';
+import { ProjectMaterialsManager } from './ProjectMaterialsManager';
 import { StripPlanResult, extractRollMaterialSpecs } from '@/lib/rollGoods';
 import { OptimizedCutPlan } from '@/lib/rollGoods/cutOptimizer';
+import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
 import { toast } from 'sonner';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
 
 // Per-material drop allocations stored in project
 export type DropAllocationsMap = Record<string, PersistedDropAllocation[]>;
@@ -39,6 +43,10 @@ interface ReportTabProps {
   onWasteOverridesChange?: (overrides: WasteOverrides) => void;
   dropAllocations?: DropAllocationsMap;
   onDropAllocationsChange?: (allocations: DropAllocationsMap) => void;
+  // Project materials support
+  projectMaterials?: ProjectMaterial[];
+  onProjectMaterialsChange?: (materials: ProjectMaterial[]) => void;
+  onSaveProjectMaterialToLibrary?: (material: ProjectMaterial) => Promise<void>;
 }
 
 export function ReportTab({
@@ -51,7 +59,11 @@ export function ReportTab({
   onWasteOverridesChange,
   dropAllocations = {},
   onDropAllocationsChange,
+  projectMaterials = [],
+  onProjectMaterialsChange,
+  onSaveProjectMaterialToLibrary,
 }: ReportTabProps) {
+  const [projectMaterialsOpen, setProjectMaterialsOpen] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [roundingMode, setRoundingMode] = useState<QuantityRoundingMode>('up');
   const [localWasteOverrides, setLocalWasteOverrides] = useState<WasteOverrides>(wasteOverrides);
@@ -129,6 +141,32 @@ export function ReportTab({
     <>
       <ScrollArea className="h-full">
         <div className="p-3 space-y-4">
+          {/* Project Materials Section */}
+          {onProjectMaterialsChange && (
+            <Collapsible open={projectMaterialsOpen} onOpenChange={setProjectMaterialsOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:bg-muted/50 rounded-lg px-2 -mx-2">
+                <div className="flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Project Materials</span>
+                  <span className="text-xs text-muted-foreground">({projectMaterials.length})</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${projectMaterialsOpen ? 'rotate-180' : ''}`} />
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <ProjectMaterialsManager
+                  projectMaterials={projectMaterials}
+                  onProjectMaterialsChange={onProjectMaterialsChange}
+                  libraryMaterials={materials}
+                  rooms={rooms}
+                  scale={scale}
+                  onSaveToLibrary={onSaveProjectMaterialToLibrary}
+                />
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+
+          {onProjectMaterialsChange && <Separator />}
+
           {/* Warnings */}
           {(!isCalibrated || !hasMaterialsAssigned) && (
             <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-xs space-y-1">
