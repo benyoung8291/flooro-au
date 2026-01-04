@@ -34,12 +34,14 @@ import {
   LayoutGrid,
   ArrowRight,
   Pencil,
+  Library,
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
-import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
+import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { calculatePolygonArea } from '@/lib/canvas/geometry';
 import { RoomDetailView } from './RoomDetailView';
+import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
 import { cn } from '@/lib/utils';
 
 interface TakeoffPanelProps {
@@ -57,6 +59,8 @@ interface TakeoffPanelProps {
   stripPlans?: Map<string, StripPlanResult>;
   onOpenFinishesSchedule?: () => void;
   onOpenQuoteSummary?: () => void;
+  // Project materials support
+  projectMaterials?: ProjectMaterial[];
 }
 
 const typeIcons: Record<string, React.ElementType> = {
@@ -80,11 +84,22 @@ export function TakeoffPanel({
   stripPlans,
   onOpenFinishesSchedule,
   onOpenQuoteSummary,
+  projectMaterials = [],
 }: TakeoffPanelProps) {
   const { data: materials, isLoading } = useMaterials();
   const navigate = useNavigate();
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+
+  // Combine project materials (priority) with library materials for lookup
+  const allMaterialsMap = useMemo(() => {
+    const map = new Map<string, Material>();
+    // Add library materials first
+    materials?.forEach(m => map.set(m.id, m));
+    // Add project materials (will override if same ID)
+    projectMaterials.forEach(pm => map.set(pm.id, projectMaterialToMaterial(pm)));
+    return map;
+  }, [materials, projectMaterials]);
 
   // Get the room being edited
   const editingRoom = editingRoomId ? rooms.find(r => r.id === editingRoomId) : null;
@@ -125,7 +140,7 @@ export function TakeoffPanel({
 
   const getRoomCost = (room: Room): number | null => {
     if (!scale || !room.materialId) return null;
-    const material = materials?.find(m => m.id === room.materialId);
+    const material = allMaterialsMap.get(room.materialId);
     if (!material) return null;
     
     const areaPx = calculatePolygonArea(room.points);
@@ -136,7 +151,7 @@ export function TakeoffPanel({
   };
 
   const getMaterial = (room: Room): Material | undefined => {
-    return materials?.find(m => m.id === room.materialId);
+    return room.materialId ? allMaterialsMap.get(room.materialId) : undefined;
   };
 
   const toggleRoomExpanded = (roomId: string) => {
@@ -152,6 +167,12 @@ export function TakeoffPanel({
   };
 
   const handleMaterialChange = (roomId: string, materialId: string) => {
+    // Check project materials first, then library materials
+    const projectMaterial = projectMaterials.find(pm => pm.id === materialId);
+    if (projectMaterial) {
+      onMaterialSelect?.(projectMaterialToMaterial(projectMaterial), roomId);
+      return;
+    }
     const material = materials?.find(m => m.id === materialId);
     if (material && onMaterialSelect) {
       onMaterialSelect(material, roomId);
@@ -341,6 +362,35 @@ export function TakeoffPanel({
                               </SelectValue>
                             </SelectTrigger>
                             <SelectContent className="bg-popover border border-border shadow-lg z-50">
+                              {/* Project Materials (if any) */}
+                              {projectMaterials.length > 0 && (
+                                <>
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                                    <ClipboardList className="w-3 h-3" />
+                                    Project Materials
+                                  </div>
+                                  {projectMaterials.map(pm => {
+                                    const MIcon = typeIcons[pm.type] || Square;
+                                    const specs = pm.specs as any;
+                                    return (
+                                      <SelectItem key={pm.id} value={pm.id}>
+                                        <div className="flex items-center gap-2">
+                                          <MIcon className="w-3 h-3" />
+                                          <span className="font-mono text-xs text-primary">{pm.materialCode}</span>
+                                          <span>{pm.name}</span>
+                                          <span className="text-muted-foreground text-xs">
+                                            ${(specs.pricePerM2 || specs.price || 0).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mt-1 border-t">
+                                    <Library className="w-3 h-3" />
+                                    Library
+                                  </div>
+                                </>
+                              )}
                               {materials?.map(m => {
                                 const MIcon = typeIcons[m.type] || Square;
                                 return (
