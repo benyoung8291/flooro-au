@@ -165,10 +165,20 @@ export function AutoTakeoffDialog({ projectId, onRoomsDetected }: AutoTakeoffDia
         throw new Error(data.error);
       }
 
-      setResult(data as AutoTakeoffResult);
+      const resultData = data as AutoTakeoffResult;
+      setResult(resultData);
       // Select all rooms by default
-      setSelectedRooms(new Set(data.rooms.map((_: unknown, i: number) => i)));
+      setSelectedRooms(new Set(resultData.rooms.map((_: unknown, i: number) => i)));
       setStep('review');
+      
+      // Show info about detection
+      if (resultData.rooms.length === 0) {
+        toast({
+          title: 'No rooms detected',
+          description: 'The AI could not identify any valid rooms in this floor plan. Try a clearer image.',
+          variant: 'destructive',
+        });
+      }
     } catch (error: any) {
       setError(error.message || 'AI processing failed');
       toast({
