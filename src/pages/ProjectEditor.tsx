@@ -186,7 +186,29 @@ export default function ProjectEditor() {
   }, []);
 
   const handleDataChange = useCallback((data: Record<string, unknown>) => {
-    setLocalData(prev => ({ ...prev, ...data }));
+    setLocalData(prev => {
+      const prevPages = (prev.pages as FloorPlanPage[]) || [];
+      const prevActivePageId = prev.activePageId as string | null;
+      
+      if (prevPages.length > 0 && prevActivePageId) {
+        // Multi-page mode: update the active page with canvas data
+        const updatedPages = prevPages.map(page => {
+          if (page.id === prevActivePageId) {
+            return {
+              ...page,
+              rooms: (data.rooms as Room[]) ?? page.rooms,
+              scale: (data.scale as ScaleCalibration) ?? page.scale,
+              backgroundImage: (data.backgroundImage as BackgroundImage) ?? page.backgroundImage,
+            };
+          }
+          return page;
+        });
+        return { ...prev, pages: updatedPages, selectedRoomId: data.selectedRoomId };
+      } else {
+        // Legacy mode
+        return { ...prev, ...data };
+      }
+    });
     setHasUnsavedChanges(true);
   }, []);
 
@@ -280,7 +302,25 @@ export default function ProjectEditor() {
   const selectedRoomId = (localData.selectedRoomId as string | null) || null;
   const dropAllocations = (localData.dropAllocations as Record<string, unknown>) || {};
 
-  // Handle drop allocations change
+  // Create page-specific data to pass to EditorCanvas
+  const canvasData = useMemo(() => {
+    if (pages.length > 0 && activePageId && activePage) {
+      return {
+        rooms: activePage.rooms,
+        scale: activePage.scale,
+        backgroundImage: activePage.backgroundImage,
+        selectedRoomId: localData.selectedRoomId,
+      };
+    }
+    // Legacy mode - use root-level data
+    return {
+      rooms: (localData.rooms as Room[]) || [],
+      scale: (localData.scale as ScaleCalibration) || null,
+      backgroundImage: (localData.backgroundImage as BackgroundImage) || null,
+      selectedRoomId: localData.selectedRoomId,
+    };
+  }, [pages, activePageId, activePage, localData.rooms, localData.scale, localData.backgroundImage, localData.selectedRoomId]);
+
   const handleDropAllocationsChange = useCallback((allocations: Record<string, unknown>) => {
     setLocalData(prev => ({ ...prev, dropAllocations: allocations }));
     setHasUnsavedChanges(true);
@@ -918,8 +958,8 @@ export default function ProjectEditor() {
         </div>
       </header>
 
-      {/* Page Tabs - only show when multiple pages exist */}
-      {!isMobile && pages.length > 1 && (
+      {/* Page Tabs - show when pages exist */}
+      {!isMobile && pages.length >= 1 && (
         <PageTabs
           pages={pages}
           activePageId={activePageId}
@@ -984,8 +1024,9 @@ export default function ProjectEditor() {
             />
           ) : (
             <EditorCanvas
+              key={activePageId || 'legacy'}
               activeTool={activeTool}
-              jsonData={localData}
+              jsonData={canvasData}
               onDataChange={handleDataChange}
               materialTypes={new Map((materials || []).map(m => [m.id, m.type]))}
               materials={materials || []}
