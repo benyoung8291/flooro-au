@@ -1,4 +1,4 @@
-import { CanvasPoint, Room, Hole, ScaleCalibration, EdgeCurve } from './types';
+import { CanvasPoint, Room, Hole, ScaleCalibration, EdgeCurve, SnapSettings, SnapResult } from './types';
 
 /**
  * Get point on quadratic Bezier curve at parameter t (0-1)
@@ -490,11 +490,163 @@ export function calculateZoomToFit(
   const scaleY = availableHeight / boundingBox.height;
   
   // Use the smaller scale to fit everything, capped between 0.1 and 2.0
-  const zoom = Math.max(0.1, Math.min(2.0, Math.min(scaleX, scaleY)));
+const zoom = Math.max(0.1, Math.min(2.0, Math.min(scaleX, scaleY)));
   
   // Calculate offsets to center the content
   const offsetX = (canvasWidth / 2) - (boundingBox.centerX * zoom);
   const offsetY = (canvasHeight / 2) - (boundingBox.centerY * zoom);
   
   return { zoom, offsetX, offsetY };
+}
+
+/**
+ * Snap a point to a grid
+ */
+export function snapToGrid(
+  point: CanvasPoint,
+  gridSize: number,
+  scale: ScaleCalibration | null
+): CanvasPoint {
+  // Convert grid size from mm to pixels if scale exists
+  const gridPx = scale ? gridSize * scale.pixelsPerMm : gridSize;
+  
+  if (gridPx <= 0) return point;
+  
+  return {
+    x: Math.round(point.x / gridPx) * gridPx,
+    y: Math.round(point.y / gridPx) * gridPx,
+  };
+}
+
+/**
+ * Smart snap point finder with priority: vertices > grid > axis
+ * Returns snap result with type info for visual feedback
+ */
+export function findSmartSnapPoint(
+  point: CanvasPoint,
+  rooms: Room[],
+  currentDrawingPoints: CanvasPoint[],
+  snapSettings: SnapSettings,
+  scale: ScaleCalibration | null,
+  snapRadius: number = 15
+): SnapResult | null {
+  if (!snapSettings.enabled) return null;
+  
+  let bestSnap: SnapResult | null = null;
+  let bestDistance = snapRadius;
+  
+  // Priority 1: Snap to current drawing points (for closing polygon)
+  for (const vertex of currentDrawingPoints) {
+    const dist = distance(point, vertex);
+    if (dist < bestDistance) {
+      bestDistance = dist;
+      bestSnap = { point: vertex, type: 'drawing' };
+    }
+  }
+  
+  // Priority 2: Snap to existing room vertices
+  if (snapSettings.vertexSnapEnabled) {
+    for (const room of rooms) {
+      for (const vertex of room.points) {
+        const dist = distance(point, vertex);
+        if (dist < bestDistance) {
+          bestDistance = dist;
+          bestSnap = { 
+            point: vertex, 
+            type: 'vertex',
+            sourceRoomId: room.id 
+          };
+        }
+      }
+      // Also check hole vertices
+      for (const hole of room.holes) {
+        for (const vertex of hole.points) {
+          const dist = distance(point, vertex);
+          if (dist < bestDistance) {
+            bestDistance = dist;
+            bestSnap = { 
+              point: vertex, 
+              type: 'vertex',
+              sourceRoomId: room.id 
+            };
+          }
+        }
+      }
+    }
+  }
+  
+  // Priority 3: Snap to grid (if no vertex snap found or grid is closer)
+  if (snapSettings.gridEnabled && !bestSnap) {
+    const gridSnap = snapToGrid(point, snapSettings.gridSize, scale);
+    const dist = distance(point, gridSnap);
+    if (dist < snapRadius && dist > 1) { // Don't snap if already on grid
+      bestSnap = { point: gridSnap, type: 'grid' };
+    }
+  }
+  
+  return bestSnap;
+}
+
+/**
+ * Calculate grid size in pixels for rendering
+ */
+export function getGridSizeInPixels(gridSize: number, scale: ScaleCalibration | null): number {
+  return scale ? gridSize * scale.pixelsPerMm : gridSize;
+}
+
+/**
+ * Parse dimension input with unit support
+ * Returns length in mm
+ */
+export function parseDimensionInput(input: string, defaultUnit: 'm' | 'cm' | 'mm' | 'imperial' = 'm'): number | null {
+  const trimmed = input.trim().toLowerCase();
+  if (!trimmed) return null;
+  
+  // Check for imperial format (e.g., 11'5" or 11'5.5")
+  const imperialMatch = trimmed.match(/^(\d+(?:\.\d+)?)'(?:(\d+(?:\.\d+)?)(?:"|'')?)?$/);
+  if (imperialMatch) {
+    const feet = parseFloat(imperialMatch[1]) || 0;
+    const inches = parseFloat(imperialMatch[2]) || 0;
+    const totalInches = feet * 12 + inches;
+    return totalInches * 25.4; // Convert to mm
+  }
+  
+  // Check for inches only (e.g., 45")
+  const inchesMatch = trimmed.match(/^(\d+(?:\.\d+)?)(?:"|''|in|inch|inches)$/);
+  if (inchesMatch) {
+    return parseFloat(inchesMatch[1]) * 25.4;
+  }
+  
+  // Check for mm suffix
+  const mmMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*mm$/);
+  if (mmMatch) {
+    return parseFloat(mmMatch[1]);
+  }
+  
+  // Check for cm suffix
+  const cmMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*cm$/);
+  if (cmMatch) {
+    return parseFloat(cmMatch[1]) * 10;
+  }
+  
+  // Check for m suffix
+  const mMatch = trimmed.match(/^(\d+(?:\.\d+)?)\s*m$/);
+  if (mMatch) {
+    return parseFloat(mMatch[1]) * 1000;
+  }
+  
+  // No unit - use default
+  const numericMatch = trimmed.match(/^(\d+(?:\.\d+)?)$/);
+  if (numericMatch) {
+    const value = parseFloat(numericMatch[1]);
+    switch (defaultUnit) {
+      case 'mm': return value;
+      case 'cm': return value * 10;
+      case 'm': return value * 1000;
+      case 'imperial': return value * 25.4; // Assume inches
+      default: return value * 1000; // Default to meters
+    }
+  }
+  
+  return null;
 }

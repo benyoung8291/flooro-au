@@ -195,3 +195,27 @@ export const MATERIAL_TYPE_COLORS: Record<string, string> = {
   tile: 'hsla(280, 65%, 60%, 0.2)',
   linear: 'hsla(25, 95%, 53%, 0.2)',
 };
+
+// Snap settings for drawing tools
+export interface SnapSettings {
+  enabled: boolean;           // Master toggle for all snapping
+  gridEnabled: boolean;       // Snap to grid
+  gridSize: number;           // Grid size in mm (when scale is set) or pixels
+  vertexSnapEnabled: boolean; // Snap to existing room corners
+  axisSnapEnabled: boolean;   // Snap to axis-aligned lines
+}
+
+export const DEFAULT_SNAP_SETTINGS: SnapSettings = {
+  enabled: true,
+  gridEnabled: true,
+  gridSize: 100, // 100mm = 10cm grid
+  vertexSnapEnabled: true,
+  axisSnapEnabled: true,
+};
+
+// Snap result with type info
+export interface SnapResult {
+  point: CanvasPoint;
+  type: 'vertex' | 'grid' | 'axis' | 'drawing';
+  sourceRoomId?: string;
+}

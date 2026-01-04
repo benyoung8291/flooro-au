@@ -2,13 +2,17 @@ import { EditorTool } from './EditorCanvas';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-import { DimensionUnit } from '@/lib/canvas/types';
+import { DimensionUnit, SnapSettings } from '@/lib/canvas/types';
 import { 
   MousePointer2, 
   Pencil, 
@@ -27,7 +31,8 @@ import {
   ChevronDown,
   HelpCircle,
   Combine,
-  Scissors
+  Scissors,
+  Magnet,
 } from 'lucide-react';
 
 interface EditorToolbarProps {
@@ -47,6 +52,9 @@ interface EditorToolbarProps {
   dimensionUnit?: DimensionUnit;
   onDimensionUnitChange?: (unit: DimensionUnit) => void;
   onShowShortcuts?: () => void;
+  // Snap settings props
+  snapSettings?: SnapSettings;
+  onSnapSettingsChange?: (settings: SnapSettings) => void;
 }
 
 const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut: string }[] = [
@@ -67,6 +75,13 @@ const unitLabels: Record<DimensionUnit, string> = {
   imperial: 'Feet & Inches',
 };
 
+const gridSizeOptions = [
+  { label: '50mm', value: 50 },
+  { label: '100mm', value: 100 },
+  { label: '250mm', value: 250 },
+  { label: '500mm', value: 500 },
+];
+
 export function EditorToolbar({
   activeTool,
   onToolChange,
@@ -84,7 +99,21 @@ export function EditorToolbar({
   dimensionUnit = 'm',
   onDimensionUnitChange,
   onShowShortcuts,
+  snapSettings,
+  onSnapSettingsChange,
 }: EditorToolbarProps) {
+  const handleSnapToggle = (key: keyof SnapSettings, value: boolean) => {
+    if (snapSettings && onSnapSettingsChange) {
+      onSnapSettingsChange({ ...snapSettings, [key]: value });
+    }
+  };
+
+  const handleGridSizeChange = (size: number) => {
+    if (snapSettings && onSnapSettingsChange) {
+      onSnapSettingsChange({ ...snapSettings, gridSize: size });
+    }
+  };
+
   return (
     <div className="glass-panel flex items-center gap-1 p-1.5">
       {/* 2D/3D Toggle */}
@@ -151,6 +180,108 @@ export function EditorToolbar({
       </div>
 
       <Separator orientation="vertical" className="h-6 mx-1" />
+
+      {/* Snap Settings */}
+      {snapSettings && onSnapSettingsChange && (
+        <>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`tool-button ${snapSettings.enabled ? 'active' : 'opacity-50'}`}
+                    disabled={is3DMode}
+                  >
+                    <Magnet className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>Snap Settings <span className="text-muted-foreground ml-1">(G)</span></p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-56 bg-popover border shadow-lg">
+              <DropdownMenuLabel className="text-xs text-muted-foreground">Snap Options</DropdownMenuLabel>
+              
+              {/* Master Toggle */}
+              <div className="flex items-center justify-between px-2 py-2">
+                <Label htmlFor="snap-enabled" className="text-sm font-medium">Enable Snapping</Label>
+                <Switch
+                  id="snap-enabled"
+                  checked={snapSettings.enabled}
+                  onCheckedChange={(checked) => handleSnapToggle('enabled', checked)}
+                />
+              </div>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Grid Snap */}
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <Label htmlFor="grid-snap" className="text-sm">Snap to Grid</Label>
+                <Switch
+                  id="grid-snap"
+                  checked={snapSettings.gridEnabled}
+                  onCheckedChange={(checked) => handleSnapToggle('gridEnabled', checked)}
+                  disabled={!snapSettings.enabled}
+                />
+              </div>
+              
+              {/* Grid Size */}
+              <div className="px-2 py-1.5">
+                <Label className="text-xs text-muted-foreground mb-1.5 block">Grid Size</Label>
+                <div className="flex gap-1">
+                  {gridSizeOptions.map((option) => (
+                    <Button
+                      key={option.value}
+                      variant={snapSettings.gridSize === option.value ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 px-2 text-xs flex-1"
+                      onClick={() => handleGridSizeChange(option.value)}
+                      disabled={!snapSettings.enabled || !snapSettings.gridEnabled}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              
+              <DropdownMenuSeparator />
+              
+              {/* Vertex Snap */}
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <Label htmlFor="vertex-snap" className="text-sm">Snap to Corners</Label>
+                <Switch
+                  id="vertex-snap"
+                  checked={snapSettings.vertexSnapEnabled}
+                  onCheckedChange={(checked) => handleSnapToggle('vertexSnapEnabled', checked)}
+                  disabled={!snapSettings.enabled}
+                />
+              </div>
+              
+              {/* Axis Snap */}
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <Label htmlFor="axis-snap" className="text-sm">Snap to Axes</Label>
+                <Switch
+                  id="axis-snap"
+                  checked={snapSettings.axisSnapEnabled}
+                  onCheckedChange={(checked) => handleSnapToggle('axisSnapEnabled', checked)}
+                  disabled={!snapSettings.enabled}
+                />
+              </div>
+              
+              <DropdownMenuSeparator />
+              
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                <p><kbd className="bg-muted px-1 rounded">G</kbd> Toggle grid • <kbd className="bg-muted px-1 rounded">Alt</kbd> Hold to disable</p>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          
+          <Separator orientation="vertical" className="h-6 mx-1" />
+        </>
+      )}
 
       {/* History */}
       <div className="flex items-center gap-0.5">

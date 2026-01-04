@@ -17,6 +17,7 @@ interface CanvasRendererProps {
   isDrawing: boolean;
   orthoLocked: boolean;
   snapPoint: CanvasPoint | null;
+  snapType?: 'vertex' | 'grid' | 'axis' | 'drawing' | null;
   axisSnapLines: { horizontal: number | null; vertical: number | null };
   materialTypes?: Map<string, string>;
   hoveredVertex?: { roomId: string; index: number } | null;
@@ -32,6 +33,9 @@ interface CanvasRendererProps {
   stripPlans?: Map<string, StripPlanResult>;
   showSeamLines?: boolean;
   showSharedEdgeIndicators?: boolean;
+  // Grid props
+  showGrid?: boolean;
+  gridSizePx?: number;
   // Merge mode props
   mergeFirstRoomId?: string | null;
   mergeableRoomIds?: string[];
@@ -76,6 +80,7 @@ export function CanvasRenderer({
   isDrawing,
   orthoLocked,
   snapPoint,
+  snapType,
   axisSnapLines,
   materialTypes = new Map(),
   hoveredVertex,
@@ -91,6 +96,8 @@ export function CanvasRenderer({
   stripPlans,
   showSeamLines = true,
   showSharedEdgeIndicators = true,
+  showGrid = false,
+  gridSizePx = 0,
   mergeFirstRoomId,
   mergeableRoomIds = [],
   isMergeMode = false,
@@ -170,8 +177,13 @@ export function CanvasRenderer({
     ctx.translate(offsetX, offsetY);
     ctx.scale(zoom, zoom);
 
-    // Draw grid
+    // Draw default subtle grid
     drawGrid(ctx, width, height, zoom, offsetX, offsetY);
+
+    // Draw snap grid overlay if enabled
+    if (showGrid && gridSizePx > 0) {
+      drawSnapGrid(ctx, width, height, zoom, offsetX, offsetY, gridSizePx);
+    }
 
     // Draw background image (below everything else)
     if (loadedImage && state.backgroundImage) {
@@ -285,12 +297,41 @@ export function CanvasRenderer({
       });
     }
 
-    // Draw snap indicator
+    // Draw snap indicator with type-specific styling
     if (snapPoint) {
-      ctx.fillStyle = 'hsl(142 71% 45%)';
-      ctx.beginPath();
-      ctx.arc(snapPoint.x, snapPoint.y, 8 / zoom, 0, Math.PI * 2);
-      ctx.fill();
+      if (snapType === 'vertex') {
+        // Vertex snap - highlighted ring
+        ctx.strokeStyle = 'hsl(142 71% 45%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.beginPath();
+        ctx.arc(snapPoint.x, snapPoint.y, 12 / zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = 'hsl(142 71% 45%)';
+        ctx.beginPath();
+        ctx.arc(snapPoint.x, snapPoint.y, 5 / zoom, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (snapType === 'grid') {
+        // Grid snap - crosshair
+        ctx.strokeStyle = 'hsl(217 91% 60%)';
+        ctx.lineWidth = 1.5 / zoom;
+        const size = 10 / zoom;
+        ctx.beginPath();
+        ctx.moveTo(snapPoint.x - size, snapPoint.y);
+        ctx.lineTo(snapPoint.x + size, snapPoint.y);
+        ctx.moveTo(snapPoint.x, snapPoint.y - size);
+        ctx.lineTo(snapPoint.x, snapPoint.y + size);
+        ctx.stroke();
+        ctx.fillStyle = 'hsl(217 91% 50%)';
+        ctx.beginPath();
+        ctx.arc(snapPoint.x, snapPoint.y, 4 / zoom, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Default snap indicator
+        ctx.fillStyle = 'hsl(142 71% 45%)';
+        ctx.beginPath();
+        ctx.arc(snapPoint.x, snapPoint.y, 8 / zoom, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Draw split preview
@@ -355,7 +396,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx]);
 
   useEffect(() => {
     render();
@@ -1168,5 +1209,65 @@ function drawSeamLines(
   });
   
   ctx.setLineDash([]);
+  ctx.restore();
+}
+
+/**
+ * Draw snap grid overlay with enhanced visibility
+ */
+function drawSnapGrid(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  zoom: number,
+  offsetX: number,
+  offsetY: number,
+  gridSizePx: number
+) {
+  if (gridSizePx <= 0) return;
+  
+  // Calculate visible bounds in canvas coordinates
+  const visibleMinX = -offsetX / zoom;
+  const visibleMaxX = (width - offsetX) / zoom;
+  const visibleMinY = -offsetY / zoom;
+  const visibleMaxY = (height - offsetY) / zoom;
+  
+  // Calculate grid line start/end positions
+  const startX = Math.floor(visibleMinX / gridSizePx) * gridSizePx;
+  const endX = Math.ceil(visibleMaxX / gridSizePx) * gridSizePx;
+  const startY = Math.floor(visibleMinY / gridSizePx) * gridSizePx;
+  const endY = Math.ceil(visibleMaxY / gridSizePx) * gridSizePx;
+  
+  ctx.save();
+  ctx.strokeStyle = 'hsla(217, 70%, 50%, 0.15)';
+  ctx.lineWidth = 1 / zoom;
+  
+  // Draw vertical lines
+  for (let x = startX; x <= endX; x += gridSizePx) {
+    ctx.beginPath();
+    ctx.moveTo(x, startY);
+    ctx.lineTo(x, endY);
+    ctx.stroke();
+  }
+  
+  // Draw horizontal lines
+  for (let y = startY; y <= endY; y += gridSizePx) {
+    ctx.beginPath();
+    ctx.moveTo(startX, y);
+    ctx.lineTo(endX, y);
+    ctx.stroke();
+  }
+  
+  // Draw grid intersection points for visibility
+  ctx.fillStyle = 'hsla(217, 70%, 50%, 0.25)';
+  const dotSize = 2 / zoom;
+  for (let x = startX; x <= endX; x += gridSizePx) {
+    for (let y = startY; y <= endY; y += gridSizePx) {
+      ctx.beginPath();
+      ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  
   ctx.restore();
 }

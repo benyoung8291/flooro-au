@@ -1,10 +1,11 @@
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { CanvasRenderer } from './CanvasRenderer';
 import { Minimap } from './Minimap';
+import { DimensionInputOverlay } from './DimensionInputOverlay';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
 import { useCanvasEditing } from '@/hooks/useCanvasEditing';
 import { useTouchGestures } from '@/hooks/useTouchGestures';
-import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve } from '@/lib/canvas/types';
+import { CanvasPoint, Room, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve, SnapSettings, DEFAULT_SNAP_SETTINGS, EdgeTransition } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import {
@@ -17,14 +18,19 @@ import {
   generateHoleId,
   generateDoorId,
   angleBetweenPoints,
+  findSmartSnapPoint,
+  getGridSizeInPixels,
+  distance,
 } from '@/lib/canvas/geometry';
-import { detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
+import { detectSharedEdges, detectSharedEdgesForNewRoom } from '@/lib/canvas/sharedEdgeDetector';
 import { mergeRoomsAtSharedEdge, findSharedEdgeBetweenRooms } from '@/lib/canvas/polygonMerge';
 import { splitPolygonWithLine, findEdgeForPoint, assignHolesToPolygons } from '@/lib/canvas/polygonSplit';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
 import { FinishesLegend } from '@/components/reports/FinishesLegend';
 import { Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const SNAP_SETTINGS_KEY = 'flooro_snap_settings';
 
 
 export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan' | 'merge' | 'split';
@@ -50,6 +56,9 @@ interface EditorCanvasProps {
   dimensionUnit?: DimensionUnit;
   stripPlans?: Map<string, StripPlanResult>;
   showSeamLines?: boolean;
+  // Snap settings - controlled by parent via toolbar
+  snapSettings?: SnapSettings;
+  onSnapSettingsChange?: (settings: SnapSettings) => void;
 }
 
 export function EditorCanvas({
@@ -69,6 +78,8 @@ export function EditorCanvas({
   dimensionUnit = 'm',
   stripPlans,
   showSeamLines = true,
+  snapSettings: externalSnapSettings,
+  onSnapSettingsChange,
 }: EditorCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
@@ -84,6 +95,7 @@ export function EditorCanvas({
   const [cursorPosition, setCursorPosition] = useState<CanvasPoint | null>(null);
   const [orthoLocked, setOrthoLocked] = useState(false);
   const [snapPoint, setSnapPoint] = useState<CanvasPoint | null>(null);
+  const [snapType, setSnapType] = useState<'vertex' | 'grid' | 'axis' | 'drawing' | null>(null);
   const [axisSnapLines, setAxisSnapLines] = useState<{ horizontal: number | null; vertical: number | null }>({ horizontal: null, vertical: null });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<CanvasPoint | null>(null);
@@ -94,6 +106,25 @@ export function EditorCanvas({
   const [isDraggingMaterial, setIsDraggingMaterial] = useState(false);
   const [dragTargetRoomId, setDragTargetRoomId] = useState<string | null>(null);
   
+  // Snap settings state - use external if provided, otherwise use local state
+  const [localSnapSettings, setLocalSnapSettings] = useState<SnapSettings>(() => {
+    const saved = localStorage.getItem(SNAP_SETTINGS_KEY);
+    if (saved) {
+      try {
+        return { ...DEFAULT_SNAP_SETTINGS, ...JSON.parse(saved) };
+      } catch {
+        return DEFAULT_SNAP_SETTINGS;
+      }
+    }
+    return DEFAULT_SNAP_SETTINGS;
+  });
+  
+  const snapSettings = externalSnapSettings || localSnapSettings;
+  const setSnapSettings = onSnapSettingsChange || setLocalSnapSettings;
+  
+  const [tempSnapDisabled, setTempSnapDisabled] = useState(false); // Alt key held
+  const [showDimensionInput, setShowDimensionInput] = useState(false);
+  
   // Merge tool state
   const [mergeFirstRoom, setMergeFirstRoom] = useState<Room | null>(null);
   const [mergeableRoomIds, setMergeableRoomIds] = useState<string[]>([]);
@@ -103,6 +134,23 @@ export function EditorCanvas({
   const [splitStartPoint, setSplitStartPoint] = useState<CanvasPoint | null>(null);
   const [splitPreviewEnd, setSplitPreviewEnd] = useState<CanvasPoint | null>(null);
   const [splitStartEdge, setSplitStartEdge] = useState<number | null>(null);
+
+  // Persist snap settings
+  useEffect(() => {
+    localStorage.setItem(SNAP_SETTINGS_KEY, JSON.stringify(snapSettings));
+  }, [snapSettings]);
+
+  // Effective snap settings (respects temp disable)
+  const effectiveSnapSettings = useMemo(() => ({
+    ...snapSettings,
+    enabled: snapSettings.enabled && !tempSnapDisabled,
+  }), [snapSettings, tempSnapDisabled]);
+
+  // Grid size in pixels for rendering
+  const gridSizePx = useMemo(() => {
+    if (!snapSettings.gridEnabled || !snapSettings.enabled) return 0;
+    return getGridSizeInPixels(snapSettings.gridSize, state.scale);
+  }, [snapSettings.gridEnabled, snapSettings.enabled, snapSettings.gridSize, state.scale]);
 
   // Detect shared edges for merge tool
   const sharedEdges = useMemo(() => {
@@ -297,10 +345,14 @@ export function EditorCanvas({
       if (e.key === 'Shift') {
         setOrthoLocked(true);
       }
+      if (e.key === 'Alt') {
+        setTempSnapDisabled(true);
+      }
       if (e.key === 'Escape') {
         setIsDrawing(false);
         setDrawingPoints([]);
         setScaleStart(null);
+        setShowDimensionInput(false);
         // Cancel merge mode
         setMergeFirstRoom(null);
         setMergeableRoomIds([]);
@@ -317,6 +369,14 @@ export function EditorCanvas({
         } else {
           undo();
         }
+      }
+      // Toggle grid snap
+      if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) {
+        setSnapSettings(prev => ({ ...prev, gridEnabled: !prev.gridEnabled }));
+      }
+      // Toggle dimension input while drawing
+      if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey && isDrawing) {
+        setShowDimensionInput(prev => !prev);
       }
       // Keyboard shortcut for merge tool
       if (e.key === 'm' || e.key === 'M') {
@@ -336,6 +396,9 @@ export function EditorCanvas({
       if (e.key === 'Shift') {
         setOrthoLocked(false);
       }
+      if (e.key === 'Alt') {
+        setTempSnapDisabled(false);
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -345,7 +408,7 @@ export function EditorCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [undo, redo, onToolChange]);
+  }, [undo, redo, onToolChange, isDrawing]);
 
   // Reset merge state when tool changes
   useEffect(() => {
@@ -536,9 +599,15 @@ export function EditorCanvas({
       }
 
       case 'draw': {
-        // Check for snap
-        const snap = findSnapPoint(point, state.rooms);
-        const actualPoint = snap || point;
+        // Use smart snapping with priority: vertex > grid > axis
+        const smartSnap = findSmartSnapPoint(
+          point, 
+          state.rooms, 
+          drawingPoints, 
+          effectiveSnapSettings, 
+          state.scale
+        );
+        const actualPoint = smartSnap?.point || point;
 
         if (!isDrawing) {
           setIsDrawing(true);
@@ -546,12 +615,9 @@ export function EditorCanvas({
         } else {
           // Check if closing the polygon
           const startPoint = drawingPoints[0];
-          const distance = Math.sqrt(
-            Math.pow(actualPoint.x - startPoint.x, 2) +
-            Math.pow(actualPoint.y - startPoint.y, 2)
-          );
+          const distToStart = distance(actualPoint, startPoint);
 
-          if (distance < 15 && drawingPoints.length >= 3) {
+          if (distToStart < 15 && drawingPoints.length >= 3) {
             // Close polygon - create room
             const newRoom: Room = {
               id: generateRoomId(),
@@ -561,10 +627,27 @@ export function EditorCanvas({
               doors: [],
               materialId: null,
               color: DEFAULT_ROOM_COLOR,
+              edgeTransitions: [],
             };
+            
+            // Auto-detect shared edges with existing rooms
+            const sharedEdgesForNewRoom = detectSharedEdgesForNewRoom(newRoom, state.rooms);
+            
+            if (sharedEdgesForNewRoom.length > 0) {
+              newRoom.edgeTransitions = sharedEdgesForNewRoom.map(se => ({
+                edgeIndex: se.newRoomEdgeIndex,
+                adjacentRoomId: se.existingRoomId,
+                adjacentRoomName: se.existingRoomName,
+                transitionType: 'auto' as const,
+              }));
+              
+              toast.success(`${sharedEdgesForNewRoom.length} shared edge(s) detected - marked as transitions`);
+            }
+            
             dispatch({ type: 'ADD_ROOM', room: newRoom });
             setIsDrawing(false);
             setDrawingPoints([]);
+            setShowDimensionInput(false);
           } else {
             // Apply ortho lock if active
             let finalPoint = actualPoint;
@@ -826,27 +909,62 @@ export function EditorCanvas({
       finalPoint = applyOrthoLock(point, drawingPoints[drawingPoints.length - 1]);
     }
 
-    // Check for snapping
-    const snap = findSnapPoint(finalPoint, state.rooms);
-    setSnapPoint(snap);
-    
-    if (snap) {
-      finalPoint = snap;
-    }
+    // Use smart snapping when drawing
+    if (activeTool === 'draw' || activeTool === 'hole') {
+      const smartSnap = findSmartSnapPoint(
+        finalPoint,
+        state.rooms,
+        drawingPoints,
+        effectiveSnapSettings,
+        state.scale
+      );
+      
+      if (smartSnap) {
+        setSnapPoint(smartSnap.point);
+        setSnapType(smartSnap.type);
+        finalPoint = smartSnap.point;
+      } else {
+        setSnapPoint(null);
+        setSnapType(null);
+      }
+      
+      // Check for axis snap lines if enabled
+      if (effectiveSnapSettings.axisSnapEnabled) {
+        const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
+        setAxisSnapLines(axisSnap);
+        
+        if (axisSnap.horizontal !== null) {
+          finalPoint = { ...finalPoint, y: axisSnap.horizontal };
+        }
+        if (axisSnap.vertical !== null) {
+          finalPoint = { ...finalPoint, x: axisSnap.vertical };
+        }
+      } else {
+        setAxisSnapLines({ horizontal: null, vertical: null });
+      }
+    } else {
+      // Legacy snapping for other tools
+      const snap = findSnapPoint(finalPoint, state.rooms);
+      setSnapPoint(snap);
+      setSnapType(snap ? 'vertex' : null);
+      
+      if (snap) {
+        finalPoint = snap;
+      }
 
-    // Check for axis snap lines
-    const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
-    setAxisSnapLines(axisSnap);
-    
-    if (axisSnap.horizontal !== null) {
-      finalPoint = { ...finalPoint, y: axisSnap.horizontal };
-    }
-    if (axisSnap.vertical !== null) {
-      finalPoint = { ...finalPoint, x: axisSnap.vertical };
+      const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
+      setAxisSnapLines(axisSnap);
+      
+      if (axisSnap.horizontal !== null) {
+        finalPoint = { ...finalPoint, y: axisSnap.horizontal };
+      }
+      if (axisSnap.vertical !== null) {
+        finalPoint = { ...finalPoint, x: axisSnap.vertical };
+      }
     }
 
     setCursorPosition(finalPoint);
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint]);
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
@@ -1047,6 +1165,7 @@ export function EditorCanvas({
         isDrawing={isDrawing}
         orthoLocked={orthoLocked}
         snapPoint={snapPoint}
+        snapType={snapType}
         axisSnapLines={axisSnapLines}
         materialTypes={materialTypes}
         hoveredVertex={hoveredVertex}
@@ -1060,6 +1179,8 @@ export function EditorCanvas({
         dimensionUnit={dimensionUnit}
         stripPlans={stripPlans}
         showSeamLines={showSeamLines}
+        showGrid={snapSettings.gridEnabled && snapSettings.enabled}
+        gridSizePx={gridSizePx}
         mergeFirstRoomId={mergeFirstRoom?.id || null}
         mergeableRoomIds={mergeableRoomIds}
         isMergeMode={activeTool === 'merge'}
@@ -1077,12 +1198,49 @@ export function EditorCanvas({
       )}
 
       {/* Drawing indicator */}
-      {isDrawing && (
+      {isDrawing && !showDimensionInput && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-pulse">
-          {activeTool === 'hole' ? 'Drawing hole' : 'Drawing room'} • Click near start to close • Esc to cancel
+          {activeTool === 'hole' ? 'Drawing hole' : 'Drawing room'} • Click near start to close • L for length input • Esc to cancel
           {orthoLocked && ' • ORTHO'}
+          {tempSnapDisabled && ' • SNAP OFF'}
         </div>
       )}
+
+      {/* Dimension Input Overlay */}
+      <DimensionInputOverlay
+        isDrawing={isDrawing}
+        lastPoint={drawingPoints.length > 0 ? drawingPoints[drawingPoints.length - 1] : null}
+        cursorPosition={cursorPosition}
+        scale={state.scale}
+        dimensionUnit={dimensionUnit}
+        visible={showDimensionInput}
+        onClose={() => setShowDimensionInput(false)}
+        onSubmitDimension={(lengthMm) => {
+          if (!cursorPosition || drawingPoints.length === 0) return;
+          
+          const lastPoint = drawingPoints[drawingPoints.length - 1];
+          
+          // Calculate direction from last point to cursor
+          const dx = cursorPosition.x - lastPoint.x;
+          const dy = cursorPosition.y - lastPoint.y;
+          const currentLength = Math.sqrt(dx * dx + dy * dy);
+          
+          if (currentLength === 0) return;
+          
+          // Normalize direction
+          const dirX = dx / currentLength;
+          const dirY = dy / currentLength;
+          
+          // Calculate new point at exact distance
+          const lengthPx = state.scale ? lengthMm * state.scale.pixelsPerMm : lengthMm;
+          const newPoint = {
+            x: lastPoint.x + dirX * lengthPx,
+            y: lastPoint.y + dirY * lengthPx,
+          };
+          
+          setDrawingPoints([...drawingPoints, newPoint]);
+        }}
+      />
 
       {/* Scale calibration indicator */}
       {activeTool === 'scale' && (
