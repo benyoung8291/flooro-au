@@ -184,11 +184,6 @@ export function RoomContextHeader({
                 {material.type}
               </Badge>
               <span className="text-xs font-medium truncate">{material.name}</span>
-              {room.materialCode && (
-                <Badge variant="outline" className="text-xs font-mono">
-                  {room.materialCode}
-                </Badge>
-              )}
             </div>
             {(material.specs.range || material.specs.colour) && (
               <p className="text-xs text-muted-foreground truncate mt-0.5">

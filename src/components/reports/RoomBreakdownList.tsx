@@ -33,11 +33,6 @@ export function RoomBreakdownList({ roomCalculations }: RoomBreakdownListProps) 
           >
             <div className="flex items-start justify-between mb-2">
               <div className="flex items-center gap-2">
-                {room.materialCode && (
-                  <span className="font-mono text-xs font-semibold bg-primary/10 text-primary px-1.5 py-0.5 rounded">
-                    {room.materialCode}
-                  </span>
-                )}
                 <span className="font-medium text-sm">{room.roomName}</span>
               </div>
               {room.totalCost > 0 && (

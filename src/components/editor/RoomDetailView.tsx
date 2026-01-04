@@ -253,20 +253,7 @@ export function RoomDetailView({
               </Select>
             </div>
 
-            {/* Material Code */}
-            <div className="space-y-2">
-              <Label className="text-xs">Material Code</Label>
-              <Input
-                value={room.materialCode || ''}
-                onChange={(e) =>
-                  onUpdateRoom(room.id, {
-                    materialCode: e.target.value.toUpperCase(),
-                  })
-                }
-                placeholder="e.g. CP01"
-                className="h-9 font-mono uppercase"
-              />
-            </div>
+            {/* Note: Material codes are now managed in Project Materials */}
 
             {/* Quick Stats */}
             {material && (

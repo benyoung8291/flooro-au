@@ -172,7 +172,6 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
         holes: room.holes || [],
         doors: room.doors || [],
         materialId: room.materialId || null,
-        materialCode: room.materialCode,
         color: room.color || 'hsla(217, 91%, 50%, 0.15)',
         fillDirection: room.fillDirection,
         accessories: room.accessories,

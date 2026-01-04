@@ -4,10 +4,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Download, ClipboardList } from 'lucide-react';
 import { RoomCalculation, formatArea } from '@/lib/reports/calculations';
 import { Material, MaterialSpecs } from '@/hooks/useMaterials';
+import { ProjectMaterial } from '@/lib/canvas/types';
 
 interface FinishesScheduleProps {
   roomCalculations: RoomCalculation[];
   materials: Material[];
+  projectMaterials?: ProjectMaterial[];
 }
 
 interface ScheduleEntry {
@@ -22,41 +24,54 @@ interface ScheduleEntry {
   totalArea: number;
 }
 
-function getMaterialDetails(specs: MaterialSpecs) {
+function getMaterialDetails(specs: MaterialSpecs | Record<string, unknown>) {
+  const s = specs as any;
   return {
-    range: specs.range || '',
-    colour: specs.colour || '',
-    backing: specs.backing || '',
+    range: s.range || '',
+    colour: s.colour || '',
+    backing: s.backing || '',
   };
 }
 
-export function FinishesSchedule({ roomCalculations, materials }: FinishesScheduleProps) {
+export function FinishesSchedule({ roomCalculations, materials, projectMaterials = [] }: FinishesScheduleProps) {
   const scheduleEntries = useMemo(() => {
-    const materialMap = new Map(materials.map(m => [m.id, m]));
+    // Build a lookup from materialId to projectMaterial
+    const projectMaterialMap = new Map(projectMaterials.map(pm => [pm.id, pm]));
+    const libraryMaterialMap = new Map(materials.map(m => [m.id, m]));
     const entriesMap = new Map<string, ScheduleEntry>();
 
     for (const room of roomCalculations) {
-      if (!room.materialCode || !room.materialId) continue;
+      if (!room.materialId) continue;
 
-      const material = materialMap.get(room.materialId);
-      if (!material) continue;
+      // Get the project material (for code) or library material (for specs)
+      const projectMaterial = projectMaterialMap.get(room.materialId);
+      const libraryMaterial = libraryMaterialMap.get(room.materialId);
+      
+      // Material code comes from project material only
+      const materialCode = projectMaterial?.materialCode;
+      if (!materialCode) continue;
 
-      const key = room.materialCode;
+      // Get specs from project material if available, otherwise library material
+      const specs = projectMaterial?.specs || libraryMaterial?.specs;
+      const materialName = projectMaterial?.name || libraryMaterial?.name || 'Unknown';
+      const materialType = projectMaterial?.type || libraryMaterial?.type || 'unknown';
+
+      const key = projectMaterial?.id || room.materialId;
       const existing = entriesMap.get(key);
-      const details = getMaterialDetails(material.specs);
+      const details = specs ? getMaterialDetails(specs) : { range: '', colour: '', backing: '' };
 
       if (existing) {
         existing.rooms.push({ name: room.roomName, area: room.netAreaM2 });
         existing.totalArea += room.netAreaM2;
       } else {
         entriesMap.set(key, {
-          code: room.materialCode,
+          code: materialCode,
           materialId: room.materialId,
-          materialName: material.name,
+          materialName,
           range: details.range,
           colour: details.colour,
           backing: details.backing,
-          type: material.type,
+          type: materialType,
           rooms: [{ name: room.roomName, area: room.netAreaM2 }],
           totalArea: room.netAreaM2,
         });
@@ -65,7 +80,7 @@ export function FinishesSchedule({ roomCalculations, materials }: FinishesSchedu
 
     // Sort by code
     return Array.from(entriesMap.values()).sort((a, b) => a.code.localeCompare(b.code));
-  }, [roomCalculations, materials]);
+  }, [roomCalculations, materials, projectMaterials]);
 
   const handleExportCSV = () => {
     const headers = ['Code', 'Material', 'Range', 'Colour', 'Backing', 'Type', 'Rooms', 'Total Area (m²)'];
@@ -99,7 +114,7 @@ export function FinishesSchedule({ roomCalculations, materials }: FinishesSchedu
       <div className="text-center py-6 text-muted-foreground text-sm">
         <ClipboardList className="w-8 h-8 mx-auto mb-2 opacity-50" />
         <p>No material codes assigned</p>
-        <p className="text-xs mt-1">Assign codes to rooms in the properties panel</p>
+        <p className="text-xs mt-1">Add materials to the project and assign codes in Project Materials</p>
       </div>
     );
   }

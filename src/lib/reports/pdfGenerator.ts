@@ -3,7 +3,7 @@ import { generateSeamDiagramSvg, svgToDataUrl } from './seamDiagramSvg';
 import { ClientDetails } from '@/components/reports/ClientDetailsForm';
 import { CompanyBranding } from '@/components/reports/CompanyBrandingForm';
 import { Material } from '@/hooks/useMaterials';
-import { Room } from '@/lib/canvas/types';
+import { Room, ProjectMaterial } from '@/lib/canvas/types';
 
 export interface PDFGeneratorOptions {
   projectName: string;
@@ -16,6 +16,7 @@ export interface PDFGeneratorOptions {
   quoteValidityDays?: number;
   rooms?: Room[];
   materials?: Material[];
+  projectMaterials?: ProjectMaterial[];
 }
 
 // Generate HTML content for the PDF
@@ -30,7 +31,8 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
     includeFinishesSchedule = true,
     quoteValidityDays = 30,
     rooms = [],
-    materials = []
+    materials = [],
+    projectMaterials = []
   } = options;
   
   const date = new Date().toLocaleDateString('en-US', {
@@ -352,7 +354,7 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
         <tbody>
           ${report.roomCalculations.map(room => `
             <tr>
-              <td style="font-family: 'SF Mono', Monaco, monospace; font-weight: 600; color: #0066cc;">${room.materialCode || '—'}</td>
+              <td style="font-family: 'SF Mono', Monaco, monospace; font-weight: 600; color: #0066cc;">—</td>
               <td>${room.roomName}</td>
               <td>${room.materialName || '—'}</td>
               <td class="number">${formatArea(room.netAreaM2)}</td>
@@ -390,7 +392,7 @@ export function generateReportHTML(options: PDFGeneratorOptions): string {
         </table>
       ` : ''}
 
-      ${includeFinishesSchedule ? generateFinishesScheduleHTML(rooms, materials) : ''}
+      ${includeFinishesSchedule ? generateFinishesScheduleHTML(rooms, materials, projectMaterials) : ''}
 
       <div class="summary-box">
         <h3>Total Estimate</h3>
@@ -480,8 +482,9 @@ export function exportToPDF(options: PDFGeneratorOptions): void {
 }
 
 // Generate finishes schedule HTML for PDF
-function generateFinishesScheduleHTML(rooms: Room[], materials: Material[]): string {
-  const materialMap = new Map(materials.map(m => [m.id, m]));
+function generateFinishesScheduleHTML(rooms: Room[], materials: Material[], projectMaterials: ProjectMaterial[] = []): string {
+  const projectMaterialMap = new Map(projectMaterials.map(pm => [pm.id, pm]));
+  const libraryMaterialMap = new Map(materials.map(m => [m.id, m]));
   const entriesMap = new Map<string, {
     code: string;
     materialName: string;
@@ -493,26 +496,31 @@ function generateFinishesScheduleHTML(rooms: Room[], materials: Material[]): str
     totalArea: number;
   }>();
 
-  // Build entries from room calculations
+  // Build entries from rooms using project materials for codes
   for (const room of rooms) {
-    if (!room.materialCode || !room.materialId) continue;
+    if (!room.materialId) continue;
 
-    const material = materialMap.get(room.materialId);
-    if (!material) continue;
+    const projectMaterial = projectMaterialMap.get(room.materialId);
+    const libraryMaterial = libraryMaterialMap.get(room.materialId);
+    
+    // Code comes from project material only
+    const materialCode = projectMaterial?.materialCode;
+    if (!materialCode) continue;
 
-    const key = room.materialCode;
+    const key = projectMaterial.id;
     const existing = entriesMap.get(key);
+    const specs = projectMaterial.specs as any;
 
     if (existing) {
       existing.rooms.push(room.name);
     } else {
       entriesMap.set(key, {
-        code: room.materialCode,
-        materialName: material.name,
-        range: material.specs.range,
-        colour: material.specs.colour,
-        backing: material.specs.backing,
-        type: material.type,
+        code: materialCode,
+        materialName: projectMaterial.name,
+        range: specs?.range || libraryMaterial?.specs.range,
+        colour: specs?.colour || libraryMaterial?.specs.colour,
+        backing: specs?.backing || libraryMaterial?.specs.backing,
+        type: projectMaterial.type,
         rooms: [room.name],
         totalArea: 0,
       });

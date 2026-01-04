@@ -264,12 +264,13 @@ export function ReportTab({
           </div>
 
           {/* Finishes Schedule */}
-          {report.roomCalculations.some(r => r.materialCode) && (
+          {report.roomCalculations.some(r => r.materialId) && (
             <>
               <Separator />
               <FinishesSchedule 
                 roomCalculations={report.roomCalculations}
                 materials={materials}
+                projectMaterials={projectMaterials}
               />
             </>
           )}
