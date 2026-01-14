@@ -107,9 +107,7 @@ export default function Auth() {
       <div className="w-full max-w-md animate-slide-up">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-            <Square className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <img src="/favicon.png" alt="Flooro" className="w-10 h-10" />
           <span className="text-2xl font-semibold text-foreground">Flooro</span>
         </div>
 
