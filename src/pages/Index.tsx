@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Square, ArrowRight, Ruler, Calculator, Users } from 'lucide-react';
+import { ArrowRight, Ruler, Calculator, Users } from 'lucide-react';
 
 export default function Index() {
   const { user, loading } = useAuth();
@@ -21,9 +21,7 @@ export default function Index() {
       <header className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Square className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src="/favicon.png" alt="Flooro" className="w-9 h-9" />
             <span className="text-xl font-semibold text-foreground">Flooro</span>
           </div>
           
@@ -124,9 +122,7 @@ export default function Index() {
       <footer className="border-t border-border py-8">
         <div className="container mx-auto px-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <Square className="w-3 h-3 text-primary-foreground" />
-            </div>
+            <img src="/favicon.png" alt="Flooro" className="w-7 h-7" />
             <span className="font-semibold text-foreground">Flooro</span>
           </div>
           <p className="text-sm text-muted-foreground">

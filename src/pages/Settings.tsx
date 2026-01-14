@@ -165,6 +165,7 @@ export default function Settings() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
+            <img src="/favicon.png" alt="Flooro" className="w-8 h-8" />
             <h1 className="text-xl font-semibold">Settings</h1>
           </div>
           

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { ArrowLeft, Square } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { MaterialsList } from '@/components/materials/MaterialsList';
 import { CreateMaterialDialog } from '@/components/materials/CreateMaterialDialog';
 import { ImportProductDialog } from '@/components/materials/ImportProductDialog';
@@ -18,9 +18,7 @@ export default function Materials() {
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Square className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src="/favicon.png" alt="Flooro" className="w-9 h-9" />
             <span className="text-xl font-semibold text-foreground">Materials</span>
           </div>
           
