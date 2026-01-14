@@ -9,7 +9,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
-  Square, 
   FolderOpen, 
   Clock, 
   CheckCircle2, 
