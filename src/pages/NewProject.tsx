@@ -166,6 +166,7 @@ export default function NewProject() {
           <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
             <ArrowLeft className="w-4 h-4" />
           </Button>
+          <img src="/favicon.png" alt="Flooro" className="w-8 h-8" />
           <h1 className="font-semibold text-foreground">New Project</h1>
         </div>
       </header>
