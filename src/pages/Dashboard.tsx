@@ -52,9 +52,7 @@ export default function Dashboard() {
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
-              <Square className="w-4 h-4 text-primary-foreground" />
-            </div>
+            <img src="/favicon.png" alt="Flooro" className="w-9 h-9" />
             <span className="text-xl font-semibold text-foreground">Flooro</span>
             {organization && (
               <>
