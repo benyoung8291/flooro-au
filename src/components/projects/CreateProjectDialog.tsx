@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCreateProject } from '@/hooks/useProjects';
+import { useCanCreateProject } from '@/hooks/useUsageLimits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Crown, AlertTriangle } from 'lucide-react';
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -24,6 +25,7 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
   const navigate = useNavigate();
   const { toast } = useToast();
   const createProject = useCreateProject();
+  const { canCreate, remaining } = useCanCreateProject();
   
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
@@ -33,6 +35,15 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     
     if (!name.trim()) {
       toast({ title: 'Project name required', variant: 'destructive' });
+      return;
+    }
+
+    if (!canCreate) {
+      toast({ 
+        title: 'Project limit reached', 
+        description: 'Upgrade your plan to create more projects.',
+        variant: 'destructive' 
+      });
       return;
     }
 
@@ -52,6 +63,43 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
     }
   };
 
+  // If user can't create projects, show upgrade prompt
+  if (!canCreate) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Project Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              You've reached your project limit on your current plan.
+              Upgrade to create more projects.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 text-center">
+            <Crown className="h-12 w-12 mx-auto text-primary mb-4" />
+            <p className="text-muted-foreground mb-4">
+              Unlock more projects and features with a Pro or Enterprise plan.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => navigate('/settings?tab=billing')}>
+              <Crown className="w-4 h-4 mr-2" />
+              Upgrade Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -60,6 +108,11 @@ export function CreateProjectDialog({ open, onOpenChange }: CreateProjectDialogP
             <DialogTitle>Create New Project</DialogTitle>
             <DialogDescription>
               Start a new floor plan measurement project.
+              {remaining !== Infinity && remaining <= 3 && (
+                <span className="block mt-1 text-warning">
+                  {remaining} project{remaining === 1 ? '' : 's'} remaining on your plan
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           
