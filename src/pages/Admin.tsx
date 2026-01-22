@@ -14,7 +14,7 @@ export default function Admin() {
         <main className="flex-1 flex flex-col">
           <header className="h-14 border-b flex items-center px-4 gap-4 bg-card">
             <SidebarTrigger />
-            <h1 className="font-semibold text-foreground">Service Bureau Admin</h1>
+            <h1 className="font-semibold text-foreground">Platform Admin</h1>
           </header>
           <div className="flex-1 p-6 overflow-auto">
             {isRootAdmin ? <AdminDashboard /> : <Outlet />}

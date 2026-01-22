@@ -16,9 +16,7 @@ import ProjectEditor from "./pages/ProjectEditor";
 import Materials from "./pages/Materials";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
-import ServiceQueue from "./pages/admin/ServiceQueue";
 import Organizations from "./pages/admin/Organizations";
-import ProjectDetail from "./pages/admin/ProjectDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,9 +46,7 @@ const App = () => (
               {/* Admin Routes */}
               <Route element={<AdminRoute />}>
                 <Route path="/admin" element={<Admin />}>
-                  <Route path="queue" element={<ServiceQueue />} />
                   <Route path="organizations" element={<Organizations />} />
-                  <Route path="projects/:projectId" element={<ProjectDetail />} />
                 </Route>
               </Route>
               

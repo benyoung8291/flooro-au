@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useProject, useUpdateProject, useRequestService } from '@/hooks/useProjects';
+import { useProject, useUpdateProject } from '@/hooks/useProjects';
 import { useHasRole } from '@/hooks/useUserProfile';
 import { useMaterials, Material, useCreateMaterial, MaterialSubtype } from '@/hooks/useMaterials';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -35,7 +35,6 @@ import {
   ArrowLeft, 
   Save, 
   MoreVertical,
-  Phone,
   Loader2,
   LayoutGrid,
   FileText,
@@ -50,9 +49,8 @@ import {
 
 const statusLabels: Record<string, { label: string; className: string }> = {
   draft: { label: 'Draft', className: 'status-draft' },
-  pending_service: { label: 'Pending Service', className: 'status-pending' },
-  in_progress: { label: 'In Progress', className: 'status-progress' },
-  completed: { label: 'Completed', className: 'status-completed' },
+  active: { label: 'Active', className: 'status-progress' },
+  archived: { label: 'Archived', className: 'status-completed' },
 };
 
 export default function ProjectEditor() {
@@ -65,7 +63,6 @@ export default function ProjectEditor() {
   const { data: project, isLoading } = useProject(projectId);
   const { data: materials } = useMaterials();
   const updateProject = useUpdateProject();
-  const requestService = useRequestService();
   const isViewer = useHasRole('viewer');
 
   const [activeTool, setActiveTool] = useState<EditorTool>('select');
@@ -275,19 +272,6 @@ export default function ProjectEditor() {
     }
   };
 
-  const handleRequestService = async () => {
-    if (!projectId) return;
-
-    try {
-      await requestService.mutateAsync(projectId);
-      toast({ 
-        title: 'Service requested!', 
-        description: 'Our team will measure your floor plan shortly.' 
-      });
-    } catch (error: any) {
-      toast({ title: 'Request failed', description: error.message, variant: 'destructive' });
-    }
-  };
 
   // Get pages and active page data
   const pages = (localData.pages as FloorPlanPage[]) || [];
@@ -853,22 +837,6 @@ export default function ProjectEditor() {
         </div>
 
         <div className="flex items-center gap-1 md:gap-2">
-          {/* Request Service Button - Hidden on mobile */}
-          {!isMobile && !project.service_requested && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleRequestService}
-              disabled={requestService.isPending}
-            >
-              {requestService.isPending ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Phone className="w-4 h-4 mr-2" />
-              )}
-              Request Measurement Service
-            </Button>
-          )}
 
           {/* Rooms Overview Button - Desktop Only */}
           {!isMobile && rooms.length > 0 && (
@@ -942,11 +910,6 @@ export default function ProjectEditor() {
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setReportPreviewOpen(true)}>Export PDF</DropdownMenuItem>
               <DropdownMenuItem>Share Project</DropdownMenuItem>
-              {isMobile && !project.service_requested && (
-                <DropdownMenuItem onClick={handleRequestService}>
-                  Request Measurement Service
-                </DropdownMenuItem>
-              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}/settings`)}>
                 Project Settings

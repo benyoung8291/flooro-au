@@ -10,8 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   FolderOpen, 
-  Clock, 
-  CheckCircle2, 
+  FileEdit, 
+  Archive, 
   Settings,
   LogOut,
   Shield,
@@ -65,7 +65,7 @@ export default function Dashboard() {
             {isPlatformAdmin && (
               <Button variant="outline" size="sm" onClick={() => navigate('/admin')}>
                 <Shield className="w-4 h-4 mr-2" />
-                Service Bureau
+                Admin
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => navigate('/materials')}>
@@ -103,20 +103,20 @@ export default function Dashboard() {
             value={stats.total.toString()}
           />
           <StatsCard 
-            icon={<Clock className="w-5 h-5" />}
-            label="Pending Service"
-            value={stats.pending.toString()}
-            highlight={stats.pending > 0}
+            icon={<FileEdit className="w-5 h-5" />}
+            label="Draft"
+            value={stats.draft.toString()}
           />
           <StatsCard 
-            icon={<Clock className="w-5 h-5" />}
-            label="In Progress"
-            value={stats.inProgress.toString()}
+            icon={<FolderOpen className="w-5 h-5" />}
+            label="Active"
+            value={stats.active.toString()}
+            highlight={stats.active > 0}
           />
           <StatsCard 
-            icon={<CheckCircle2 className="w-5 h-5" />}
-            label="Completed"
-            value={stats.completed.toString()}
+            icon={<Archive className="w-5 h-5" />}
+            label="Archived"
+            value={stats.archived.toString()}
           />
         </div>
 
@@ -139,11 +139,11 @@ function StatsCard({
   highlight?: boolean;
 }) {
   return (
-    <Card className={highlight ? 'border-warning/50 bg-warning/5' : ''}>
+    <Card className={highlight ? 'border-primary/50 bg-primary/5' : ''}>
       <CardContent className="pt-6">
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-            highlight ? 'bg-warning/20 text-warning' : 'bg-primary/10 text-primary'
+            highlight ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'
           }`}>
             {icon}
           </div>
