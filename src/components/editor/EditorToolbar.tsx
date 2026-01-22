@@ -16,7 +16,8 @@ import { DimensionUnit, SnapSettings } from '@/lib/canvas/types';
 import { 
   MousePointer2, 
   Pencil, 
-  Square, 
+  SquareDashed,
+  RectangleHorizontal,
   DoorOpen, 
   Ruler,
   RulerIcon,
@@ -57,16 +58,26 @@ interface EditorToolbarProps {
   onSnapSettingsChange?: (settings: SnapSettings) => void;
 }
 
-const tools: { id: EditorTool; icon: React.ElementType; label: string; shortcut: string }[] = [
-  { id: 'select', icon: MousePointer2, label: 'Select', shortcut: 'V' },
-  { id: 'draw', icon: Pencil, label: 'Draw Room', shortcut: 'D' },
-  { id: 'hole', icon: Square, label: 'Cut Hole', shortcut: 'H' },
-  { id: 'door', icon: DoorOpen, label: 'Add Door', shortcut: 'O' },
-  { id: 'scale', icon: Ruler, label: 'Set Scale', shortcut: 'S' },
-  { id: 'pan', icon: Move, label: 'Pan', shortcut: 'Space' },
-  { id: 'merge', icon: Combine, label: 'Merge Rooms', shortcut: 'M' },
-  { id: 'split', icon: Scissors, label: 'Split Room', shortcut: 'X' },
-];
+// Tool groups for organized toolbar
+const toolGroups = {
+  navigate: [
+    { id: 'select' as EditorTool, icon: MousePointer2, label: 'Select', shortcut: 'V' },
+    { id: 'pan' as EditorTool, icon: Move, label: 'Pan', shortcut: 'Space' },
+  ],
+  draw: [
+    { id: 'draw' as EditorTool, icon: Pencil, label: 'Draw Room', shortcut: 'D' },
+    { id: 'rectangle' as EditorTool, icon: RectangleHorizontal, label: 'Rectangle Room', shortcut: 'R' },
+    { id: 'hole' as EditorTool, icon: SquareDashed, label: 'Cut Hole/Void', shortcut: 'H' },
+  ],
+  elements: [
+    { id: 'door' as EditorTool, icon: DoorOpen, label: 'Add Door', shortcut: 'O' },
+    { id: 'scale' as EditorTool, icon: Ruler, label: 'Set Scale', shortcut: 'S' },
+  ],
+  edit: [
+    { id: 'merge' as EditorTool, icon: Combine, label: 'Merge Rooms', shortcut: 'M' },
+    { id: 'split' as EditorTool, icon: Scissors, label: 'Split Room', shortcut: 'X' },
+  ],
+};
 
 const unitLabels: Record<DimensionUnit, string> = {
   m: 'Meters',
@@ -114,6 +125,25 @@ export function EditorToolbar({
     }
   };
 
+  const renderToolButton = (tool: { id: EditorTool; icon: React.ElementType; label: string; shortcut: string }) => (
+    <Tooltip key={tool.id}>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`tool-button ${activeTool === tool.id ? 'active' : ''}`}
+          onClick={() => onToolChange(tool.id)}
+          disabled={is3DMode}
+        >
+          <tool.icon className="w-4 h-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">
+        <p>{tool.label} <span className="text-muted-foreground ml-1">({tool.shortcut})</span></p>
+      </TooltipContent>
+    </Tooltip>
+  );
+
   return (
     <div className="glass-panel flex items-center gap-1 p-1.5">
       {/* 2D/3D Toggle */}
@@ -157,26 +187,30 @@ export function EditorToolbar({
         </>
       )}
       
-      {/* Main Tools */}
+      {/* Navigate Tools */}
       <div className="flex items-center gap-0.5">
-        {tools.map(tool => (
-          <Tooltip key={tool.id}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`tool-button ${activeTool === tool.id ? 'active' : ''}`}
-                onClick={() => onToolChange(tool.id)}
-                disabled={is3DMode}
-              >
-                <tool.icon className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>{tool.label} <span className="text-muted-foreground ml-1">({tool.shortcut})</span></p>
-            </TooltipContent>
-          </Tooltip>
-        ))}
+        {toolGroups.navigate.map(renderToolButton)}
+      </div>
+
+      <Separator orientation="vertical" className="h-6 mx-0.5 opacity-50" />
+
+      {/* Draw Tools */}
+      <div className="flex items-center gap-0.5">
+        {toolGroups.draw.map(renderToolButton)}
+      </div>
+
+      <Separator orientation="vertical" className="h-6 mx-0.5 opacity-50" />
+
+      {/* Element Tools */}
+      <div className="flex items-center gap-0.5">
+        {toolGroups.elements.map(renderToolButton)}
+      </div>
+
+      <Separator orientation="vertical" className="h-6 mx-0.5 opacity-50" />
+
+      {/* Edit Tools */}
+      <div className="flex items-center gap-0.5">
+        {toolGroups.edit.map(renderToolButton)}
       </div>
 
       <Separator orientation="vertical" className="h-6 mx-1" />

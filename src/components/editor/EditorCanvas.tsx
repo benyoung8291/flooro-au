@@ -33,7 +33,7 @@ import { toast } from 'sonner';
 const SNAP_SETTINGS_KEY = 'flooro_snap_settings';
 
 
-export type EditorTool = 'select' | 'draw' | 'hole' | 'door' | 'scale' | 'pan' | 'merge' | 'split';
+export type EditorTool = 'select' | 'draw' | 'rectangle' | 'hole' | 'door' | 'scale' | 'pan' | 'merge' | 'split';
 
 interface EditorCanvasProps {
   activeTool: EditorTool;
@@ -108,6 +108,9 @@ export function EditorCanvas({
   const [hoveredRoomId, setHoveredRoomId] = useState<string | null>(null);
   const [isDraggingMaterial, setIsDraggingMaterial] = useState(false);
   const [dragTargetRoomId, setDragTargetRoomId] = useState<string | null>(null);
+  
+  // Rectangle tool state
+  const [rectangleStart, setRectangleStart] = useState<CanvasPoint | null>(null);
   
   // Snap settings state - use external if provided, otherwise use local state
   const [localSnapSettings, setLocalSnapSettings] = useState<SnapSettings>(() => {
@@ -411,7 +414,7 @@ export function EditorCanvas({
     };
   }, [undo, redo, onToolChange, isDrawing]);
 
-  // Reset merge state when tool changes
+  // Reset tool state when tool changes
   useEffect(() => {
     if (activeTool !== 'merge') {
       setMergeFirstRoom(null);
@@ -422,6 +425,9 @@ export function EditorCanvas({
       setSplitStartPoint(null);
       setSplitPreviewEnd(null);
       setSplitStartEdge(null);
+    }
+    if (activeTool !== 'rectangle') {
+      setRectangleStart(null);
     }
   }, [activeTool]);
 
@@ -654,6 +660,59 @@ export function EditorCanvas({
             }
             setDrawingPoints([...drawingPoints, finalPoint]);
           }
+        }
+        break;
+      }
+
+      case 'rectangle': {
+        // Smart snapping for corner
+        const smartSnap = findSmartSnapPoint(point, state.rooms, [], effectiveSnapSettings, state.scale);
+        const actualPoint = smartSnap?.point || point;
+
+        if (!rectangleStart) {
+          // First click - set corner
+          setRectangleStart(actualPoint);
+        } else {
+          // Second click - create rectangle room
+          const x1 = Math.min(rectangleStart.x, actualPoint.x);
+          const y1 = Math.min(rectangleStart.y, actualPoint.y);
+          const x2 = Math.max(rectangleStart.x, actualPoint.x);
+          const y2 = Math.max(rectangleStart.y, actualPoint.y);
+
+          // Only create if has some size
+          if (Math.abs(x2 - x1) > 10 && Math.abs(y2 - y1) > 10) {
+            const rectPoints: CanvasPoint[] = [
+              { x: x1, y: y1 },
+              { x: x2, y: y1 },
+              { x: x2, y: y2 },
+              { x: x1, y: y2 },
+            ];
+
+            const newRoom: Room = {
+              id: generateRoomId(),
+              name: `Room ${state.rooms.length + 1}`,
+              points: rectPoints,
+              holes: [],
+              doors: [],
+              materialId: null,
+              color: DEFAULT_ROOM_COLOR,
+              edgeTransitions: [],
+            };
+
+            // Auto-detect shared edges
+            const sharedEdgesForNewRoom = detectSharedEdgesForNewRoom(newRoom, state.rooms);
+            if (sharedEdgesForNewRoom.length > 0) {
+              newRoom.edgeTransitions = sharedEdgesForNewRoom.map(se => ({
+                edgeIndex: se.newRoomEdgeIndex,
+                adjacentRoomId: se.existingRoomId,
+                adjacentRoomName: se.existingRoomName,
+                transitionType: 'auto' as const,
+              }));
+            }
+
+            dispatch({ type: 'ADD_ROOM', room: newRoom });
+          }
+          setRectangleStart(null);
         }
         break;
       }
