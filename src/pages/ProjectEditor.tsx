@@ -938,9 +938,9 @@ export default function ProjectEditor() {
       )}
 
       {/* Main Editor Area */}
-      <div className={`flex-1 flex overflow-hidden ${isMobile ? 'pb-16' : ''}`}>
+      <div className={`flex-1 flex min-w-0 ${isMobile ? 'pb-16' : ''}`}>
         {/* Canvas Area */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative min-w-0 overflow-hidden">
           {/* Desktop Floating Toolbar */}
           {!isMobile && (
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
