@@ -55,6 +55,53 @@ export type Database = {
           },
         ]
       }
+      organization_members: {
+        Row: {
+          activated_at: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          invited_by: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          status: Database["public"]["Enums"]["member_status"]
+          user_id: string | null
+        }
+        Insert: {
+          activated_at?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          invited_by?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["member_status"]
+          user_id?: string | null
+        }
+        Update: {
+          activated_at?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          invited_by?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["member_status"]
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           address: string | null
@@ -138,49 +185,40 @@ export type Database = {
       projects: {
         Row: {
           address: string | null
-          assigned_to: string | null
           created_at: string
           created_by: string | null
           floor_plan_url: string | null
           id: string
-          internal_notes: string | null
           json_data: Json | null
           name: string
           notes: string | null
           organization_id: string
-          service_requested: boolean
           status: Database["public"]["Enums"]["project_status"]
           updated_at: string
         }
         Insert: {
           address?: string | null
-          assigned_to?: string | null
           created_at?: string
           created_by?: string | null
           floor_plan_url?: string | null
           id?: string
-          internal_notes?: string | null
           json_data?: Json | null
           name: string
           notes?: string | null
           organization_id: string
-          service_requested?: boolean
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
         }
         Update: {
           address?: string | null
-          assigned_to?: string | null
           created_at?: string
           created_by?: string | null
           floor_plan_url?: string | null
           id?: string
-          internal_notes?: string | null
           json_data?: Json | null
           name?: string
           notes?: string | null
           organization_id?: string
-          service_requested?: boolean
           status?: Database["public"]["Enums"]["project_status"]
           updated_at?: string
         }
@@ -254,7 +292,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user" | "viewer" | "platform_admin"
-      project_status: "draft" | "pending_service" | "in_progress" | "completed"
+      member_status: "pending" | "active" | "suspended"
+      project_status: "draft" | "active" | "archived"
       subscription_tier: "free" | "pro" | "enterprise"
     }
     CompositeTypes: {
@@ -384,7 +423,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user", "viewer", "platform_admin"],
-      project_status: ["draft", "pending_service", "in_progress", "completed"],
+      member_status: ["pending", "active", "suspended"],
+      project_status: ["draft", "active", "archived"],
       subscription_tier: ["free", "pro", "enterprise"],
     },
   },

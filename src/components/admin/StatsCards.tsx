@@ -1,39 +1,35 @@
-import { Clock, Loader2, CheckCircle2, Building2 } from 'lucide-react';
+import { FolderOpen, Building2, Users, CreditCard } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useServiceStats } from '@/hooks/useServiceBureau';
+import { useAdminStats } from '@/hooks/useServiceBureau';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function StatsCards() {
-  const { data: stats, isLoading } = useServiceStats();
+  const { data: stats, isLoading } = useAdminStats();
 
   const cards = [
     {
-      title: 'Pending Requests',
-      value: stats?.pending ?? 0,
-      icon: Clock,
-      className: 'status-pending',
-      iconClassName: 'text-warning',
-    },
-    {
-      title: 'In Progress',
-      value: stats?.inProgress ?? 0,
-      icon: Loader2,
-      className: 'status-progress',
+      title: 'Total Projects',
+      value: stats?.totalProjects ?? 0,
+      icon: FolderOpen,
       iconClassName: 'text-primary',
     },
     {
-      title: 'Completed',
-      value: stats?.completed ?? 0,
-      icon: CheckCircle2,
-      className: 'status-completed',
-      iconClassName: 'text-success',
+      title: 'Organizations',
+      value: stats?.totalOrganizations ?? 0,
+      icon: Building2,
+      iconClassName: 'text-muted-foreground',
     },
     {
-      title: 'Organizations',
-      value: stats?.organizations ?? 0,
-      icon: Building2,
-      className: 'bg-secondary text-secondary-foreground',
+      title: 'Total Users',
+      value: stats?.totalUsers ?? 0,
+      icon: Users,
       iconClassName: 'text-muted-foreground',
+    },
+    {
+      title: 'Pro/Enterprise',
+      value: (stats?.tierBreakdown?.pro ?? 0) + (stats?.tierBreakdown?.enterprise ?? 0),
+      icon: CreditCard,
+      iconClassName: 'text-success',
     },
   ];
 
@@ -54,9 +50,6 @@ export function StatsCards() {
               <div className="text-2xl font-bold">{card.value}</div>
             )}
           </CardContent>
-          <div
-            className={`absolute bottom-0 left-0 right-0 h-1 ${card.className}`}
-          />
         </Card>
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListTodo, Building2, Settings, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Building2, ArrowLeft } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useLocation, Link } from 'react-router-dom';
 import {
@@ -17,7 +17,6 @@ import { Button } from '@/components/ui/button';
 
 const adminNavItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
-  { title: 'Service Queue', url: '/admin/queue', icon: ListTodo },
   { title: 'Organizations', url: '/admin/organizations', icon: Building2 },
 ];
 
@@ -36,11 +35,11 @@ export function AdminSidebar() {
       <SidebarHeader className="p-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <Settings className="h-4 w-4 text-primary-foreground" />
+            <LayoutDashboard className="h-4 w-4 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-sidebar-foreground">Service Bureau</h2>
-            <p className="text-xs text-muted-foreground">Admin Panel</p>
+            <h2 className="font-semibold text-sidebar-foreground">Platform Admin</h2>
+            <p className="text-xs text-muted-foreground">Internal Dashboard</p>
           </div>
         </div>
       </SidebarHeader>

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from './useUserProfile';
 import type { Json } from '@/integrations/supabase/types';
 
-export type ProjectStatus = 'draft' | 'pending_service' | 'in_progress' | 'completed';
+export type ProjectStatus = 'draft' | 'active' | 'archived';
 
 export interface Project {
   id: string;
@@ -12,13 +12,10 @@ export interface Project {
   name: string;
   address: string | null;
   status: ProjectStatus;
-  service_requested: boolean;
   json_data: Record<string, unknown>;
   floor_plan_url: string | null;
   created_by: string | null;
-  assigned_to: string | null;
   notes: string | null;
-  internal_notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +29,6 @@ export interface UpdateProjectInput {
   name?: string;
   address?: string;
   status?: ProjectStatus;
-  service_requested?: boolean;
   json_data?: Json;
   floor_plan_url?: string;
   notes?: string;
@@ -150,39 +146,13 @@ export function useDeleteProject() {
   });
 }
 
-export function useRequestService() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (projectId: string): Promise<Project> => {
-      const { data, error } = await supabase
-        .from('projects')
-        .update({ 
-          service_requested: true, 
-          status: 'pending_service' as ProjectStatus 
-        })
-        .eq('id', projectId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as Project;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['project', data.id] });
-    },
-  });
-}
-
 export function useProjectStats() {
   const { data: projects } = useProjects();
 
   return {
     total: projects?.length ?? 0,
     draft: projects?.filter(p => p.status === 'draft').length ?? 0,
-    pending: projects?.filter(p => p.status === 'pending_service').length ?? 0,
-    inProgress: projects?.filter(p => p.status === 'in_progress').length ?? 0,
-    completed: projects?.filter(p => p.status === 'completed').length ?? 0,
+    active: projects?.filter(p => p.status === 'active').length ?? 0,
+    archived: projects?.filter(p => p.status === 'archived').length ?? 0,
   };
 }
