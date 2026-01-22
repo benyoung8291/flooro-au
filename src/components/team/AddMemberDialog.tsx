@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCreateTeamMember, MemberRole } from '@/hooks/useTeamMembers';
+import { useCanAddTeamMember } from '@/hooks/useUsageLimits';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Crown, AlertTriangle } from 'lucide-react';
 
 interface AddMemberDialogProps {
   open: boolean;
@@ -27,8 +29,10 @@ interface AddMemberDialogProps {
 }
 
 export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const createMember = useCreateTeamMember();
+  const { canAdd, remaining } = useCanAddTeamMember();
   
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
@@ -39,6 +43,15 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
     
     if (!email.trim()) {
       toast({ title: 'Error', description: 'Email is required', variant: 'destructive' });
+      return;
+    }
+
+    if (!canAdd) {
+      toast({ 
+        title: 'Team member limit reached', 
+        description: 'Upgrade your plan to add more team members.',
+        variant: 'destructive' 
+      });
       return;
     }
 
@@ -63,6 +76,43 @@ export function AddMemberDialog({ open, onOpenChange }: AddMemberDialogProps) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
+
+  // If user can't add members, show upgrade prompt
+  if (!canAdd) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Team Member Limit Reached
+            </DialogTitle>
+            <DialogDescription>
+              You've reached your team member limit on your current plan.
+              Upgrade to add more members.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 text-center">
+            <Crown className="h-12 w-12 mx-auto text-primary mb-4" />
+            <p className="text-muted-foreground mb-4">
+              Unlock more team members and features with a Pro or Enterprise plan.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => navigate('/settings?tab=billing')}>
+              <Crown className="w-4 h-4 mr-2" />
+              Upgrade Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
