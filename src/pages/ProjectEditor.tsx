@@ -18,6 +18,7 @@ import { PageTabs } from '@/components/editor/PageTabs';
 import { ProjectProgressBar } from '@/components/editor/ProjectProgressBar';
 import { RoomsOverviewDialog } from '@/components/editor/RoomsOverviewDialog';
 import { SaveStatusIndicator, SaveStatus } from '@/components/editor/SaveStatusIndicator';
+import { CanvasStatusBar } from '@/components/editor/CanvasStatusBar';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -145,6 +146,7 @@ export default function ProjectEditor() {
       switch (e.key.toLowerCase()) {
         case 'v': setActiveTool('select'); break;
         case 'd': setActiveTool('draw'); break;
+        case 'r': setActiveTool('rectangle'); break;
         case 'h': setActiveTool('hole'); break;
         case 'o': setActiveTool('door'); break;
         case 's': 
@@ -159,6 +161,8 @@ export default function ProjectEditor() {
           e.preventDefault();
           setActiveTool('pan'); 
           break;
+        case 'm': setActiveTool('merge'); break;
+        case 'x': setActiveTool('split'); break;
         case '2':
           setIs3DMode(false);
           break;
@@ -962,9 +966,9 @@ export default function ProjectEditor() {
             </div>
           )}
 
-          {/* Image Controls (when background image exists) - Responsive */}
+          {/* Image Controls (when background image exists) - Bottom left, above zoom */}
           {backgroundImage && !is3DMode && (
-            <div className={`absolute z-10 ${isMobile ? 'top-2 left-2 right-2' : 'top-4 left-1/2 -translate-x-1/2'}`}>
+            <div className="absolute bottom-20 left-4 z-10">
               <ImageControls
                 image={backgroundImage}
                 onUpdate={handleUpdateBackgroundImage}
@@ -999,6 +1003,18 @@ export default function ProjectEditor() {
               showSeamLines={true}
               projectMaterials={projectMaterials}
             />
+          )}
+
+          {/* Status Bar - Bottom of canvas */}
+          {!isMobile && !is3DMode && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+              <CanvasStatusBar
+                activeTool={activeTool}
+                scale={scale}
+                selectedRoom={rooms.find(r => r.id === selectedRoomId) || null}
+                dimensionUnit={dimensionUnit}
+              />
+            </div>
           )}
         </div>
 
