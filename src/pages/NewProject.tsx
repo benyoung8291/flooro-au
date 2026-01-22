@@ -105,8 +105,10 @@ export default function NewProject() {
         const fileExt = uploadedFile.name.split('.').pop();
         const filePath = `${project.id}/floor-plan.${fileExt}`;
 
+        console.log('Uploading floor plan to floor_plan_images bucket:', filePath);
+        
         const { error: uploadError } = await supabase.storage
-          .from('floor-plans')
+          .from('floor_plan_images')
           .upload(filePath, uploadedFile, { upsert: true });
 
         if (uploadError) {
@@ -120,28 +122,36 @@ export default function NewProject() {
         } else {
           // Get public URL
           const { data: urlData } = supabase.storage
-            .from('floor-plans')
+            .from('floor_plan_images')
             .getPublicUrl(filePath);
 
-          // Update project with floor plan URL and initial json_data
+          console.log('Floor plan uploaded, public URL:', urlData?.publicUrl);
+
+          // Update project with floor plan URL and multi-page json_data format
           if (urlData?.publicUrl) {
+            const pageId = crypto.randomUUID();
             await supabase
               .from('projects')
               .update({
                 floor_plan_url: urlData.publicUrl,
                 json_data: {
-                  rooms: [],
-                  scale: null,
+                  pages: [{
+                    id: pageId,
+                    name: 'Level 1',
+                    rooms: [],
+                    scale: null,
+                    backgroundImage: {
+                      url: urlData.publicUrl,
+                      opacity: 0.5,
+                      scale: 1,
+                      rotation: 0,
+                      offsetX: 0,
+                      offsetY: 0,
+                      locked: true,
+                    },
+                  }],
+                  activePageId: pageId,
                   selectedRoomId: null,
-                  backgroundImage: {
-                    url: urlData.publicUrl,
-                    opacity: 0.5,
-                    scale: 1,
-                    rotation: 0,
-                    offsetX: 0,
-                    offsetY: 0,
-                    locked: false,
-                  },
                 },
               })
               .eq('id', project.id);
