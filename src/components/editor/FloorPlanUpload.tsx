@@ -54,6 +54,8 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
     const fileExt = file.name.split('.').pop();
     const fileName = `${projectId}/${Date.now()}.${fileExt}`;
 
+    console.log('FloorPlanUpload: Uploading file to floor_plan_images bucket:', fileName);
+
     const { error: uploadError } = await supabase.storage
       .from('floor_plan_images')
       .upload(fileName, file, {
@@ -61,23 +63,44 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
         upsert: false,
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error('FloorPlanUpload: Upload error:', uploadError);
+      throw uploadError;
+    }
 
     const { data: { publicUrl } } = supabase.storage
       .from('floor_plan_images')
       .getPublicUrl(fileName);
 
+    console.log('FloorPlanUpload: Upload successful, public URL:', publicUrl);
     return publicUrl;
   };
 
   const analyzePdf = async (pdfUrl: string): Promise<PdfAnalysis> => {
-    const { data, error } = await supabase.functions.invoke('parse-pdf', {
+    console.log('FloorPlanUpload: Starting PDF analysis for:', pdfUrl);
+    
+    // Create a timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('PDF analysis timed out after 30 seconds')), 30000);
+    });
+    
+    const analysisPromise = supabase.functions.invoke('parse-pdf', {
       body: { pdfUrl, extractDimensions: true }
     });
 
-    if (error) throw error;
-    if (!data.success) throw new Error(data.error);
+    // Race between analysis and timeout
+    const { data, error } = await Promise.race([analysisPromise, timeoutPromise]);
 
+    if (error) {
+      console.error('FloorPlanUpload: PDF analysis error:', error);
+      throw error;
+    }
+    if (!data.success) {
+      console.error('FloorPlanUpload: PDF analysis failed:', data.error);
+      throw new Error(data.error);
+    }
+
+    console.log('FloorPlanUpload: PDF analysis complete:', data.data);
     return data.data;
   };
 
@@ -104,6 +127,7 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
     }
 
     setIsUploading(true);
+    console.log('FloorPlanUpload: Processing file:', file.name, 'Type:', file.type);
 
     try {
       const publicUrl = await uploadFile(file);
@@ -119,8 +143,8 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
           setIsUploading(false);
           // Keep dialog open for page selection
         } catch (analysisError: any) {
-          console.error('PDF analysis failed:', analysisError);
-          // If analysis fails, still use the PDF
+          console.error('FloorPlanUpload: PDF analysis failed, using fallback:', analysisError.message);
+          // If analysis fails, still use the PDF as background
           const backgroundImage: BackgroundImage = {
             url: publicUrl,
             opacity: 0.5,
@@ -128,13 +152,15 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
             rotation: 0,
             offsetX: 0,
             offsetY: 0,
-            locked: true, // Lock by default to keep rooms aligned
+            locked: true,
           };
           onImageUploaded(backgroundImage);
           setIsOpen(false);
           toast({ 
             title: 'PDF uploaded',
-            description: 'Could not analyze pages. Using first page.'
+            description: analysisError.message.includes('timeout') 
+              ? 'Analysis timed out. PDF loaded as background.' 
+              : 'Could not analyze pages. Using as background.'
           });
         } finally {
           setIsAnalyzingPdf(false);
