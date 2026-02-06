@@ -190,6 +190,8 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
         accessories: room.accessories,
         seamOptions: room.seamOptions,
         tilePattern: room.tilePattern,
+        edgeTransitions: room.edgeTransitions || [],
+        edgeCurves: room.edgeCurves,
       }));
       
       // Preserve scale from incoming data - never lose calibration
