@@ -97,7 +97,7 @@ export function EditorCanvas({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastExportedDataRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
-  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform, startDragBatch, endDragBatch } = useCanvasHistory();
+  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform } = useCanvasHistory();
 
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<CanvasPoint[]>([]);
@@ -613,7 +613,6 @@ export function EditorCanvas({
       case 'select': {
         // Try to start dragging vertex or wall first
         if (startDrag(point)) {
-          startDragBatch();
           return;
         }
         
@@ -917,7 +916,7 @@ export function EditorCanvas({
         break;
       }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, startDragBatch, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
 
   // Handle pointer move (RAF-throttled to avoid per-pixel expensive operations)
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -1067,9 +1066,8 @@ export function EditorCanvas({
     // End any dragging operation
     if (isDragging) {
       endDrag();
-      endDragBatch();
     }
-  }, [isDragging, endDrag, endDragBatch]);
+  }, [isDragging, endDrag]);
 
   // Handle double-click (for removing curves)
   const handleDoubleClickEvent = useCallback((e: React.MouseEvent) => {
