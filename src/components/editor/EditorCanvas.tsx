@@ -287,30 +287,38 @@ export function EditorCanvas({
   }, [state.rooms, canvasSize, fitToView]);
 
   // Notify parent of changes with debounce to prevent rapid-fire updates
+  // NOTE: We intentionally exclude exportToJson and viewTransform from deps
+  // to avoid triggering parent updates during pan/zoom, which can cause
+  // cascading re-renders that reset the user's view position.
   useEffect(() => {
     // Clear any pending save
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    
+
     // Debounce the data change notification
     saveTimeoutRef.current = setTimeout(() => {
-      const data = exportToJson();
+      const data = {
+        rooms: state.rooms,
+        scale: state.scale,
+        backgroundImage: state.backgroundImage,
+      };
       const dataString = JSON.stringify(data);
-      
+
       // Only notify if data actually changed
       if (dataString !== lastExportedDataRef.current) {
         lastExportedDataRef.current = dataString;
         onDataChange?.(data);
       }
     }, 100);
-    
+
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [state.rooms, state.scale, state.backgroundImage, exportToJson, onDataChange]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.rooms, state.scale, state.backgroundImage, onDataChange]);
 
 
   // Sync external room property changes (fillDirection, seamOptions, accessories, etc.)
@@ -615,7 +623,54 @@ export function EditorCanvas({
         if (startDrag(point)) {
           return;
         }
-        
+
+        // Check if clicking near an edge midpoint of the selected room to toggle transition
+        if (state.selectedRoomId) {
+          const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
+          if (selectedRoom) {
+            const clickRadius = 12 / state.viewTransform.zoom;
+            for (let i = 0; i < selectedRoom.points.length; i++) {
+              const j = (i + 1) % selectedRoom.points.length;
+              const midX = (selectedRoom.points[i].x + selectedRoom.points[j].x) / 2;
+              const midY = (selectedRoom.points[i].y + selectedRoom.points[j].y) / 2;
+              const dist = distance(point, { x: midX, y: midY });
+              if (dist < clickRadius) {
+                // Toggle transition on this edge
+                const existing = selectedRoom.edgeTransitions || [];
+                const hasTransition = existing.some(t => t.edgeIndex === i);
+                if (hasTransition) {
+                  dispatch({
+                    type: 'UPDATE_ROOM',
+                    roomId: selectedRoom.id,
+                    updates: { edgeTransitions: existing.filter(t => t.edgeIndex !== i) },
+                  });
+                  toast.success(`Removed transition from Edge ${i + 1}`);
+                } else {
+                  // Auto-detect adjacent room for this edge
+                  const sharedEdgesForRoom = detectSharedEdgesForNewRoom(
+                    { ...selectedRoom, points: selectedRoom.points } as Room,
+                    state.rooms.filter(r => r.id !== selectedRoom.id)
+                  );
+                  const sharedForEdge = sharedEdgesForRoom.find(se => se.newRoomEdgeIndex === i);
+                  const newTransition: EdgeTransition = {
+                    edgeIndex: i,
+                    adjacentRoomId: sharedForEdge?.existingRoomId,
+                    adjacentRoomName: sharedForEdge?.existingRoomName,
+                    transitionType: 'auto',
+                  };
+                  dispatch({
+                    type: 'UPDATE_ROOM',
+                    roomId: selectedRoom.id,
+                    updates: { edgeTransitions: [...existing, newTransition] },
+                  });
+                  toast.success(`Added transition to Edge ${i + 1}${sharedForEdge ? ` (→ ${sharedForEdge.existingRoomName})` : ''}`);
+                }
+                return; // Don't fall through to room selection
+              }
+            }
+          }
+        }
+
         // Find clicked room
         let clickedRoom: Room | null = null;
         for (const room of state.rooms) {
@@ -630,12 +685,14 @@ export function EditorCanvas({
 
       case 'draw': {
         // Use smart snapping with priority: vertex > grid > axis
+        // Snap radius is in screen pixels, convert to canvas space
         const smartSnap = findSmartSnapPoint(
-          point, 
-          state.rooms, 
-          drawingPoints, 
-          effectiveSnapSettings, 
-          state.scale
+          point,
+          state.rooms,
+          drawingPoints,
+          effectiveSnapSettings,
+          state.scale,
+          15 / state.viewTransform.zoom
         );
         const actualPoint = smartSnap?.point || point;
 
@@ -691,8 +748,8 @@ export function EditorCanvas({
       }
 
       case 'rectangle': {
-        // Smart snapping for corner
-        const smartSnap = findSmartSnapPoint(point, state.rooms, [], effectiveSnapSettings, state.scale);
+        // Smart snapping for corner - zoom-aware radius
+        const smartSnap = findSmartSnapPoint(point, state.rooms, [], effectiveSnapSettings, state.scale, 15 / state.viewTransform.zoom);
         const actualPoint = smartSnap?.point || point;
 
         if (!rectangleStart) {
@@ -747,7 +804,7 @@ export function EditorCanvas({
         // Must have a selected room
         if (!state.selectedRoomId) return;
 
-        const snap = findSnapPoint(point, state.rooms);
+        const snap = findSnapPoint(point, state.rooms, 10 / state.viewTransform.zoom);
         const actualPoint = snap || point;
 
         if (!isDrawing) {
@@ -1000,14 +1057,15 @@ export function EditorCanvas({
         finalPoint = applyOrthoLock(point, drawingPoints[drawingPoints.length - 1]);
       }
 
-      // Use smart snapping when drawing
+      // Use smart snapping when drawing - zoom-aware radius
       if (activeTool === 'draw' || activeTool === 'hole') {
         const smartSnap = findSmartSnapPoint(
           finalPoint,
           state.rooms,
           drawingPoints,
           effectiveSnapSettings,
-          state.scale
+          state.scale,
+          15 / state.viewTransform.zoom
         );
 
         if (smartSnap) {
@@ -1019,9 +1077,9 @@ export function EditorCanvas({
           setSnapType(null);
         }
 
-        // Check for axis snap lines if enabled
+        // Check for axis snap lines if enabled - zoom-aware radius
         if (effectiveSnapSettings.axisSnapEnabled) {
-          const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
+          const axisSnap = findAxisSnapLines(finalPoint, state.rooms, 10 / state.viewTransform.zoom);
           setAxisSnapLines(axisSnap);
 
           if (axisSnap.horizontal !== null) {
@@ -1034,8 +1092,8 @@ export function EditorCanvas({
           setAxisSnapLines({ horizontal: null, vertical: null });
         }
       } else {
-        // Legacy snapping for other tools
-        const snap = findSnapPoint(finalPoint, state.rooms);
+        // Legacy snapping for other tools - zoom-aware radius
+        const snap = findSnapPoint(finalPoint, state.rooms, 10 / state.viewTransform.zoom);
         setSnapPoint(snap);
         setSnapType(snap ? 'vertex' : null);
 
@@ -1043,7 +1101,7 @@ export function EditorCanvas({
           finalPoint = snap;
         }
 
-        const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
+        const axisSnap = findAxisSnapLines(finalPoint, state.rooms, 10 / state.viewTransform.zoom);
         setAxisSnapLines(axisSnap);
 
         if (axisSnap.horizontal !== null) {
@@ -1283,6 +1341,7 @@ export function EditorCanvas({
         rectangleStart={rectangleStart}
         activeTool={activeTool}
         projectMaterials={projectMaterials}
+        scaleStart={scaleStart}
       />
 
       {/* Material drag indicator */}

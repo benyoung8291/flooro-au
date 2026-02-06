@@ -50,6 +50,8 @@ interface CanvasRendererProps {
   activeTool?: string;
   // Project materials for code badges
   projectMaterials?: ProjectMaterial[];
+  // Scale tool preview
+  scaleStart?: CanvasPoint | null;
 }
 
 // Cache for loaded images
@@ -113,6 +115,7 @@ export function CanvasRenderer({
   rectangleStart,
   activeTool,
   projectMaterials = [],
+  scaleStart,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -382,6 +385,83 @@ export function CanvasRenderer({
       ctx.restore();
     }
 
+    // Draw scale tool reference line
+    if (scaleStart && activeTool === 'scale' && cursorPosition) {
+      ctx.save();
+
+      // Draw the reference line
+      ctx.strokeStyle = 'hsl(45 93% 47%)';
+      ctx.lineWidth = 2.5 / zoom;
+      ctx.setLineDash([8 / zoom, 4 / zoom]);
+      ctx.beginPath();
+      ctx.moveTo(scaleStart.x, scaleStart.y);
+      ctx.lineTo(cursorPosition.x, cursorPosition.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw start point
+      ctx.fillStyle = 'hsl(45 93% 47%)';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2 / zoom;
+      ctx.beginPath();
+      ctx.arc(scaleStart.x, scaleStart.y, 6 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw end point (cursor)
+      ctx.fillStyle = 'hsl(45 93% 47%)';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2 / zoom;
+      ctx.beginPath();
+      ctx.arc(cursorPosition.x, cursorPosition.y, 6 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Show pixel length label at midpoint
+      const dx = cursorPosition.x - scaleStart.x;
+      const dy = cursorPosition.y - scaleStart.y;
+      const pixelLength = Math.sqrt(dx * dx + dy * dy);
+      const midX = (scaleStart.x + cursorPosition.x) / 2;
+      const midY = (scaleStart.y + cursorPosition.y) / 2;
+
+      const fontSize = 12 / zoom;
+      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+      const lengthText = `${Math.round(pixelLength)}px`;
+      const textWidth = ctx.measureText(lengthText).width;
+      const padding = 4 / zoom;
+
+      // Background pill
+      ctx.fillStyle = 'hsla(45, 93%, 47%, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(
+        midX - textWidth / 2 - padding,
+        midY - fontSize - padding * 2,
+        textWidth + padding * 2,
+        fontSize + padding * 2,
+        3 / zoom
+      );
+      ctx.fill();
+
+      // Text
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(lengthText, midX, midY - fontSize / 2 - padding / 2);
+
+      ctx.restore();
+    } else if (scaleStart && activeTool === 'scale') {
+      // Draw just the start point when cursor hasn't moved yet
+      ctx.save();
+      ctx.fillStyle = 'hsl(45 93% 47%)';
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 2 / zoom;
+      ctx.beginPath();
+      ctx.arc(scaleStart.x, scaleStart.y, 6 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     // Draw snap indicator with type-specific styling
     if (snapPoint) {
       if (snapType === 'vertex') {
@@ -481,7 +561,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart]);
 
   useEffect(() => {
     render();
@@ -841,23 +921,108 @@ function drawRoom(
     ctx.stroke();
     ctx.setLineDash([]);
     
-    // Draw transition indicator "T" at edge midpoint
+    // Draw transition indicator with label at edge midpoint
     if (isTransitionEdge && !isDragTarget && !isValidDropZone) {
+      const transition = room.edgeTransitions?.find(t => t.edgeIndex === i);
       const midX = (p1.x + p2.x) / 2;
       const midY = (p1.y + p2.y) / 2;
-      
-      // Draw circle background
+
+      // Build label text: "E{n} T" + type + adjacent room
+      const edgeLabel = `E${i + 1}`;
+      const typeLabel = transition?.transitionType === 'auto' ? '' :
+        transition?.transitionType === 't-molding' ? 'T-Mold' :
+        transition?.transitionType === 'reducer' ? 'Reducer' :
+        transition?.transitionType === 'threshold' ? 'Threshold' :
+        transition?.transitionType === 'ramp' ? 'Ramp' :
+        transition?.transitionType === 'end-cap' ? 'End Cap' : '';
+      const adjLabel = transition?.adjacentRoomName ? `→ ${transition.adjacentRoomName}` : '';
+      const fullLabel = [edgeLabel, typeLabel, adjLabel].filter(Boolean).join(' ');
+
+      // Measure label for background sizing
+      const fontSize = 9 / zoom;
+      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+      const textWidth = ctx.measureText(fullLabel).width;
+      const paddingX = 5 / zoom;
+      const paddingY = 3 / zoom;
+      const badgeHeight = fontSize + paddingY * 2;
+      const badgeWidth = textWidth + paddingX * 2;
+
+      // Offset label perpendicular to edge so it doesn't overlap the edge line
+      const edgeDx = p2.x - p1.x;
+      const edgeDy = p2.y - p1.y;
+      const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+      const perpX = edgeLen > 0 ? -edgeDy / edgeLen : 0;
+      const perpY = edgeLen > 0 ? edgeDx / edgeLen : 0;
+      const offsetDist = 14 / zoom;
+      const labelX = midX + perpX * offsetDist;
+      const labelY = midY + perpY * offsetDist;
+
+      // Draw badge background (rounded rect)
       ctx.fillStyle = 'hsl(35 90% 50%)';
       ctx.beginPath();
-      ctx.arc(midX, midY, 8 / zoom, 0, Math.PI * 2);
+      ctx.roundRect(
+        labelX - badgeWidth / 2,
+        labelY - badgeHeight / 2,
+        badgeWidth,
+        badgeHeight,
+        3 / zoom
+      );
       ctx.fill();
-      
-      // Draw "T" letter
+
+      // Draw white border
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1 / zoom;
+      ctx.stroke();
+
+      // Draw label text
       ctx.fillStyle = 'white';
-      ctx.font = `bold ${10 / zoom}px Inter, sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('T', midX, midY);
+      ctx.fillText(fullLabel, labelX, labelY);
+    }
+
+    // Draw edge number labels for selected rooms (non-transition edges)
+    if (isSelected && !isTransitionEdge && !isDragTarget && !isValidDropZone && !isMergeSelected && !isMergeable && !isMergeTarget && !isMergeDimmed) {
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+
+      // Offset perpendicular to edge
+      const edgeDx = p2.x - p1.x;
+      const edgeDy = p2.y - p1.y;
+      const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+
+      // Only show for edges long enough
+      if (edgeLen > 30 / zoom) {
+        const perpX = edgeLen > 0 ? -edgeDy / edgeLen : 0;
+        const perpY = edgeLen > 0 ? edgeDx / edgeLen : 0;
+        const offsetDist = 14 / zoom;
+        const labelX = midX + perpX * offsetDist;
+        const labelY = midY + perpY * offsetDist;
+
+        const edgeLabel = `E${i + 1}`;
+        const fontSize = 8 / zoom;
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+        const tw = ctx.measureText(edgeLabel).width;
+        const px = 3 / zoom;
+        const py = 2 / zoom;
+
+        // Semi-transparent background
+        ctx.fillStyle = 'hsla(217, 91%, 50%, 0.6)';
+        ctx.beginPath();
+        ctx.roundRect(
+          labelX - tw / 2 - px,
+          labelY - fontSize / 2 - py,
+          tw + px * 2,
+          fontSize + py * 2,
+          2 / zoom
+        );
+        ctx.fill();
+
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(edgeLabel, labelX, labelY);
+      }
     }
   }
 
