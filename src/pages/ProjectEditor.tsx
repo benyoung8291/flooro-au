@@ -372,6 +372,36 @@ export default function ProjectEditor() {
     setLocalData(prev => ({ ...prev, selectedRoomId: currentRooms[nextIndex].id }));
   }, [localData.pages, localData.activePageId, localData.rooms, localData.selectedRoomId]);
 
+  // handleUpdateRoom must be declared before the useEffect that references it
+  const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
+    setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+      
+      if (pages.length > 0 && activePageId) {
+        const updatedPages = pages.map(page => {
+          if (page.id === activePageId) {
+            return {
+              ...page,
+              rooms: page.rooms.map(room => 
+                room.id === roomId ? { ...room, ...updates } : room
+              ),
+            };
+          }
+          return page;
+        });
+        return { ...prev, pages: updatedPages };
+      } else {
+        const currentRooms = (prev.rooms as Room[]) || [];
+        const updatedRooms = currentRooms.map(room => 
+          room.id === roomId ? { ...room, ...updates } : room
+        );
+        return { ...prev, rooms: updatedRooms };
+      }
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   // Extended keyboard shortcuts for room navigation, fill direction, and pan
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -385,8 +415,6 @@ export default function ProjectEditor() {
 
       switch (e.key) {
         case 'r': {
-          // Only rotate fill direction, don't also activate rectangle tool
-          // This is handled by the extended shortcuts, remove from main shortcuts
           e.preventDefault();
           e.stopPropagation();
           if (cSelectedId) {
@@ -431,36 +459,6 @@ export default function ProjectEditor() {
     };
   }, [localData.pages, localData.activePageId, localData.rooms, localData.selectedRoomId, handleNavigatePrevRoom, handleNavigateNextRoom, handleUpdateRoom, activeTool]);
 
-  const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
-    setLocalData(prev => {
-      const pages = (prev.pages as FloorPlanPage[]) || [];
-      const activePageId = prev.activePageId as string | null;
-      
-      if (pages.length > 0 && activePageId) {
-        // Multi-page mode: update room in active page
-        const updatedPages = pages.map(page => {
-          if (page.id === activePageId) {
-            return {
-              ...page,
-              rooms: page.rooms.map(room => 
-                room.id === roomId ? { ...room, ...updates } : room
-              ),
-            };
-          }
-          return page;
-        });
-        return { ...prev, pages: updatedPages };
-      } else {
-        // Legacy mode: update root-level rooms
-        const currentRooms = (prev.rooms as Room[]) || [];
-        const updatedRooms = currentRooms.map(room => 
-          room.id === roomId ? { ...room, ...updates } : room
-        );
-        return { ...prev, rooms: updatedRooms };
-      }
-    });
-    setHasUnsavedChanges(true);
-  }, []);
 
   const handleDeleteRoom = useCallback((roomId: string) => {
     const roomToDelete = rooms.find(r => r.id === roomId);
