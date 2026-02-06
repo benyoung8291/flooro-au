@@ -27,6 +27,11 @@ import { mergeRoomsAtSharedEdge, findSharedEdgeBetweenRooms } from '@/lib/canvas
 import { splitPolygonWithLine, findEdgeForPoint, assignHolesToPolygons } from '@/lib/canvas/polygonSplit';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
 import { FinishesLegend } from '@/components/reports/FinishesLegend';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Maximize2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -91,8 +96,9 @@ export function EditorCanvas({
   const lastJsonDataRef = useRef<Record<string, unknown> | null>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastExportedDataRef = useRef<string>('');
-  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform } = useCanvasHistory();
-  
+  const rafIdRef = useRef<number | null>(null);
+  const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform, startDragBatch, endDragBatch } = useCanvasHistory();
+
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<CanvasPoint[]>([]);
   const [cursorPosition, setCursorPosition] = useState<CanvasPoint | null>(null);
@@ -109,6 +115,12 @@ export function EditorCanvas({
   const [isDraggingMaterial, setIsDraggingMaterial] = useState(false);
   const [dragTargetRoomId, setDragTargetRoomId] = useState<string | null>(null);
   
+  // Scale input modal state
+  const [scaleInputOpen, setScaleInputOpen] = useState(false);
+  const [scaleInputValue, setScaleInputValue] = useState('');
+  const [scaleInputUnit, setScaleInputUnit] = useState<'mm' | 'cm' | 'm'>('mm');
+  const [pendingScalePixelLength, setPendingScalePixelLength] = useState<number | null>(null);
+
   // Rectangle tool state
   const [rectangleStart, setRectangleStart] = useState<CanvasPoint | null>(null);
   
@@ -356,6 +368,7 @@ export function EditorCanvas({
         setIsDrawing(false);
         setDrawingPoints([]);
         setScaleStart(null);
+        setRectangleStart(null);
         setShowDimensionInput(false);
         // Cancel merge mode
         setMergeFirstRoom(null);
@@ -430,6 +443,15 @@ export function EditorCanvas({
       setRectangleStart(null);
     }
   }, [activeTool]);
+
+  // Clean up pending RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
 
   // Handle merge rooms
   const handleMergeRooms = useCallback((room1: Room, room2: Room) => {
@@ -591,6 +613,7 @@ export function EditorCanvas({
       case 'select': {
         // Try to start dragging vertex or wall first
         if (startDrag(point)) {
+          startDragBatch();
           return;
         }
         
@@ -625,7 +648,7 @@ export function EditorCanvas({
           const startPoint = drawingPoints[0];
           const distToStart = distance(actualPoint, startPoint);
 
-          if (distToStart < 15 && drawingPoints.length >= 3) {
+          if (distToStart < 15 / state.viewTransform.zoom && drawingPoints.length >= 3) {
             // Close polygon - create room
             const newRoom: Room = {
               id: generateRoomId(),
@@ -738,7 +761,7 @@ export function EditorCanvas({
             Math.pow(actualPoint.y - startPoint.y, 2)
           );
 
-          if (distance < 15 && drawingPoints.length >= 3) {
+          if (distance < 15 / state.viewTransform.zoom && drawingPoints.length >= 3) {
             // Create hole
             dispatch({
               type: 'ADD_HOLE',
@@ -796,20 +819,12 @@ export function EditorCanvas({
             Math.pow(point.x - scaleStart.x, 2) +
             Math.pow(point.y - scaleStart.y, 2)
           );
-          
-          // Prompt for real-world measurement (simplified - in production, use a modal)
-          const realLength = parseFloat(prompt('Enter real-world length in mm:', '1000') || '1000');
-          
-          if (realLength > 0 && pixelLength > 0) {
-            dispatch({
-              type: 'SET_SCALE',
-              scale: {
-                pixelLength,
-                realWorldLength: realLength,
-                pixelsPerMm: pixelLength / realLength,
-              },
-            });
-          }
+
+          // Open modal for real-world measurement input
+          setPendingScalePixelLength(pixelLength);
+          setScaleInputValue('');
+          setScaleInputUnit('mm');
+          setScaleInputOpen(true);
           setScaleStart(null);
         }
         break;
@@ -902,141 +917,159 @@ export function EditorCanvas({
         break;
       }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, startDragBatch, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
 
-  // Handle pointer move
+  // Handle pointer move (RAF-throttled to avoid per-pixel expensive operations)
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     // Ignore during touch gestures
     if (isTouchGesture || isTwoFingerGesture()) return;
-    
-    const point = getEventPoint(e);
 
-    if (isPanning && panStart) {
-      const dx = e.clientX - panStart.x;
-      const dy = e.clientY - panStart.y;
-      dispatch({
-        type: 'SET_VIEW_TRANSFORM',
-        transform: {
-          offsetX: state.viewTransform.offsetX + dx,
-          offsetY: state.viewTransform.offsetY + dy,
-        },
-      });
-      setPanStart({ x: e.clientX, y: e.clientY });
-      return;
+    // Cancel any pending RAF
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
     }
 
-    // Handle dragging in select mode
-    if (activeTool === 'select' && isDragging) {
-      updateDrag(point, orthoLocked);
-      setCursorPosition(point);
-      return;
-    }
+    // Extract event data before RAF (React synthetic events are pooled and
+    // cannot be accessed asynchronously inside the requestAnimationFrame callback)
+    const clientX = e.clientX;
+    const clientY = e.clientY;
 
-    // Handle hover for select or merge mode (visual feedback)
-    if (activeTool === 'select' || activeTool === 'merge' || activeTool === 'split') {
-      if (activeTool === 'select') {
-        handleHover(point);
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+
+      // Compute canvas point from extracted coordinates
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const point = screenToCanvas(clientX - rect.left, clientY - rect.top);
+
+      if (isPanning && panStart) {
+        const dx = clientX - panStart.x;
+        const dy = clientY - panStart.y;
+        dispatch({
+          type: 'SET_VIEW_TRANSFORM',
+          transform: {
+            offsetX: state.viewTransform.offsetX + dx,
+            offsetY: state.viewTransform.offsetY + dy,
+          },
+        });
+        setPanStart({ x: clientX, y: clientY });
+        return;
       }
-      
-      // Check for room hover
-      let foundHoveredRoom: string | null = null;
-      for (const room of state.rooms) {
-        if (isPointInPolygon(point, room.points)) {
-          foundHoveredRoom = room.id;
-          break;
+
+      // Handle dragging in select mode
+      if (activeTool === 'select' && isDragging) {
+        updateDrag(point, orthoLocked);
+        setCursorPosition(point);
+        return;
+      }
+
+      // Handle hover for select or merge mode (visual feedback)
+      if (activeTool === 'select' || activeTool === 'merge' || activeTool === 'split') {
+        if (activeTool === 'select') {
+          handleHover(point);
         }
-      }
-      setHoveredRoomId(foundHoveredRoom);
-      
-      // Update split preview
-      if (activeTool === 'split' && splitRoom && splitStartPoint) {
-        // Snap to edge if close
-        const edgeInfo = findEdgeForPoint(point, splitRoom.points, 20 / state.viewTransform.zoom);
-        if (edgeInfo) {
-          setSplitPreviewEnd(edgeInfo.projectedPoint);
-        } else {
-          setSplitPreviewEnd(point);
+
+        // Check for room hover
+        let foundHoveredRoom: string | null = null;
+        for (const room of state.rooms) {
+          if (isPointInPolygon(point, room.points)) {
+            foundHoveredRoom = room.id;
+            break;
+          }
         }
-      }
-    } else {
-      setHoveredRoomId(null);
-      setSplitPreviewEnd(null);
-    }
+        setHoveredRoomId(foundHoveredRoom);
 
-    // Update cursor position
-    let finalPoint = point;
-    
-    if (orthoLocked && drawingPoints.length > 0) {
-      finalPoint = applyOrthoLock(point, drawingPoints[drawingPoints.length - 1]);
-    }
-
-    // Use smart snapping when drawing
-    if (activeTool === 'draw' || activeTool === 'hole') {
-      const smartSnap = findSmartSnapPoint(
-        finalPoint,
-        state.rooms,
-        drawingPoints,
-        effectiveSnapSettings,
-        state.scale
-      );
-      
-      if (smartSnap) {
-        setSnapPoint(smartSnap.point);
-        setSnapType(smartSnap.type);
-        finalPoint = smartSnap.point;
+        // Update split preview
+        if (activeTool === 'split' && splitRoom && splitStartPoint) {
+          // Snap to edge if close
+          const edgeInfo = findEdgeForPoint(point, splitRoom.points, 20 / state.viewTransform.zoom);
+          if (edgeInfo) {
+            setSplitPreviewEnd(edgeInfo.projectedPoint);
+          } else {
+            setSplitPreviewEnd(point);
+          }
+        }
       } else {
-        setSnapPoint(null);
-        setSnapType(null);
+        setHoveredRoomId(null);
+        setSplitPreviewEnd(null);
       }
-      
-      // Check for axis snap lines if enabled
-      if (effectiveSnapSettings.axisSnapEnabled) {
+
+      // Update cursor position
+      let finalPoint = point;
+
+      if (orthoLocked && drawingPoints.length > 0) {
+        finalPoint = applyOrthoLock(point, drawingPoints[drawingPoints.length - 1]);
+      }
+
+      // Use smart snapping when drawing
+      if (activeTool === 'draw' || activeTool === 'hole') {
+        const smartSnap = findSmartSnapPoint(
+          finalPoint,
+          state.rooms,
+          drawingPoints,
+          effectiveSnapSettings,
+          state.scale
+        );
+
+        if (smartSnap) {
+          setSnapPoint(smartSnap.point);
+          setSnapType(smartSnap.type);
+          finalPoint = smartSnap.point;
+        } else {
+          setSnapPoint(null);
+          setSnapType(null);
+        }
+
+        // Check for axis snap lines if enabled
+        if (effectiveSnapSettings.axisSnapEnabled) {
+          const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
+          setAxisSnapLines(axisSnap);
+
+          if (axisSnap.horizontal !== null) {
+            finalPoint = { ...finalPoint, y: axisSnap.horizontal };
+          }
+          if (axisSnap.vertical !== null) {
+            finalPoint = { ...finalPoint, x: axisSnap.vertical };
+          }
+        } else {
+          setAxisSnapLines({ horizontal: null, vertical: null });
+        }
+      } else {
+        // Legacy snapping for other tools
+        const snap = findSnapPoint(finalPoint, state.rooms);
+        setSnapPoint(snap);
+        setSnapType(snap ? 'vertex' : null);
+
+        if (snap) {
+          finalPoint = snap;
+        }
+
         const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
         setAxisSnapLines(axisSnap);
-        
+
         if (axisSnap.horizontal !== null) {
           finalPoint = { ...finalPoint, y: axisSnap.horizontal };
         }
         if (axisSnap.vertical !== null) {
           finalPoint = { ...finalPoint, x: axisSnap.vertical };
         }
-      } else {
-        setAxisSnapLines({ horizontal: null, vertical: null });
-      }
-    } else {
-      // Legacy snapping for other tools
-      const snap = findSnapPoint(finalPoint, state.rooms);
-      setSnapPoint(snap);
-      setSnapType(snap ? 'vertex' : null);
-      
-      if (snap) {
-        finalPoint = snap;
       }
 
-      const axisSnap = findAxisSnapLines(finalPoint, state.rooms);
-      setAxisSnapLines(axisSnap);
-      
-      if (axisSnap.horizontal !== null) {
-        finalPoint = { ...finalPoint, y: axisSnap.horizontal };
-      }
-      if (axisSnap.vertical !== null) {
-        finalPoint = { ...finalPoint, x: axisSnap.vertical };
-      }
-    }
-
-    setCursorPosition(finalPoint);
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, getEventPoint, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
+      setCursorPosition(finalPoint);
+    });
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, screenToCanvas, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
     setIsPanning(false);
     setPanStart(null);
-    
+
     // End any dragging operation
     if (isDragging) {
       endDrag();
+      endDragBatch();
     }
-  }, [isDragging, endDrag]);
+  }, [isDragging, endDrag, endDragBatch]);
 
   // Handle double-click (for removing curves)
   const handleDoubleClickEvent = useCallback((e: React.MouseEvent) => {
@@ -1249,6 +1282,8 @@ export function EditorCanvas({
         splitStartPoint={splitStartPoint}
         splitPreviewEnd={splitPreviewEnd}
         isSplitMode={activeTool === 'split'}
+        rectangleStart={rectangleStart}
+        activeTool={activeTool}
         projectMaterials={projectMaterials}
       />
 
@@ -1384,13 +1419,110 @@ export function EditorCanvas({
       {/* Finishes Legend - show if any room has a material from projectMaterials with a code */}
       {showFinishesLegend && state.rooms.some(r => r.materialId) && (
         <div className="absolute top-4 right-4 z-10">
-          <FinishesLegend 
+          <FinishesLegend
             rooms={state.rooms}
             materials={materials}
             compact
           />
         </div>
       )}
+
+      {/* Scale Calibration Dialog */}
+      <Dialog open={scaleInputOpen} onOpenChange={(open) => {
+        if (!open) {
+          setScaleInputOpen(false);
+          setPendingScalePixelLength(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set Scale</DialogTitle>
+            <DialogDescription>
+              Enter the real-world length of the line you just drew.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="scale-length" className="text-right">
+                Length
+              </Label>
+              <Input
+                id="scale-length"
+                type="number"
+                min="0"
+                step="any"
+                placeholder="e.g. 1000"
+                value={scaleInputValue}
+                onChange={(e) => setScaleInputValue(e.target.value)}
+                className="col-span-2"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const parsed = parseFloat(scaleInputValue);
+                    if (!parsed || parsed <= 0 || !pendingScalePixelLength) return;
+                    let realLengthMm = parsed;
+                    if (scaleInputUnit === 'cm') realLengthMm = parsed * 10;
+                    else if (scaleInputUnit === 'm') realLengthMm = parsed * 1000;
+                    dispatch({
+                      type: 'SET_SCALE',
+                      scale: {
+                        pixelLength: pendingScalePixelLength,
+                        realWorldLength: realLengthMm,
+                        pixelsPerMm: pendingScalePixelLength / realLengthMm,
+                      },
+                    });
+                    setScaleInputOpen(false);
+                    setPendingScalePixelLength(null);
+                    toast.success('Scale calibrated');
+                  }
+                }}
+              />
+              <Select value={scaleInputUnit} onValueChange={(v) => setScaleInputUnit(v as 'mm' | 'cm' | 'm')}>
+                <SelectTrigger className="col-span-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mm">mm</SelectItem>
+                  <SelectItem value="cm">cm</SelectItem>
+                  <SelectItem value="m">m</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setScaleInputOpen(false);
+              setPendingScalePixelLength(null);
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              const parsed = parseFloat(scaleInputValue);
+              if (!parsed || parsed <= 0 || !pendingScalePixelLength) {
+                toast.error('Please enter a valid positive number');
+                return;
+              }
+              let realLengthMm = parsed;
+              if (scaleInputUnit === 'cm') realLengthMm = parsed * 10;
+              else if (scaleInputUnit === 'm') realLengthMm = parsed * 1000;
+              dispatch({
+                type: 'SET_SCALE',
+                scale: {
+                  pixelLength: pendingScalePixelLength,
+                  realWorldLength: realLengthMm,
+                  pixelsPerMm: pendingScalePixelLength / realLengthMm,
+                },
+              });
+              setScaleInputOpen(false);
+              setPendingScalePixelLength(null);
+              toast.success('Scale calibrated');
+            }}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

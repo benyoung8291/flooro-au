@@ -38,6 +38,7 @@ import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { calculatePolygonArea } from '@/lib/canvas/geometry';
+import { formatCurrency } from '@/lib/reports/calculations';
 import { RoomDetailView } from './RoomDetailView';
 import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
 import { cn } from '@/lib/utils';
@@ -132,7 +133,7 @@ export function TakeoffPanel({
     if (!scale) return '—';
     const areaPx = calculatePolygonArea(room.points);
     const areaM2 = areaPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
-    return `${areaM2.toFixed(1)} m²`;
+    return `${areaM2.toFixed(2)} m²`;
   };
 
   const getRoomCost = (room: Room): number | null => {
@@ -261,7 +262,7 @@ export function TakeoffPanel({
             {/* Summary Stats */}
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="bg-background rounded-md p-2">
-                <div className="text-lg font-bold font-mono">{totals.area.toFixed(0)}</div>
+                <div className="text-lg font-bold font-mono">{totals.area.toFixed(2)}</div>
                 <div className="text-[10px] text-muted-foreground uppercase">m² Total</div>
               </div>
               <div className="bg-background rounded-md p-2">
@@ -269,7 +270,7 @@ export function TakeoffPanel({
                 <div className="text-[10px] text-muted-foreground uppercase">Rooms</div>
               </div>
               <div className="bg-background rounded-md p-2">
-                <div className="text-lg font-bold font-mono">${totals.cost.toFixed(0)}</div>
+                <div className="text-lg font-bold font-mono">{formatCurrency(totals.cost)}</div>
                 <div className="text-[10px] text-muted-foreground uppercase">Est. Cost</div>
               </div>
             </div>
@@ -385,7 +386,7 @@ export function TakeoffPanel({
                                           <span className="font-mono text-xs text-primary">{pm.materialCode}</span>
                                           <span>{pm.name}</span>
                                           <span className="text-muted-foreground text-xs">
-                                            ${(specs.pricePerM2 || specs.price || 0).toFixed(2)}
+                                            {formatCurrency(specs.pricePerM2 || specs.price || 0)}
                                           </span>
                                         </div>
                                       </SelectItem>
@@ -405,7 +406,7 @@ export function TakeoffPanel({
                                       <MIcon className="w-3 h-3" />
                                       <span>{m.name}</span>
                                       <span className="text-muted-foreground text-xs">
-                                        ${((m.specs as any).pricePerM2 || (m.specs as any).price || 0).toFixed(2)}
+                                        {formatCurrency((m.specs as any).pricePerM2 || (m.specs as any).price || 0)}
                                       </span>
                                     </div>
                                   </SelectItem>
@@ -417,7 +418,7 @@ export function TakeoffPanel({
                           
                           {cost !== null && (
                             <span className="text-xs font-mono text-muted-foreground shrink-0 w-14 text-right">
-                              ${cost.toFixed(0)}
+                              {formatCurrency(cost)}
                             </span>
                           )}
                           

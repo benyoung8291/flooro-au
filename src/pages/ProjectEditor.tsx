@@ -463,10 +463,13 @@ export default function ProjectEditor() {
   }, []);
 
   const handleDeleteRoom = useCallback((roomId: string) => {
+    const roomToDelete = rooms.find(r => r.id === roomId);
+    if (!window.confirm(`Delete room "${roomToDelete?.name || 'Unnamed'}"? This cannot be undone.`)) return;
+
     setLocalData(prev => {
       const pages = (prev.pages as FloorPlanPage[]) || [];
       const activePageId = prev.activePageId as string | null;
-      
+
       if (pages.length > 0 && activePageId) {
         // Multi-page mode
         const updatedPages = pages.map(page => {
@@ -478,23 +481,23 @@ export default function ProjectEditor() {
           }
           return page;
         });
-        return { 
-          ...prev, 
+        return {
+          ...prev,
           pages: updatedPages,
           selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
         };
       } else {
         // Legacy mode
         const currentRooms = (prev.rooms as Room[]) || [];
-        return { 
-          ...prev, 
+        return {
+          ...prev,
           rooms: currentRooms.filter(room => room.id !== roomId),
           selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
         };
       }
     });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [rooms]);
 
   const handleRenameRoom = useCallback((roomId: string, name: string) => {
     handleUpdateRoom(roomId, { name });
@@ -757,13 +760,16 @@ export default function ProjectEditor() {
   }, []);
 
   const handleDeletePage = useCallback((pageId: string) => {
+    const pageToDelete = pages.find(p => p.id === pageId);
+    if (!window.confirm(`Delete page "${pageToDelete?.name || 'Unnamed'}"? All rooms on this page will be lost.`)) return;
+
     setLocalData(prev => {
       const pages = (prev.pages as FloorPlanPage[]) || [];
       if (pages.length <= 1) return prev; // Don't delete last page
-      
+
       const remaining = pages.filter(p => p.id !== pageId);
       const newActiveId = prev.activePageId === pageId ? remaining[0]?.id : prev.activePageId;
-      
+
       return {
         ...prev,
         pages: remaining,
@@ -773,7 +779,7 @@ export default function ProjectEditor() {
     });
     setHasUnsavedChanges(true);
     toast({ title: 'Page deleted' });
-  }, [toast]);
+  }, [toast, pages]);
 
   const handleDuplicatePage = useCallback((pageId: string) => {
     setLocalData(prev => {
@@ -968,7 +974,7 @@ export default function ProjectEditor() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setReportPreviewOpen(true)}>Export PDF</DropdownMenuItem>
-              <DropdownMenuItem>Share Project</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast({ title: 'Share feature coming soon' })}>Share Project</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}/settings`)}>
                 Project Settings

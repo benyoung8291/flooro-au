@@ -45,6 +45,9 @@ interface CanvasRendererProps {
   splitStartPoint?: CanvasPoint | null;
   splitPreviewEnd?: CanvasPoint | null;
   isSplitMode?: boolean;
+  // Rectangle preview props
+  rectangleStart?: CanvasPoint | null;
+  activeTool?: string;
   // Project materials for code badges
   projectMaterials?: ProjectMaterial[];
 }
@@ -107,6 +110,8 @@ export function CanvasRenderer({
   splitStartPoint,
   splitPreviewEnd,
   isSplitMode = false,
+  rectangleStart,
+  activeTool,
   projectMaterials = [],
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -309,6 +314,72 @@ export function CanvasRenderer({
         ctx.fill();
         ctx.stroke();
       });
+
+      // Draw polygon close zone indicator when enough points exist
+      if (drawingPoints.length >= 3) {
+        const firstPoint = drawingPoints[0];
+        ctx.save();
+        ctx.strokeStyle = 'hsla(142, 71%, 45%, 0.5)';
+        ctx.lineWidth = 1 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+        ctx.beginPath();
+        ctx.arc(firstPoint.x, firstPoint.y, 15 / zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
+
+    // Draw rectangle preview while placing
+    if (rectangleStart && activeTool === 'rectangle' && cursorPosition) {
+      const rx1 = Math.min(rectangleStart.x, cursorPosition.x);
+      const ry1 = Math.min(rectangleStart.y, cursorPosition.y);
+      const rx2 = Math.max(rectangleStart.x, cursorPosition.x);
+      const ry2 = Math.max(rectangleStart.y, cursorPosition.y);
+      const rw = rx2 - rx1;
+      const rh = ry2 - ry1;
+
+      ctx.save();
+      ctx.setLineDash([8 / zoom, 4 / zoom]);
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
+      ctx.lineWidth = 2 / zoom;
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+      ctx.beginPath();
+      ctx.rect(rx1, ry1, rw, rh);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw start corner marker
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+      ctx.beginPath();
+      ctx.arc(rectangleStart.x, rectangleStart.y, 5 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Show dimensions text
+      if (rw > 5 && rh > 5) {
+        let widthText: string;
+        let heightText: string;
+        if (state.scale) {
+          const wMm = rw / state.scale.pixelsPerMm;
+          const hMm = rh / state.scale.pixelsPerMm;
+          widthText = formatDimension(wMm, dimensionUnit);
+          heightText = formatDimension(hMm, dimensionUnit);
+        } else {
+          widthText = `${Math.round(rw)}px`;
+          heightText = `${Math.round(rh)}px`;
+        }
+
+        const dimText = `${widthText} × ${heightText}`;
+        const fontSize = 12 / zoom;
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(dimText, rx1 + rw / 2, ry1 - 6 / zoom);
+      }
+
+      ctx.restore();
     }
 
     // Draw snap indicator with type-specific styling
@@ -410,7 +481,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, projectMaterials]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials]);
 
   useEffect(() => {
     render();
