@@ -192,7 +192,10 @@ function calculateBrickPattern(
   
   let row = 0;
   for (let y = -effectiveTileHeight; y < bbox.height + effectiveTileHeight; y += effectiveTileHeight) {
-    const rowOffset = (row % 2) * effectiveTileWidth * offsetRatio;
+    // For brick (0.5): alternate 0, 0.5, 0, 0.5...
+    // For thirds (0.333): cycle 0, 0.333, 0.667, 0, 0.333, 0.667...
+    const cycleLength = Math.round(1 / offsetRatio);
+    const rowOffset = (row % cycleLength) * effectiveTileWidth * offsetRatio;
     
     for (let x = -effectiveTileWidth * 2; x < bbox.width + effectiveTileWidth; x += effectiveTileWidth) {
       const tileX = x + rowOffset;
@@ -255,67 +258,72 @@ function calculateHerringbonePattern(
 ): { tiles: TilePosition[]; groutLines: GroutLine[] } {
   const tiles: TilePosition[] = [];
   const groutLines: GroutLine[] = [];
-  
-  // For herringbone, we use the longer dimension as length
+
+  // For herringbone, we use the longer dimension as length and shorter as width
   const tileLength = Math.max(tileWidth, tileHeight);
   const tileShort = Math.min(tileWidth, tileHeight);
-  
-  // Pattern unit size
-  const unitWidth = tileLength + groutWidth;
-  const unitHeight = tileShort * 2 + groutWidth * 2;
-  
-  for (let unitY = -unitHeight; unitY < bbox.height + unitHeight; unitY += unitHeight) {
-    for (let unitX = -unitWidth * 2; unitX < bbox.width + unitWidth; unitX += unitWidth) {
-      // Each unit has 4 tiles in herringbone
-      const positions = [
-        { x: unitX, y: unitY, rotation: 0 },
-        { x: unitX, y: unitY + tileShort + groutWidth, rotation: 0 },
-        { x: unitX + tileShort + groutWidth, y: unitY - tileShort / 2, rotation: 90 },
-        { x: unitX + tileShort + groutWidth, y: unitY + tileShort / 2 + groutWidth, rotation: 90 },
-      ];
-      
-      for (const pos of positions) {
-        const isRotated = pos.rotation === 90;
-        const actualTileWidth = isRotated ? tileShort : tileLength;
-        const actualTileHeight = isRotated ? tileLength : tileShort;
-        
-        const tileRight = pos.x + actualTileWidth;
-        const tileBottom = pos.y + actualTileHeight;
-        
-        if (tileRight <= bbox.minX || pos.x >= bbox.maxX ||
-            tileBottom <= bbox.minY || pos.y >= bbox.maxY) {
-          continue;
-        }
-        
-        const actualX = Math.max(pos.x, bbox.minX);
-        const actualY = Math.max(pos.y, bbox.minY);
-        const clipRight = Math.min(tileRight, bbox.maxX);
-        const clipBottom = Math.min(tileBottom, bbox.maxY);
-        
-        const clippedWidth = clipRight - actualX;
-        const clippedHeight = clipBottom - actualY;
-        
-        const isCut = clippedWidth < actualTileWidth || clippedHeight < actualTileHeight;
-        const originalArea = tileWidth * tileHeight;
-        const usedArea = clippedWidth * clippedHeight;
-        
-        tiles.push({
-          id: generateId('tile'),
-          x: actualX,
-          y: actualY,
-          width: clippedWidth,
-          height: clippedHeight,
-          rotation: pos.rotation,
-          isCut,
-          cutType: isCut ? 'complex' : undefined,
-          originalArea,
-          usedArea,
-          wasteArea: originalArea - usedArea,
-        });
+
+  // In a herringbone pattern, tiles alternate between horizontal and vertical
+  // Each V-unit consists of one horizontal tile and one vertical tile
+  // The horizontal step is tileLength + groutWidth
+  // The vertical step is tileShort + groutWidth
+  const stepX = tileShort + groutWidth;
+  const stepY = tileShort + groutWidth;
+
+  for (let row = -4; row < Math.ceil(bbox.height / stepY) + 4; row++) {
+    for (let col = -4; col < Math.ceil(bbox.width / stepX) + 4; col++) {
+      // Determine if this is a horizontal or vertical tile based on checkerboard
+      const isVertical = (row + col) % 2 !== 0;
+
+      // Base position
+      const baseX = col * stepX;
+      const baseY = row * stepY;
+
+      const tw = isVertical ? tileShort : tileLength;
+      const th = isVertical ? tileLength : tileShort;
+
+      const tileX = baseX;
+      const tileY = baseY;
+      const tileRight = tileX + tw;
+      const tileBottom = tileY + th;
+
+      // Skip if completely outside bbox
+      if (tileRight <= bbox.minX || tileX >= bbox.maxX ||
+          tileBottom <= bbox.minY || tileY >= bbox.maxY) {
+        continue;
       }
+
+      // Clip to bbox
+      const actualX = Math.max(tileX, bbox.minX);
+      const actualY = Math.max(tileY, bbox.minY);
+      const clipRight = Math.min(tileRight, bbox.maxX);
+      const clipBottom = Math.min(tileBottom, bbox.maxY);
+
+      const clippedWidth = clipRight - actualX;
+      const clippedHeight = clipBottom - actualY;
+
+      if (clippedWidth <= 0 || clippedHeight <= 0) continue;
+
+      const isCut = clippedWidth < tw || clippedHeight < th;
+      const originalArea = tileWidth * tileHeight;
+      const usedArea = clippedWidth * clippedHeight;
+
+      tiles.push({
+        id: generateId('tile'),
+        x: actualX,
+        y: actualY,
+        width: clippedWidth,
+        height: clippedHeight,
+        rotation: isVertical ? 90 : 0,
+        isCut,
+        cutType: isCut ? 'complex' : undefined,
+        originalArea,
+        usedArea,
+        wasteArea: Math.max(0, originalArea - usedArea),
+      });
     }
   }
-  
+
   return { tiles, groutLines };
 }
 
@@ -370,7 +378,11 @@ function calculateDiagonalPattern(
       const isCut = left < bbox.minX || right > bbox.maxX || 
                     top < bbox.minY || bottom > bbox.maxY;
       const originalArea = tileWidth * tileHeight;
-      const usedArea = clippedWidth * clippedHeight * 0.5; // Approximate for diamond
+      // For a full uncut rotated tile, usedArea should equal the actual tile area
+      // For clipped tiles, approximate based on clipped rectangle area
+      const usedArea = isCut
+        ? Math.min(clippedWidth * clippedHeight, originalArea)
+        : originalArea;
       
       tiles.push({
         id: generateId('tile'),
@@ -388,6 +400,91 @@ function calculateDiagonalPattern(
     }
   }
   
+  return { tiles, groutLines };
+}
+
+/**
+ * Calculate basketweave pattern layout
+ */
+function calculateBasketweavePattern(
+  bbox: TileBoundingBox,
+  tileWidth: number,
+  tileHeight: number,
+  groutWidth: number,
+  options: TileLayoutOptions
+): { tiles: TilePosition[]; groutLines: GroutLine[] } {
+  const tiles: TilePosition[] = [];
+  const groutLines: GroutLine[] = [];
+
+  // Basketweave: pairs of tiles alternate between horizontal and vertical
+  const tileLength = Math.max(tileWidth, tileHeight);
+  const tileShort = Math.min(tileWidth, tileHeight);
+
+  // Each unit is a 2-tile pair: either 2 horizontal stacked or 2 vertical side-by-side
+  const unitSize = tileLength + groutWidth;
+
+  for (let row = -2; row < Math.ceil(bbox.height / unitSize) + 2; row++) {
+    for (let col = -2; col < Math.ceil(bbox.width / unitSize) + 2; col++) {
+      const isVerticalPair = (row + col) % 2 !== 0;
+      const unitX = col * unitSize;
+      const unitY = row * unitSize;
+
+      let pairTiles: { x: number; y: number; w: number; h: number }[];
+
+      if (isVerticalPair) {
+        // Two vertical tiles side by side
+        pairTiles = [
+          { x: unitX, y: unitY, w: tileShort, h: tileLength },
+          { x: unitX + tileShort + groutWidth, y: unitY, w: tileShort, h: tileLength },
+        ];
+      } else {
+        // Two horizontal tiles stacked
+        pairTiles = [
+          { x: unitX, y: unitY, w: tileLength, h: tileShort },
+          { x: unitX, y: unitY + tileShort + groutWidth, w: tileLength, h: tileShort },
+        ];
+      }
+
+      for (const pt of pairTiles) {
+        const tileRight = pt.x + pt.w;
+        const tileBottom = pt.y + pt.h;
+
+        if (tileRight <= bbox.minX || pt.x >= bbox.maxX ||
+            tileBottom <= bbox.minY || pt.y >= bbox.maxY) {
+          continue;
+        }
+
+        const actualX = Math.max(pt.x, bbox.minX);
+        const actualY = Math.max(pt.y, bbox.minY);
+        const clipRight = Math.min(tileRight, bbox.maxX);
+        const clipBottom = Math.min(tileBottom, bbox.maxY);
+
+        const clippedWidth = clipRight - actualX;
+        const clippedHeight = clipBottom - actualY;
+
+        if (clippedWidth <= 0 || clippedHeight <= 0) continue;
+
+        const isCut = clippedWidth < pt.w || clippedHeight < pt.h;
+        const originalArea = tileWidth * tileHeight;
+        const usedArea = clippedWidth * clippedHeight;
+
+        tiles.push({
+          id: generateId('tile'),
+          x: actualX,
+          y: actualY,
+          width: clippedWidth,
+          height: clippedHeight,
+          rotation: isVerticalPair ? 90 : 0,
+          isCut,
+          cutType: isCut ? 'edge' : undefined,
+          originalArea,
+          usedArea,
+          wasteArea: Math.max(0, originalArea - usedArea),
+        });
+      }
+    }
+  }
+
   return { tiles, groutLines };
 }
 
@@ -424,6 +521,9 @@ export function calculateTileLayout(
       break;
     case 'diagonal':
       layout = calculateDiagonalPattern(bbox, specs.widthMm, specs.lengthMm, groutWidth, options);
+      break;
+    case 'basketweave':
+      layout = calculateBasketweavePattern(bbox, specs.widthMm, specs.lengthMm, groutWidth, options);
       break;
     case 'grid':
     default:
@@ -535,6 +635,7 @@ export function getAvailablePatterns(): { value: TilePattern; label: string }[] 
     { value: 'brick', label: 'Brick (1/2 Offset)' },
     { value: 'thirds', label: 'Thirds (1/3 Offset)' },
     { value: 'herringbone', label: 'Herringbone' },
+    { value: 'basketweave', label: 'Basketweave' },
     { value: 'diagonal', label: 'Diagonal (45°)' },
   ];
 }

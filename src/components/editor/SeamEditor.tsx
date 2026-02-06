@@ -152,11 +152,15 @@ export function SeamEditor({
 
     const rect = svgRef.current.getBoundingClientRect();
     const isHorizontal = stripPlan.layoutDirection === 'horizontal';
-    
+
+    // Scale mouse coordinates to match SVG viewBox dimensions
+    const scaleX = width / rect.width;
+    const scaleY = height / rect.height;
+
     // Get position in mm
     const position = isHorizontal
-      ? toMmY(e.clientY - rect.top)
-      : toMmX(e.clientX - rect.left);
+      ? toMmY((e.clientY - rect.top) * scaleY)
+      : toMmX((e.clientX - rect.left) * scaleX);
 
     // Snap to material width increments
     const snappedPosition = Math.round(position / materialWidth) * materialWidth;

@@ -60,6 +60,8 @@ export default function ProjectEditor() {
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
+  const previousToolRef = useRef<EditorTool>('select');
+  const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
   
   const { data: project, isLoading } = useProject(projectId);
   const { data: materials } = useMaterials();
@@ -146,20 +148,15 @@ export default function ProjectEditor() {
       switch (e.key.toLowerCase()) {
         case 'v': setActiveTool('select'); break;
         case 'd': setActiveTool('draw'); break;
-        case 'r': setActiveTool('rectangle'); break;
         case 'h': setActiveTool('hole'); break;
         case 'o': setActiveTool('door'); break;
-        case 's': 
+        case 's':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            handleSave();
+            handleSaveRef.current?.();
           } else {
             setActiveTool('scale');
           }
-          break;
-        case ' ': 
-          e.preventDefault();
-          setActiveTool('pan'); 
           break;
         case 'm': setActiveTool('merge'); break;
         case 'x': setActiveTool('split'); break;
@@ -276,6 +273,20 @@ export default function ProjectEditor() {
     }
   };
 
+  // Keep handleSaveRef in sync so keyboard shortcut always calls latest version
+  useEffect(() => { handleSaveRef.current = handleSave; });
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Get pages and active page data
   const pages = (localData.pages as FloorPlanPage[]) || [];
@@ -338,50 +349,62 @@ export default function ProjectEditor() {
 
   // Room navigation handlers
   const handleNavigatePrevRoom = useCallback(() => {
-    const currentRooms = (localData.rooms as Room[]) || [];
+    const pages = (localData.pages as FloorPlanPage[]) || [];
+    const activeId = (localData.activePageId as string | null) || (pages.length > 0 ? pages[0]?.id : null);
+    const activePg = pages.find(p => p.id === activeId) || null;
+    const currentRooms = activePg?.rooms || (localData.rooms as Room[]) || [];
     const currentSelectedId = (localData.selectedRoomId as string | null);
     if (currentRooms.length === 0) return;
     const currentIndex = currentRooms.findIndex(r => r.id === currentSelectedId);
     const prevIndex = currentIndex <= 0 ? currentRooms.length - 1 : currentIndex - 1;
     setLocalData(prev => ({ ...prev, selectedRoomId: currentRooms[prevIndex].id }));
-  }, [localData.rooms, localData.selectedRoomId]);
+  }, [localData.pages, localData.activePageId, localData.rooms, localData.selectedRoomId]);
 
   const handleNavigateNextRoom = useCallback(() => {
-    const currentRooms = (localData.rooms as Room[]) || [];
+    const pages = (localData.pages as FloorPlanPage[]) || [];
+    const activeId = (localData.activePageId as string | null) || (pages.length > 0 ? pages[0]?.id : null);
+    const activePg = pages.find(p => p.id === activeId) || null;
+    const currentRooms = activePg?.rooms || (localData.rooms as Room[]) || [];
     const currentSelectedId = (localData.selectedRoomId as string | null);
     if (currentRooms.length === 0) return;
     const currentIndex = currentRooms.findIndex(r => r.id === currentSelectedId);
     const nextIndex = currentIndex >= currentRooms.length - 1 ? 0 : currentIndex + 1;
     setLocalData(prev => ({ ...prev, selectedRoomId: currentRooms[nextIndex].id }));
-  }, [localData.rooms, localData.selectedRoomId]);
+  }, [localData.pages, localData.activePageId, localData.rooms, localData.selectedRoomId]);
 
-  // Extended keyboard shortcuts for room navigation
+  // Extended keyboard shortcuts for room navigation, fill direction, and pan
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      
-      const currentRooms = (localData.rooms as Room[]) || [];
-      const currentSelectedId = (localData.selectedRoomId as string | null);
-      
+
+      const pgs = (localData.pages as FloorPlanPage[]) || [];
+      const actId = (localData.activePageId as string | null) || (pgs.length > 0 ? pgs[0]?.id : null);
+      const actPg = pgs.find(p => p.id === actId) || null;
+      const cRooms = actPg?.rooms || (localData.rooms as Room[]) || [];
+      const cSelectedId = (localData.selectedRoomId as string | null);
+
       switch (e.key) {
-        case 'r':
-          if (currentSelectedId) {
-            const selectedRoom = currentRooms.find(r => r.id === currentSelectedId);
+        case 'r': {
+          // Only rotate fill direction, don't also activate rectangle tool
+          // This is handled by the extended shortcuts, remove from main shortcuts
+          e.preventDefault();
+          e.stopPropagation();
+          if (cSelectedId) {
+            const selectedRoom = cRooms.find(r => r.id === cSelectedId);
             if (selectedRoom) {
               const currentDirection = selectedRoom.fillDirection || 0;
-              const newDirection = (currentDirection + 45) % 360;
-              setLocalData(prev => {
-                const rooms = (prev.rooms as Room[]) || [];
-                return {
-                  ...prev,
-                  rooms: rooms.map(room => 
-                    room.id === currentSelectedId ? { ...room, fillDirection: newDirection } : room
-                  )
-                };
-              });
-              setHasUnsavedChanges(true);
+              const newDirection = (currentDirection + 90) % 360;
+              handleUpdateRoom(cSelectedId, { fillDirection: newDirection });
             }
+          } else {
+            setActiveTool('rectangle');
           }
+          break;
+        }
+        case ' ':
+          e.preventDefault();
+          previousToolRef.current = activeTool;
+          setActiveTool('pan');
           break;
         case '[':
           e.preventDefault();
@@ -394,9 +417,19 @@ export default function ProjectEditor() {
       }
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === ' ') {
+        setActiveTool(previousToolRef.current);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [localData.rooms, localData.selectedRoomId, handleNavigatePrevRoom, handleNavigateNextRoom]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [localData.pages, localData.activePageId, localData.rooms, localData.selectedRoomId, handleNavigatePrevRoom, handleNavigateNextRoom, handleUpdateRoom, activeTool]);
 
   const handleUpdateRoom = useCallback((roomId: string, updates: Partial<Room>) => {
     setLocalData(prev => {
@@ -430,10 +463,13 @@ export default function ProjectEditor() {
   }, []);
 
   const handleDeleteRoom = useCallback((roomId: string) => {
+    const roomToDelete = rooms.find(r => r.id === roomId);
+    if (!window.confirm(`Delete room "${roomToDelete?.name || 'Unnamed'}"? This cannot be undone.`)) return;
+
     setLocalData(prev => {
       const pages = (prev.pages as FloorPlanPage[]) || [];
       const activePageId = prev.activePageId as string | null;
-      
+
       if (pages.length > 0 && activePageId) {
         // Multi-page mode
         const updatedPages = pages.map(page => {
@@ -445,23 +481,23 @@ export default function ProjectEditor() {
           }
           return page;
         });
-        return { 
-          ...prev, 
+        return {
+          ...prev,
           pages: updatedPages,
           selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
         };
       } else {
         // Legacy mode
         const currentRooms = (prev.rooms as Room[]) || [];
-        return { 
-          ...prev, 
+        return {
+          ...prev,
           rooms: currentRooms.filter(room => room.id !== roomId),
           selectedRoomId: prev.selectedRoomId === roomId ? null : prev.selectedRoomId
         };
       }
     });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [rooms]);
 
   const handleRenameRoom = useCallback((roomId: string, name: string) => {
     handleUpdateRoom(roomId, { name });
@@ -549,6 +585,12 @@ export default function ProjectEditor() {
     }
   }, [rooms, handleUpdateRoom]);
   
+  // Memoize materialTypes map to avoid recreating on every render
+  const materialTypeMap = useMemo(
+    () => new Map((materials || []).map(m => [m.id, m.type])),
+    [materials]
+  );
+
   const report = useMemo(
     () => generateReport(rooms, materials || [], scale),
     [rooms, materials, scale]
@@ -649,12 +691,28 @@ export default function ProjectEditor() {
   }, []);
 
   // Bulk assign material to multiple rooms
-
-  // Bulk assign material to multiple rooms
   const handleBulkAssignMaterial = useCallback((roomIds: string[], materialId: string) => {
     setLocalData(prev => {
+      const pages = (prev.pages as FloorPlanPage[]) || [];
+      const activePageId = prev.activePageId as string | null;
+
+      if (pages.length > 0 && activePageId) {
+        const updatedPages = pages.map(page => {
+          if (page.id === activePageId) {
+            return {
+              ...page,
+              rooms: page.rooms.map(room =>
+                roomIds.includes(room.id) ? { ...room, materialId } : room
+              ),
+            };
+          }
+          return page;
+        });
+        return { ...prev, pages: updatedPages };
+      }
+
       const currentRooms = (prev.rooms as Room[]) || [];
-      const updatedRooms = currentRooms.map(room => 
+      const updatedRooms = currentRooms.map(room =>
         roomIds.includes(room.id) ? { ...room, materialId } : room
       );
       return { ...prev, rooms: updatedRooms };
@@ -702,13 +760,16 @@ export default function ProjectEditor() {
   }, []);
 
   const handleDeletePage = useCallback((pageId: string) => {
+    const pageToDelete = pages.find(p => p.id === pageId);
+    if (!window.confirm(`Delete page "${pageToDelete?.name || 'Unnamed'}"? All rooms on this page will be lost.`)) return;
+
     setLocalData(prev => {
       const pages = (prev.pages as FloorPlanPage[]) || [];
       if (pages.length <= 1) return prev; // Don't delete last page
-      
+
       const remaining = pages.filter(p => p.id !== pageId);
       const newActiveId = prev.activePageId === pageId ? remaining[0]?.id : prev.activePageId;
-      
+
       return {
         ...prev,
         pages: remaining,
@@ -718,7 +779,7 @@ export default function ProjectEditor() {
     });
     setHasUnsavedChanges(true);
     toast({ title: 'Page deleted' });
-  }, [toast]);
+  }, [toast, pages]);
 
   const handleDuplicatePage = useCallback((pageId: string) => {
     setLocalData(prev => {
@@ -913,7 +974,7 @@ export default function ProjectEditor() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => setReportPreviewOpen(true)}>Export PDF</DropdownMenuItem>
-              <DropdownMenuItem>Share Project</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => toast({ title: 'Share feature coming soon' })}>Share Project</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => navigate(`/projects/${projectId}/settings`)}>
                 Project Settings
@@ -990,7 +1051,7 @@ export default function ProjectEditor() {
               activeTool={activeTool}
               jsonData={canvasData}
               onDataChange={handleDataChange}
-              materialTypes={new Map((materials || []).map(m => [m.id, m.type]))}
+              materialTypes={materialTypeMap}
               materials={materials || []}
               backgroundImage={backgroundImage}
               onSetBackgroundImage={handleSetBackgroundImage}
@@ -1118,14 +1179,14 @@ export default function ProjectEditor() {
       />
 
       {/* Accessory Quick-Add Dialog */}
-      {pendingMaterialRoom && (
+      {pendingMaterialRoom && rooms.find(r => r.id === pendingMaterialRoom.roomId) && (
         <AccessoryQuickAddDialog
           open={accessoryDialogOpen}
           onOpenChange={setAccessoryDialogOpen}
           materialType={pendingMaterialRoom.material.type}
           materialSubtype={pendingMaterialRoom.material.specs?.subtype}
           materialName={pendingMaterialRoom.material.name}
-          room={rooms.find(r => r.id === pendingMaterialRoom.roomId) || rooms[0]}
+          room={rooms.find(r => r.id === pendingMaterialRoom.roomId)!}
           onApplyAccessories={handleApplyAccessories}
           onSkip={handleSkipAccessories}
         />

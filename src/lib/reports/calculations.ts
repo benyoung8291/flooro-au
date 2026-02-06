@@ -15,6 +15,16 @@ import {
   ComplexityMetrics 
 } from './wasteCalculator';
 
+export interface AccessoryCosts {
+  coving?: { quantity: number; unit: string; cost: number };
+  smoothEdge?: { quantity: number; unit: string; cost: number };
+  underlayment?: { quantity: number; unit: string; cost: number };
+  adhesive?: { quantity: number; unit: string; cost: number };
+  weldRod?: { quantity: number; unit: string; cost: number };
+  transitions?: { quantity: number; unit: string; cost: number };
+  totalAccessoryCost: number;
+}
+
 export interface RoomCalculation {
   roomId: string;
   roomName: string;
@@ -37,6 +47,8 @@ export interface RoomCalculation {
   boxesNeeded?: number;
   tilesPerBox?: number;
   boxCoverageM2?: number;
+  // Accessory costs
+  accessoryCosts?: AccessoryCosts;
 }
 
 export interface ReportSummary {
@@ -105,6 +117,125 @@ function roundQuantity(value: number, mode: QuantityRoundingMode): number {
   }
 }
 
+// Calculate accessory costs for a room
+function calculateAccessoryCosts(
+  room: Room,
+  netAreaM2: number,
+  netPerimeterM: number,
+  scale: ScaleCalibration | null,
+  stripPlan?: StripPlanResult
+): AccessoryCosts | undefined {
+  const accessories = room.accessories;
+  if (!accessories) return undefined;
+
+  const result: AccessoryCosts = { totalAccessoryCost: 0 };
+  let hasAny = false;
+
+  // Coving: quantity = perimeter minus excluded walls
+  if (accessories.coving?.enabled) {
+    let covingPerimeter = netPerimeterM;
+    if (accessories.coving.excludeWalls && accessories.coving.excludeWalls.length > 0 && scale) {
+      // Calculate length of excluded walls and subtract
+      const points = room.points;
+      let excludedLength = 0;
+      for (const wallIdx of accessories.coving.excludeWalls) {
+        if (wallIdx >= 0 && wallIdx < points.length) {
+          const p1 = points[wallIdx];
+          const p2 = points[(wallIdx + 1) % points.length];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const lengthPx = Math.sqrt(dx * dx + dy * dy);
+          excludedLength += lengthPx / scale.pixelsPerMm / 1000;
+        }
+      }
+      covingPerimeter = Math.max(0, covingPerimeter - excludedLength);
+    }
+    const covingUnitPrice = accessories.coving.materialId ? 0 : 0; // Use unitPrice when material linked
+    const covingCost = covingPerimeter * covingUnitPrice;
+    result.coving = { quantity: covingPerimeter, unit: 'm', cost: covingCost };
+    result.totalAccessoryCost += covingCost;
+    hasAny = true;
+  }
+
+  // Smooth Edge: quantity = perimeter minus excluded walls, doubled if doubleRow
+  if (accessories.smoothEdge?.enabled) {
+    let sePerimeter = netPerimeterM;
+    if (accessories.smoothEdge.excludeWalls && accessories.smoothEdge.excludeWalls.length > 0 && scale) {
+      const points = room.points;
+      let excludedLength = 0;
+      for (const wallIdx of accessories.smoothEdge.excludeWalls) {
+        if (wallIdx >= 0 && wallIdx < points.length) {
+          const p1 = points[wallIdx];
+          const p2 = points[(wallIdx + 1) % points.length];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const lengthPx = Math.sqrt(dx * dx + dy * dy);
+          excludedLength += lengthPx / scale.pixelsPerMm / 1000;
+        }
+      }
+      sePerimeter = Math.max(0, sePerimeter - excludedLength);
+    }
+    if (accessories.smoothEdge.doubleRow) {
+      sePerimeter *= 2;
+    }
+    const seUnitPrice = 0; // Use unitPrice when material linked
+    const seCost = sePerimeter * seUnitPrice;
+    result.smoothEdge = { quantity: sePerimeter, unit: 'm', cost: seCost };
+    result.totalAccessoryCost += seCost;
+    hasAny = true;
+  }
+
+  // Underlayment: quantity = netAreaM2 (if enabled and type !== 'none')
+  if (accessories.underlayment?.enabled && accessories.underlayment.type !== 'none') {
+    const ulUnitPrice = 0; // Use unitPrice when material linked
+    const ulCost = netAreaM2 * ulUnitPrice;
+    result.underlayment = { quantity: netAreaM2, unit: 'm²', cost: ulCost };
+    result.totalAccessoryCost += ulCost;
+    hasAny = true;
+  }
+
+  // Adhesive: quantity = ceil(netAreaM2 / coverageRate) (if enabled and type !== 'none')
+  if (accessories.adhesive?.enabled && accessories.adhesive.type !== 'none') {
+    const coverageRate = accessories.adhesive.coverageRateM2PerUnit || 1;
+    const adhQuantity = Math.ceil(netAreaM2 / coverageRate);
+    const adhUnitPrice = 0; // Use unitPrice when material linked
+    const adhCost = adhQuantity * adhUnitPrice;
+    result.adhesive = { quantity: adhQuantity, unit: 'units', cost: adhCost };
+    result.totalAccessoryCost += adhCost;
+    hasAny = true;
+  }
+
+  // Weld Rod: quantity = sum of seam line lengths
+  if (accessories.weldRod?.enabled) {
+    let weldRodLength = 0;
+    if (stripPlan && stripPlan.seamLines.length > 0 && scale) {
+      for (const seam of stripPlan.seamLines) {
+        const dx = seam.x2 - seam.x1;
+        const dy = seam.y2 - seam.y1;
+        const lengthPx = Math.sqrt(dx * dx + dy * dy);
+        weldRodLength += lengthPx / scale.pixelsPerMm / 1000; // convert to meters
+      }
+    }
+    const wrUnitPrice = 0; // Use unitPrice when material linked
+    const wrCost = weldRodLength * wrUnitPrice;
+    result.weldRod = { quantity: weldRodLength, unit: 'm', cost: wrCost };
+    result.totalAccessoryCost += wrCost;
+    hasAny = true;
+  }
+
+  // Transitions: count of transition configs (each is a unit)
+  if (accessories.transitions && accessories.transitions.length > 0) {
+    const transCount = accessories.transitions.length;
+    const trUnitPrice = 0; // Use unitPrice when material linked
+    const trCost = transCount * trUnitPrice;
+    result.transitions = { quantity: transCount, unit: 'pcs', cost: trCost };
+    result.totalAccessoryCost += trCost;
+    hasAny = true;
+  }
+
+  return hasAny ? result : undefined;
+}
+
 // Calculate cost for a single room based on material type
 export function calculateRoomCost(
   room: Room,
@@ -160,13 +291,25 @@ export function calculateRoomCost(
     case 'roll': {
       // Use Greedy Strip algorithm for roll goods
       const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
-      stripPlan = calculateStripPlan(room, rollSpecs, scale);
+      stripPlan = calculateStripPlan(room, rollSpecs, scale, {
+        fillDirection: room.fillDirection || 0,
+        firstSeamOffset: room.seamOptions?.firstSeamOffset || 0,
+        manualSeams: room.seamOptions?.manualSeams || [],
+        avoidSeamZones: room.seamOptions?.avoidZones || [],
+        wasteOverride: wasteOverride,
+      });
       
       grossAreaM2 = stripPlan.totalMaterialAreaM2;
       quantity = grossAreaM2;
       totalCost = stripPlan.materialCost;
       unit = 'm²';
-      
+
+      // Calculate accessory costs for roll goods
+      const rollAccessoryCosts = calculateAccessoryCosts(room, netAreaM2, netPerimeterM, scale, stripPlan);
+      if (rollAccessoryCosts) {
+        totalCost += rollAccessoryCosts.totalAccessoryCost;
+      }
+
       return {
         roomId: room.id,
         roomName: room.name,
@@ -184,6 +327,7 @@ export function calculateRoomCost(
         quantity,
         unit,
         stripPlan,
+        accessoryCosts: rollAccessoryCosts,
       };
     }
       
@@ -209,7 +353,13 @@ export function calculateRoomCost(
         const boxPrice = material.specs.pricePerBox || (unitPrice * boxCoverageM2);
         totalCost = boxCount * boxPrice;
         unit = 'boxes';
-        
+
+        // Calculate accessory costs for boxed tiles
+        const boxAccessoryCosts = calculateAccessoryCosts(room, netAreaM2, netPerimeterM, scale);
+        if (boxAccessoryCosts) {
+          totalCost += boxAccessoryCosts.totalAccessoryCost;
+        }
+
         return {
           roomId: room.id,
           roomName: room.name,
@@ -229,6 +379,7 @@ export function calculateRoomCost(
           boxesNeeded: boxCount,
           tilesPerBox,
           boxCoverageM2,
+          accessoryCosts: boxAccessoryCosts,
         };
       }
       
@@ -243,14 +394,21 @@ export function calculateRoomCost(
       
     case 'linear': {
       // Linear (baseboards): perimeter minus doors
-      grossAreaM2 = netPerimeterM * wasteFactor;
-      quantity = grossAreaM2;
-      totalCost = grossAreaM2 * unitPrice;
+      const linearQuantity = netPerimeterM * wasteFactor;
+      grossAreaM2 = 0; // Linear materials don't have area
+      quantity = linearQuantity;
+      totalCost = linearQuantity * unitPrice;
       unit = 'm';
       break;
     }
   }
-  
+
+  // Calculate accessory costs (for tile-without-boxes and linear cases)
+  const accessoryCosts = calculateAccessoryCosts(room, netAreaM2, netPerimeterM, scale, stripPlan);
+  if (accessoryCosts) {
+    totalCost += accessoryCosts.totalAccessoryCost;
+  }
+
   return {
     roomId: room.id,
     roomName: room.name,
@@ -268,6 +426,7 @@ export function calculateRoomCost(
     quantity,
     unit,
     stripPlan,
+    accessoryCosts,
   };
 }
 
@@ -321,17 +480,19 @@ export function generateReport(
     
     const existing = materialAggregates.get(calc.materialId);
     if (existing) {
-      existing.totalArea += calc.grossAreaM2;
-      existing.totalQuantity += calc.quantity;
-      existing.totalCost += calc.totalCost;
-      
-      // Update utilization for roll goods
+      // Update utilization for roll goods BEFORE updating totalArea
       if (calc.stripPlan && existing.wastePercent !== undefined) {
-        const totalWaste = (existing.wastePercent * existing.totalArea + calc.stripPlan.wastePercent * calc.grossAreaM2) / 
-          (existing.totalArea + calc.grossAreaM2);
+        const combinedArea = existing.totalArea + calc.grossAreaM2;
+        const totalWaste = combinedArea > 0
+          ? (existing.wastePercent * existing.totalArea + calc.stripPlan.wastePercent * calc.grossAreaM2) / combinedArea
+          : 0;
         existing.wastePercent = totalWaste;
         existing.utilizationPercent = 100 - totalWaste;
       }
+
+      existing.totalArea += calc.grossAreaM2;
+      existing.totalQuantity += calc.quantity;
+      existing.totalCost += calc.totalCost;
     } else {
       const summaryItem: MaterialSummaryItem = {
         materialId: calc.materialId,
@@ -372,9 +533,9 @@ export type { WastageSuggestion, WasteOverrides, ComplexityMetrics };
 
 // Format currency
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-AU', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'AUD',
     minimumFractionDigits: 2,
   }).format(value);
 }

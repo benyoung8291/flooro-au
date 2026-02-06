@@ -45,6 +45,9 @@ interface CanvasRendererProps {
   splitStartPoint?: CanvasPoint | null;
   splitPreviewEnd?: CanvasPoint | null;
   isSplitMode?: boolean;
+  // Rectangle preview props
+  rectangleStart?: CanvasPoint | null;
+  activeTool?: string;
   // Project materials for code badges
   projectMaterials?: ProjectMaterial[];
 }
@@ -107,6 +110,8 @@ export function CanvasRenderer({
   splitStartPoint,
   splitPreviewEnd,
   isSplitMode = false,
+  rectangleStart,
+  activeTool,
   projectMaterials = [],
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -165,14 +170,24 @@ export function CanvasRenderer({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Set canvas size
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
+    // Set canvas size with HiDPI support
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = width;
+    const displayHeight = height;
+
+    if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
+      canvas.width = displayWidth * dpr;
+      canvas.height = displayHeight * dpr;
+      canvas.style.width = `${displayWidth}px`;
+      canvas.style.height = `${displayHeight}px`;
     }
 
+    // Scale context for HiDPI
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     // Clear canvas
-    ctx.fillStyle = 'hsl(210 20% 96%)';
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    ctx.fillStyle = isDarkMode ? 'hsl(220 13% 13%)' : 'hsl(210 20% 96%)';
     ctx.fillRect(0, 0, width, height);
 
     // Save context for transformations
@@ -299,6 +314,72 @@ export function CanvasRenderer({
         ctx.fill();
         ctx.stroke();
       });
+
+      // Draw polygon close zone indicator when enough points exist
+      if (drawingPoints.length >= 3) {
+        const firstPoint = drawingPoints[0];
+        ctx.save();
+        ctx.strokeStyle = 'hsla(142, 71%, 45%, 0.5)';
+        ctx.lineWidth = 1 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+        ctx.beginPath();
+        ctx.arc(firstPoint.x, firstPoint.y, 15 / zoom, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+      }
+    }
+
+    // Draw rectangle preview while placing
+    if (rectangleStart && activeTool === 'rectangle' && cursorPosition) {
+      const rx1 = Math.min(rectangleStart.x, cursorPosition.x);
+      const ry1 = Math.min(rectangleStart.y, cursorPosition.y);
+      const rx2 = Math.max(rectangleStart.x, cursorPosition.x);
+      const ry2 = Math.max(rectangleStart.y, cursorPosition.y);
+      const rw = rx2 - rx1;
+      const rh = ry2 - ry1;
+
+      ctx.save();
+      ctx.setLineDash([8 / zoom, 4 / zoom]);
+      ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
+      ctx.lineWidth = 2 / zoom;
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+      ctx.beginPath();
+      ctx.rect(rx1, ry1, rw, rh);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw start corner marker
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+      ctx.beginPath();
+      ctx.arc(rectangleStart.x, rectangleStart.y, 5 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Show dimensions text
+      if (rw > 5 && rh > 5) {
+        let widthText: string;
+        let heightText: string;
+        if (state.scale) {
+          const wMm = rw / state.scale.pixelsPerMm;
+          const hMm = rh / state.scale.pixelsPerMm;
+          widthText = formatDimension(wMm, dimensionUnit);
+          heightText = formatDimension(hMm, dimensionUnit);
+        } else {
+          widthText = `${Math.round(rw)}px`;
+          heightText = `${Math.round(rh)}px`;
+        }
+
+        const dimText = `${widthText} × ${heightText}`;
+        const fontSize = 12 / zoom;
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+        ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(dimText, rx1 + rw / 2, ry1 - 6 / zoom);
+      }
+
+      ctx.restore();
     }
 
     // Draw snap indicator with type-specific styling
@@ -400,7 +481,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, projectMaterials]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials]);
 
   useEffect(() => {
     render();
@@ -574,25 +655,41 @@ function drawGrid(
   const startY = Math.floor(-offsetY / zoom / gridSize) * gridSize - gridSize;
   const endY = Math.ceil((height - offsetY) / zoom / gridSize) * gridSize + gridSize;
 
-  // Draw vertical lines
+  // Batch minor grid lines into single path
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 0.5 / zoom;
+  ctx.beginPath();
   for (let x = startX; x <= endX; x += gridSize) {
-    ctx.strokeStyle = x % (gridSize * 4) === 0 ? majorGridColor : gridColor;
-    ctx.lineWidth = x % (gridSize * 4) === 0 ? 1 / zoom : 0.5 / zoom;
-    ctx.beginPath();
-    ctx.moveTo(x, startY);
-    ctx.lineTo(x, endY);
-    ctx.stroke();
+    if (x % (gridSize * 4) !== 0) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
   }
-
-  // Draw horizontal lines
   for (let y = startY; y <= endY; y += gridSize) {
-    ctx.strokeStyle = y % (gridSize * 4) === 0 ? majorGridColor : gridColor;
-    ctx.lineWidth = y % (gridSize * 4) === 0 ? 1 / zoom : 0.5 / zoom;
-    ctx.beginPath();
-    ctx.moveTo(startX, y);
-    ctx.lineTo(endX, y);
-    ctx.stroke();
+    if (y % (gridSize * 4) !== 0) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
   }
+  ctx.stroke();
+
+  // Batch major grid lines into single path
+  ctx.strokeStyle = majorGridColor;
+  ctx.lineWidth = 1 / zoom;
+  ctx.beginPath();
+  for (let x = startX; x <= endX; x += gridSize) {
+    if (x % (gridSize * 4) === 0) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
+  }
+  for (let y = startY; y <= endY; y += gridSize) {
+    if (y % (gridSize * 4) === 0) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
+  }
+  ctx.stroke();
 }
 
 function drawRoom(
@@ -885,14 +982,29 @@ function drawRoom(
   });
 
   // Draw room label with area
-  const centerX = room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
-  const centerY = room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
+  // Calculate true polygon centroid using signed area method
+  let cx = 0, cy = 0, signedArea = 0;
+  for (let i = 0; i < room.points.length; i++) {
+    const j = (i + 1) % room.points.length;
+    const cross = room.points[i].x * room.points[j].y - room.points[j].x * room.points[i].y;
+    cx += (room.points[i].x + room.points[j].x) * cross;
+    cy += (room.points[i].y + room.points[j].y) * cross;
+    signedArea += cross;
+  }
+  signedArea /= 2;
+  const centerX = signedArea !== 0 ? cx / (6 * signedArea) : room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
+  const centerY = signedArea !== 0 ? cy / (6 * signedArea) : room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
   
   const pixelArea = calculateRoomNetArea(room);
   let areaText = '';
   if (scale) {
-    const realArea = mmSquaredToMSquared(pixelAreaToRealArea(pixelArea, scale));
-    areaText = `${realArea.toFixed(2)} m²`;
+    const realAreaM2 = mmSquaredToMSquared(pixelAreaToRealArea(pixelArea, scale));
+    if (dimensionUnit === 'imperial') {
+      const sqFt = realAreaM2 * 10.7639;
+      areaText = `${sqFt.toFixed(1)} ft²`;
+    } else {
+      areaText = `${realAreaM2.toFixed(2)} m²`;
+    }
   } else {
     areaText = `${(pixelArea / 10000).toFixed(1)} units²`;
   }
@@ -1057,9 +1169,18 @@ function drawFillDirectionArrow(
 ) {
   if (room.points.length < 3) return;
   
-  // Calculate room centroid
-  const centerX = room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
-  const centerY = room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
+  // Calculate true polygon centroid
+  let arrowCx = 0, arrowCy = 0, arrowSignedArea = 0;
+  for (let i = 0; i < room.points.length; i++) {
+    const j = (i + 1) % room.points.length;
+    const cross = room.points[i].x * room.points[j].y - room.points[j].x * room.points[i].y;
+    arrowCx += (room.points[i].x + room.points[j].x) * cross;
+    arrowCy += (room.points[i].y + room.points[j].y) * cross;
+    arrowSignedArea += cross;
+  }
+  arrowSignedArea /= 2;
+  const centerX = arrowSignedArea !== 0 ? arrowCx / (6 * arrowSignedArea) : room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
+  const centerY = arrowSignedArea !== 0 ? arrowCy / (6 * arrowSignedArea) : room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
   
   const direction = room.fillDirection || 0;
   const arrowLength = 35 / zoom;

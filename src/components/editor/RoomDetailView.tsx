@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Room, ScaleCalibration, RoomAccessories } from '@/lib/canvas/types';
 import { Material } from '@/hooks/useMaterials';
 import { StripPlanResult, SeamOverride, AvoidZone } from '@/lib/rollGoods/types';
@@ -29,6 +29,7 @@ import {
   ArrowLeftRight,
 } from 'lucide-react';
 import { calculatePolygonArea, calculatePerimeter } from '@/lib/canvas/geometry';
+import { formatCurrency } from '@/lib/reports/calculations';
 import { AccessoriesPanel } from './AccessoriesPanel';
 import { SeamEditor } from './SeamEditor';
 import { TilePatternViewer } from './TilePatternViewer';
@@ -70,6 +71,16 @@ export function RoomDetailView({
   const isRollMaterial = material?.type === 'roll';
   const isTileMaterial = material?.type === 'tile';
   const Icon = material ? typeIcons[material.type] || Square : null;
+
+  // Reset tab to a valid value when material type changes
+  useEffect(() => {
+    if (activeTab === 'seams' && !isRollMaterial) {
+      setActiveTab('overview');
+    }
+    if (activeTab === 'pattern' && !isTileMaterial) {
+      setActiveTab('overview');
+    }
+  }, [material?.type, activeTab, isRollMaterial, isTileMaterial]);
 
   // Calculate room metrics
   const formatArea = (): string => {
@@ -276,7 +287,7 @@ export function RoomDetailView({
                     <>
                       <div className="text-muted-foreground">Price</div>
                       <div className="font-mono">
-                        ${(material.specs as any).pricePerM2.toFixed(2)}/m²
+                        {formatCurrency((material.specs as any).pricePerM2)}/m²
                       </div>
                     </>
                   )}
@@ -334,7 +345,12 @@ export function RoomDetailView({
                 materialWidth={
                   (material?.specs as any)?.widthMm || 3660
                 }
-                onRecalculate={() => {}}
+                onRecalculate={() => {
+                  // Force strip plan recalculation by touching the room's seamOptions
+                  if (room.seamOptions) {
+                    onUpdateRoom(room.id, { seamOptions: { ...room.seamOptions } });
+                  }
+                }}
               />
             </TabsContent>
           )}

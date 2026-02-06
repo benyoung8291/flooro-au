@@ -200,12 +200,15 @@ export type CanvasAction =
   | { type: 'UPDATE_BACKGROUND_IMAGE'; updates: Partial<BackgroundImage> }
   | { type: 'REMOVE_BACKGROUND_IMAGE' }
   | { type: 'LOAD_STATE'; state: CanvasState }
-  | { type: 'RESET' };
+  | { type: 'RESET' }
+  | { type: 'BATCH'; actions: CanvasAction[] };
 
 export const DOOR_WIDTHS = [
-  { label: "30\" (762mm)", value: 762 },
-  { label: "32\" (813mm)", value: 813 },
-  { label: "36\" (914mm)", value: 914 },
+  { label: "620mm", value: 620 },
+  { label: "720mm", value: 720 },
+  { label: "820mm", value: 820 },
+  { label: "870mm", value: 870 },
+  { label: "920mm", value: 920 },
 ] as const;
 
 export const DEFAULT_ROOM_COLOR = 'hsla(217, 91%, 50%, 0.15)';

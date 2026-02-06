@@ -158,11 +158,11 @@ export function calculateStripPlan(
   } else if (fillAngle === 90 || fillAngle === 270) {
     calcDirection = 'vertical';
   } else if (options.optimizeFor === 'seams') {
-    // Minimize seams = run along longest dimension
+    // Minimize seams: fill across the shortest room dimension to get fewer strips
     calcDirection = bbox.width >= bbox.height ? 'horizontal' : 'vertical';
   } else {
-    // Default: minimize waste by running perpendicular to shortest side
-    calcDirection = bbox.width >= bbox.height ? 'horizontal' : 'vertical';
+    // Default: fill across the longest room dimension for shorter strip lengths
+    calcDirection = bbox.width >= bbox.height ? 'vertical' : 'horizontal';
   }
   
   // Determine the final layout direction label
@@ -327,7 +327,8 @@ export function calculateStripPlan(
   }
 
   // Apply additional waste factor from material specs
-  const wasteMultiplier = 1 + (material.wastePercent / 100);
+  const materialWastePercent = options.wasteOverride !== undefined ? options.wasteOverride : material.wastePercent;
+  const wasteMultiplier = 1 + (materialWastePercent / 100);
   totalMaterialMm2 *= wasteMultiplier;
   totalRollLengthMm *= wasteMultiplier;
 
