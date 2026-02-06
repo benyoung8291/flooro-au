@@ -165,14 +165,24 @@ export function CanvasRenderer({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Set canvas size
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
+    // Set canvas size with HiDPI support
+    const dpr = window.devicePixelRatio || 1;
+    const displayWidth = width;
+    const displayHeight = height;
+
+    if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
+      canvas.width = displayWidth * dpr;
+      canvas.height = displayHeight * dpr;
+      canvas.style.width = `${displayWidth}px`;
+      canvas.style.height = `${displayHeight}px`;
     }
 
+    // Scale context for HiDPI
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
     // Clear canvas
-    ctx.fillStyle = 'hsl(210 20% 96%)';
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    ctx.fillStyle = isDarkMode ? 'hsl(220 13% 13%)' : 'hsl(210 20% 96%)';
     ctx.fillRect(0, 0, width, height);
 
     // Save context for transformations
@@ -574,25 +584,41 @@ function drawGrid(
   const startY = Math.floor(-offsetY / zoom / gridSize) * gridSize - gridSize;
   const endY = Math.ceil((height - offsetY) / zoom / gridSize) * gridSize + gridSize;
 
-  // Draw vertical lines
+  // Batch minor grid lines into single path
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 0.5 / zoom;
+  ctx.beginPath();
   for (let x = startX; x <= endX; x += gridSize) {
-    ctx.strokeStyle = x % (gridSize * 4) === 0 ? majorGridColor : gridColor;
-    ctx.lineWidth = x % (gridSize * 4) === 0 ? 1 / zoom : 0.5 / zoom;
-    ctx.beginPath();
-    ctx.moveTo(x, startY);
-    ctx.lineTo(x, endY);
-    ctx.stroke();
+    if (x % (gridSize * 4) !== 0) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
   }
-
-  // Draw horizontal lines
   for (let y = startY; y <= endY; y += gridSize) {
-    ctx.strokeStyle = y % (gridSize * 4) === 0 ? majorGridColor : gridColor;
-    ctx.lineWidth = y % (gridSize * 4) === 0 ? 1 / zoom : 0.5 / zoom;
-    ctx.beginPath();
-    ctx.moveTo(startX, y);
-    ctx.lineTo(endX, y);
-    ctx.stroke();
+    if (y % (gridSize * 4) !== 0) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
   }
+  ctx.stroke();
+
+  // Batch major grid lines into single path
+  ctx.strokeStyle = majorGridColor;
+  ctx.lineWidth = 1 / zoom;
+  ctx.beginPath();
+  for (let x = startX; x <= endX; x += gridSize) {
+    if (x % (gridSize * 4) === 0) {
+      ctx.moveTo(x, startY);
+      ctx.lineTo(x, endY);
+    }
+  }
+  for (let y = startY; y <= endY; y += gridSize) {
+    if (y % (gridSize * 4) === 0) {
+      ctx.moveTo(startX, y);
+      ctx.lineTo(endX, y);
+    }
+  }
+  ctx.stroke();
 }
 
 function drawRoom(
@@ -885,14 +911,29 @@ function drawRoom(
   });
 
   // Draw room label with area
-  const centerX = room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
-  const centerY = room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
+  // Calculate true polygon centroid using signed area method
+  let cx = 0, cy = 0, signedArea = 0;
+  for (let i = 0; i < room.points.length; i++) {
+    const j = (i + 1) % room.points.length;
+    const cross = room.points[i].x * room.points[j].y - room.points[j].x * room.points[i].y;
+    cx += (room.points[i].x + room.points[j].x) * cross;
+    cy += (room.points[i].y + room.points[j].y) * cross;
+    signedArea += cross;
+  }
+  signedArea /= 2;
+  const centerX = signedArea !== 0 ? cx / (6 * signedArea) : room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
+  const centerY = signedArea !== 0 ? cy / (6 * signedArea) : room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
   
   const pixelArea = calculateRoomNetArea(room);
   let areaText = '';
   if (scale) {
-    const realArea = mmSquaredToMSquared(pixelAreaToRealArea(pixelArea, scale));
-    areaText = `${realArea.toFixed(2)} m²`;
+    const realAreaM2 = mmSquaredToMSquared(pixelAreaToRealArea(pixelArea, scale));
+    if (dimensionUnit === 'imperial') {
+      const sqFt = realAreaM2 * 10.7639;
+      areaText = `${sqFt.toFixed(1)} ft²`;
+    } else {
+      areaText = `${realAreaM2.toFixed(2)} m²`;
+    }
   } else {
     areaText = `${(pixelArea / 10000).toFixed(1)} units²`;
   }
@@ -1057,9 +1098,18 @@ function drawFillDirectionArrow(
 ) {
   if (room.points.length < 3) return;
   
-  // Calculate room centroid
-  const centerX = room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
-  const centerY = room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
+  // Calculate true polygon centroid
+  let arrowCx = 0, arrowCy = 0, arrowSignedArea = 0;
+  for (let i = 0; i < room.points.length; i++) {
+    const j = (i + 1) % room.points.length;
+    const cross = room.points[i].x * room.points[j].y - room.points[j].x * room.points[i].y;
+    arrowCx += (room.points[i].x + room.points[j].x) * cross;
+    arrowCy += (room.points[i].y + room.points[j].y) * cross;
+    arrowSignedArea += cross;
+  }
+  arrowSignedArea /= 2;
+  const centerX = arrowSignedArea !== 0 ? arrowCx / (6 * arrowSignedArea) : room.points.reduce((sum, p) => sum + p.x, 0) / room.points.length;
+  const centerY = arrowSignedArea !== 0 ? arrowCy / (6 * arrowSignedArea) : room.points.reduce((sum, p) => sum + p.y, 0) / room.points.length;
   
   const direction = room.fillDirection || 0;
   const arrowLength = 35 / zoom;

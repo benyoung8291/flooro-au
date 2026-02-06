@@ -98,7 +98,15 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
     
     case 'RESET':
       return INITIAL_STATE;
-    
+
+    case 'BATCH': {
+      let newState = state;
+      for (const subAction of action.actions) {
+        newState = canvasReducer(newState, subAction);
+      }
+      return newState;
+    }
+
     default:
       return state;
   }
@@ -112,6 +120,9 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
     ...initialState,
   });
   
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const historyRef = useRef<CanvasState[]>([{ ...INITIAL_STATE, ...initialState }]);
   const animationFrameRef = useRef<number | null>(null);
   const historyIndexRef = useRef(0);
@@ -148,14 +159,16 @@ export function useCanvasHistory(initialState?: Partial<CanvasState>) {
   const undo = useCallback(() => {
     if (historyIndexRef.current > 0) {
       historyIndexRef.current--;
-      dispatch({ type: 'LOAD_STATE', state: historyRef.current[historyIndexRef.current] });
+      const targetState = historyRef.current[historyIndexRef.current];
+      dispatch({ type: 'LOAD_STATE', state: { ...targetState, viewTransform: stateRef.current.viewTransform } });
     }
   }, []);
-  
+
   const redo = useCallback(() => {
     if (historyIndexRef.current < historyRef.current.length - 1) {
       historyIndexRef.current++;
-      dispatch({ type: 'LOAD_STATE', state: historyRef.current[historyIndexRef.current] });
+      const targetState = historyRef.current[historyIndexRef.current];
+      dispatch({ type: 'LOAD_STATE', state: { ...targetState, viewTransform: stateRef.current.viewTransform } });
     }
   }, []);
   

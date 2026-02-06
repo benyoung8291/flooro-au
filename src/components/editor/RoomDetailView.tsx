@@ -334,7 +334,12 @@ export function RoomDetailView({
                 materialWidth={
                   (material?.specs as any)?.widthMm || 3660
                 }
-                onRecalculate={() => {}}
+                onRecalculate={() => {
+                  // Force strip plan recalculation by touching the room's seamOptions
+                  if (room.seamOptions) {
+                    onUpdateRoom(room.id, { seamOptions: { ...room.seamOptions } });
+                  }
+                }}
               />
             </TabsContent>
           )}

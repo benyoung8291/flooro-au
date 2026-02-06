@@ -160,7 +160,13 @@ export function calculateRoomCost(
     case 'roll': {
       // Use Greedy Strip algorithm for roll goods
       const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
-      stripPlan = calculateStripPlan(room, rollSpecs, scale);
+      stripPlan = calculateStripPlan(room, rollSpecs, scale, {
+        fillDirection: room.fillDirection || 0,
+        firstSeamOffset: room.seamOptions?.firstSeamOffset || 0,
+        manualSeams: room.seamOptions?.manualSeams || [],
+        avoidSeamZones: room.seamOptions?.avoidZones || [],
+        wasteOverride: wasteOverride,
+      });
       
       grossAreaM2 = stripPlan.totalMaterialAreaM2;
       quantity = grossAreaM2;
@@ -243,9 +249,10 @@ export function calculateRoomCost(
       
     case 'linear': {
       // Linear (baseboards): perimeter minus doors
-      grossAreaM2 = netPerimeterM * wasteFactor;
-      quantity = grossAreaM2;
-      totalCost = grossAreaM2 * unitPrice;
+      const linearQuantity = netPerimeterM * wasteFactor;
+      grossAreaM2 = 0; // Linear materials don't have area
+      quantity = linearQuantity;
+      totalCost = linearQuantity * unitPrice;
       unit = 'm';
       break;
     }
@@ -321,17 +328,19 @@ export function generateReport(
     
     const existing = materialAggregates.get(calc.materialId);
     if (existing) {
-      existing.totalArea += calc.grossAreaM2;
-      existing.totalQuantity += calc.quantity;
-      existing.totalCost += calc.totalCost;
-      
-      // Update utilization for roll goods
+      // Update utilization for roll goods BEFORE updating totalArea
       if (calc.stripPlan && existing.wastePercent !== undefined) {
-        const totalWaste = (existing.wastePercent * existing.totalArea + calc.stripPlan.wastePercent * calc.grossAreaM2) / 
-          (existing.totalArea + calc.grossAreaM2);
+        const combinedArea = existing.totalArea + calc.grossAreaM2;
+        const totalWaste = combinedArea > 0
+          ? (existing.wastePercent * existing.totalArea + calc.stripPlan.wastePercent * calc.grossAreaM2) / combinedArea
+          : 0;
         existing.wastePercent = totalWaste;
         existing.utilizationPercent = 100 - totalWaste;
       }
+
+      existing.totalArea += calc.grossAreaM2;
+      existing.totalQuantity += calc.quantity;
+      existing.totalCost += calc.totalCost;
     } else {
       const summaryItem: MaterialSummaryItem = {
         materialId: calc.materialId,
@@ -372,9 +381,9 @@ export type { WastageSuggestion, WasteOverrides, ComplexityMetrics };
 
 // Format currency
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-AU', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'AUD',
     minimumFractionDigits: 2,
   }).format(value);
 }

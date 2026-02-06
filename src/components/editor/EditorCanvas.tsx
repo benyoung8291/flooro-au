@@ -376,7 +376,7 @@ export function EditorCanvas({
       }
       // Toggle grid snap
       if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) {
-        setSnapSettings(prev => ({ ...prev, gridEnabled: !prev.gridEnabled }));
+        setSnapSettings({ ...snapSettings, gridEnabled: !snapSettings.gridEnabled });
       }
       // Toggle dimension input while drawing
       if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey && isDrawing) {
@@ -460,11 +460,13 @@ export function EditorCanvas({
       accessories: room1.accessories || room2.accessories,
     };
     
-    // Delete old rooms, add merged
-    dispatch({ type: 'DELETE_ROOM', roomId: room1.id });
-    dispatch({ type: 'DELETE_ROOM', roomId: room2.id });
-    dispatch({ type: 'ADD_ROOM', room: mergedRoom });
-    dispatch({ type: 'SELECT_ROOM', roomId: mergedRoom.id });
+    // Delete old rooms, add merged (atomic batch)
+    dispatch({ type: 'BATCH', actions: [
+      { type: 'DELETE_ROOM', roomId: room1.id },
+      { type: 'DELETE_ROOM', roomId: room2.id },
+      { type: 'ADD_ROOM', room: mergedRoom },
+      { type: 'SELECT_ROOM', roomId: mergedRoom.id },
+    ]});
     
     // Reset merge state
     setMergeFirstRoom(null);
@@ -537,11 +539,13 @@ export function EditorCanvas({
       accessories: room.accessories,
     };
     
-    // Delete original, add new rooms
-    dispatch({ type: 'DELETE_ROOM', roomId: room.id });
-    dispatch({ type: 'ADD_ROOM', room: room1 });
-    dispatch({ type: 'ADD_ROOM', room: room2 });
-    dispatch({ type: 'SELECT_ROOM', roomId: room1.id });
+    // Delete original, add new rooms (atomic batch)
+    dispatch({ type: 'BATCH', actions: [
+      { type: 'DELETE_ROOM', roomId: room.id },
+      { type: 'ADD_ROOM', room: room1 },
+      { type: 'ADD_ROOM', room: room2 },
+      { type: 'SELECT_ROOM', roomId: room1.id },
+    ]});
     
     // Reset split state
     setSplitRoom(null);

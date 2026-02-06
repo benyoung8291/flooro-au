@@ -52,6 +52,12 @@ export interface SeamLine {
   x2: number;
   y2: number;
   type: 'primary' | 'cross'; // Primary = along strip length, cross = perpendicular join
+
+  // Enhanced properties for interactive editing
+  position?: number;      // Position along perpendicular axis (for dragging)
+  isLocked?: boolean;     // Whether this seam is locked in place
+  isManual?: boolean;     // Whether this was manually placed
+  inAvoidZone?: boolean;  // Warning: seam is in an avoid zone
 }
 
 /**
@@ -121,6 +127,9 @@ export interface StripPlanOptions {
   
   // First seam position offset from starting edge (mm)
   firstSeamOffset?: number;
+
+  // Override waste percentage (from report-level settings)
+  wasteOverride?: number;
 }
 
 /**
@@ -142,24 +151,6 @@ export interface SeamOverride {
   id: string;
   position: number;      // Position in mm from left/top edge
   type: 'add' | 'lock';  // Add = force seam here, Lock = prevent moving this seam
-}
-
-/**
- * Enhanced seam line with draggable support
- */
-export interface SeamLine {
-  id: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  type: 'primary' | 'cross';
-  
-  // Enhanced properties for interactive editing
-  position?: number;      // Position along perpendicular axis (for dragging)
-  isLocked?: boolean;     // Whether this seam is locked in place
-  isManual?: boolean;     // Whether this was manually placed
-  inAvoidZone?: boolean;  // Warning: seam is in an avoid zone
 }
 
 /**
