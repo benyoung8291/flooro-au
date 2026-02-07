@@ -502,6 +502,58 @@ export function CanvasRenderer({
       ctx.restore();
     }
 
+    // Draw hole rectangle preview while cutting
+    if (holeRectStart && activeTool === 'hole' && cursorPosition) {
+      const hx1 = Math.min(holeRectStart.x, cursorPosition.x);
+      const hy1 = Math.min(holeRectStart.y, cursorPosition.y);
+      const hx2 = Math.max(holeRectStart.x, cursorPosition.x);
+      const hy2 = Math.max(holeRectStart.y, cursorPosition.y);
+      const hw = hx2 - hx1;
+      const hh = hy2 - hy1;
+
+      ctx.save();
+      ctx.setLineDash([6 / zoom, 4 / zoom]);
+      ctx.strokeStyle = 'hsl(0 84% 60%)';
+      ctx.lineWidth = 2 / zoom;
+      ctx.fillStyle = 'hsla(0, 84%, 60%, 0.1)';
+      ctx.beginPath();
+      ctx.rect(hx1, hy1, hw, hh);
+      ctx.fill();
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Draw start corner marker
+      ctx.fillStyle = 'hsl(0 84% 60%)';
+      ctx.beginPath();
+      ctx.arc(holeRectStart.x, holeRectStart.y, 5 / zoom, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Show dimensions text
+      if (hw > 5 && hh > 5) {
+        let widthText: string;
+        let heightText: string;
+        if (state.scale) {
+          const wMm = hw / state.scale.pixelsPerMm;
+          const hMm = hh / state.scale.pixelsPerMm;
+          widthText = formatDimension(wMm, dimensionUnit);
+          heightText = formatDimension(hMm, dimensionUnit);
+        } else {
+          widthText = `${Math.round(hw)}px`;
+          heightText = `${Math.round(hh)}px`;
+        }
+
+        const dimText = `${widthText} × ${heightText}`;
+        const fontSize = 12 / zoom;
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+        ctx.fillStyle = 'hsl(0 84% 60%)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(dimText, hx1 + hw / 2, hy1 - 6 / zoom);
+      }
+
+      ctx.restore();
+    }
+
     // Draw snap indicator with type-specific styling
     if (snapPoint) {
       if (snapType === 'vertex') {
