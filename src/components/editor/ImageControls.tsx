@@ -28,7 +28,7 @@ interface ImageControlsProps {
 }
 
 export function ImageControls({ image, onUpdate, onRemove }: ImageControlsProps) {
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(true);
   
   const handleRotate = (delta: number) => {
     const newRotation = (image.rotation + delta + 360) % 360;
