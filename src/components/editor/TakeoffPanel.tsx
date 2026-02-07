@@ -37,7 +37,7 @@ import {
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
 import { StripPlanResult } from '@/lib/rollGoods/types';
-import { calculatePolygonArea } from '@/lib/canvas/geometry';
+import { calculatePolygonArea, calculateRoomNetArea } from '@/lib/canvas/geometry';
 import { formatCurrency } from '@/lib/reports/calculations';
 import { RoomDetailView } from './RoomDetailView';
 import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
@@ -131,9 +131,14 @@ export function TakeoffPanel({
 
   const formatArea = (room: Room): string => {
     if (!scale) return '—';
-    const areaPx = calculatePolygonArea(room.points);
-    const areaM2 = areaPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
-    return `${areaM2.toFixed(2)} m²`;
+    const netPx = calculateRoomNetArea(room);
+    const netM2 = netPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
+    if (room.holes.length > 0) {
+      const grossPx = calculatePolygonArea(room.points);
+      const grossM2 = grossPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
+      return `${netM2.toFixed(2)} m² (−${(grossM2 - netM2).toFixed(2)})`;
+    }
+    return `${netM2.toFixed(2)} m²`;
   };
 
   const getRoomCost = (room: Room): number | null => {
@@ -141,11 +146,11 @@ export function TakeoffPanel({
     const material = allMaterialsMap.get(room.materialId);
     if (!material) return null;
     
-    const areaPx = calculatePolygonArea(room.points);
-    const areaM2 = areaPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
+    const netPx = calculateRoomNetArea(room);
+    const netM2 = netPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
     const pricePerM2 = (material.specs as any).pricePerM2 || (material.specs as any).price || 0;
     const wastePercent = (material.specs as any).wastePercent || 10;
-    return areaM2 * (1 + wastePercent / 100) * pricePerM2;
+    return netM2 * (1 + wastePercent / 100) * pricePerM2;
   };
 
   const getMaterial = (room: Room): Material | undefined => {

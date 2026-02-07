@@ -27,6 +27,7 @@ import { mergeRoomsAtSharedEdge, findSharedEdgeBetweenRooms } from '@/lib/canvas
 import { splitPolygonWithLine, findEdgeForPoint, assignHolesToPolygons } from '@/lib/canvas/polygonSplit';
 import { DOOR_WIDTHS } from '@/lib/canvas/types';
 import { FinishesLegend } from '@/components/reports/FinishesLegend';
+import { CanvasContextMenu, ContextTarget } from './CanvasContextMenu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,6 +125,19 @@ export function EditorCanvas({
   // Rectangle tool state
   const [rectangleStart, setRectangleStart] = useState<CanvasPoint | null>(null);
   
+  // Rectangle hole tool state
+  const [holeRectStart, setHoleRectStart] = useState<CanvasPoint | null>(null);
+  
+  // Unified select-mode pan refs (refs avoid dependency re-creation)
+  const selectClickPointRef = useRef<CanvasPoint | null>(null);
+  const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isSelectPanningRef = useRef(false);
+  const selectPanStartRef = useRef<{ x: number; y: number } | null>(null);
+  
+  // Context menu state
+  const [contextTarget, setContextTarget] = useState<ContextTarget | null>(null);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  
   // Snap settings state - use external if provided, otherwise use local state
   const [localSnapSettings, setLocalSnapSettings] = useState<SnapSettings>(() => {
     const saved = localStorage.getItem(SNAP_SETTINGS_KEY);
@@ -184,6 +198,8 @@ export function EditorCanvas({
     hoveredVertex,
     hoveredWall,
     hoveredCurveControl,
+    hoveredHoleVertex,
+    hoveredHoleWall,
     handleHover,
     startDrag,
     updateDrag,
@@ -377,6 +393,7 @@ export function EditorCanvas({
         setDrawingPoints([]);
         setScaleStart(null);
         setRectangleStart(null);
+        setHoleRectStart(null);
         setShowDimensionInput(false);
         // Cancel merge mode
         setMergeFirstRoom(null);
@@ -386,6 +403,9 @@ export function EditorCanvas({
         setSplitStartPoint(null);
         setSplitPreviewEnd(null);
         setSplitStartEdge(null);
+        // Close context menu
+        setContextTarget(null);
+        setContextMenuPos(null);
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -449,6 +469,9 @@ export function EditorCanvas({
     }
     if (activeTool !== 'rectangle') {
       setRectangleStart(null);
+    }
+    if (activeTool !== 'hole') {
+      setHoleRectStart(null);
     }
   }, [activeTool]);
 
@@ -601,6 +624,110 @@ export function EditorCanvas({
     return screenToCanvas(e.clientX - rect.left, e.clientY - rect.top);
   }, [screenToCanvas]);
 
+  // Handle click in select mode (deferred from pointerUp)
+  const handleSelectClick = useCallback((point: CanvasPoint) => {
+    // Check if clicking near an edge midpoint of the selected room to toggle transition
+    if (state.selectedRoomId) {
+      const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
+      if (selectedRoom) {
+        const clickRadius = 12 / state.viewTransform.zoom;
+        for (let i = 0; i < selectedRoom.points.length; i++) {
+          const j = (i + 1) % selectedRoom.points.length;
+          const midX = (selectedRoom.points[i].x + selectedRoom.points[j].x) / 2;
+          const midY = (selectedRoom.points[i].y + selectedRoom.points[j].y) / 2;
+          const dist = distance(point, { x: midX, y: midY });
+          if (dist < clickRadius) {
+            const existing = selectedRoom.edgeTransitions || [];
+            const hasTransition = existing.some(t => t.edgeIndex === i);
+            if (hasTransition) {
+              dispatch({
+                type: 'UPDATE_ROOM',
+                roomId: selectedRoom.id,
+                updates: { edgeTransitions: existing.filter(t => t.edgeIndex !== i) },
+              });
+              toast.success(`Removed transition from Edge ${i + 1}`);
+            } else {
+              const sharedEdgesForRoom = detectSharedEdgesForNewRoom(
+                { ...selectedRoom, points: selectedRoom.points } as Room,
+                state.rooms.filter(r => r.id !== selectedRoom.id)
+              );
+              const sharedForEdge = sharedEdgesForRoom.find(se => se.newRoomEdgeIndex === i);
+              const newTransition: EdgeTransition = {
+                edgeIndex: i,
+                adjacentRoomId: sharedForEdge?.existingRoomId,
+                adjacentRoomName: sharedForEdge?.existingRoomName,
+                transitionType: 'auto',
+              };
+              dispatch({
+                type: 'UPDATE_ROOM',
+                roomId: selectedRoom.id,
+                updates: { edgeTransitions: [...existing, newTransition] },
+              });
+              toast.success(`Added transition to Edge ${i + 1}${sharedForEdge ? ` (→ ${sharedForEdge.existingRoomName})` : ''}`);
+            }
+            return;
+          }
+        }
+      }
+    }
+    // Find clicked room
+    let clickedRoom: Room | null = null;
+    for (const room of state.rooms) {
+      if (isPointInPolygon(point, room.points)) {
+        clickedRoom = room;
+        break;
+      }
+    }
+    dispatch({ type: 'SELECT_ROOM', roomId: clickedRoom?.id || null });
+  }, [state.rooms, state.selectedRoomId, state.viewTransform.zoom, dispatch]);
+
+  const handleSelectClickRef = useRef(handleSelectClick);
+  handleSelectClickRef.current = handleSelectClick;
+
+  // Handle right-click context menu on canvas
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const point = screenToCanvas(e.clientX - rect.left, e.clientY - rect.top);
+    const menuX = e.clientX - rect.left;
+    const menuY = e.clientY - rect.top;
+
+    // Hit detection: hole > edge > room
+    for (const room of state.rooms) {
+      for (const hole of room.holes) {
+        if (hole.points.length >= 3 && isPointInPolygon(point, hole.points)) {
+          setContextTarget({ type: 'hole', roomId: room.id, holeId: hole.id, point });
+          setContextMenuPos({ x: menuX, y: menuY });
+          dispatch({ type: 'SELECT_ROOM', roomId: room.id });
+          return;
+        }
+      }
+    }
+
+    for (const room of state.rooms) {
+      const wallInfo = findClosestWallSegment(point, room.points);
+      if (wallInfo && wallInfo.distance < 15 / state.viewTransform.zoom) {
+        setContextTarget({ type: 'edge', roomId: room.id, edgeIndex: wallInfo.index, point });
+        setContextMenuPos({ x: menuX, y: menuY });
+        dispatch({ type: 'SELECT_ROOM', roomId: room.id });
+        return;
+      }
+    }
+
+    for (const room of state.rooms) {
+      if (isPointInPolygon(point, room.points)) {
+        setContextTarget({ type: 'room', roomId: room.id, point });
+        setContextMenuPos({ x: menuX, y: menuY });
+        dispatch({ type: 'SELECT_ROOM', roomId: room.id });
+        return;
+      }
+    }
+
+    setContextTarget(null);
+    setContextMenuPos(null);
+  }, [screenToCanvas, state.rooms, state.viewTransform.zoom, dispatch]);
+
   // Handle pointer down
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     // Ignore during touch gestures
@@ -620,69 +747,22 @@ export function EditorCanvas({
 
     if (e.button !== 0) return;
 
+    // Close context menu on any click
+    setContextTarget(null);
+    setContextMenuPos(null);
+
     switch (activeTool) {
       case 'select': {
-        // Try to start dragging vertex or wall first
+        // Try to start dragging vertex or wall first (immediate)
         if (startDrag(point)) {
           return;
         }
 
-        // Check if clicking near an edge midpoint of the selected room to toggle transition
-        if (state.selectedRoomId) {
-          const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
-          if (selectedRoom) {
-            const clickRadius = 12 / state.viewTransform.zoom;
-            for (let i = 0; i < selectedRoom.points.length; i++) {
-              const j = (i + 1) % selectedRoom.points.length;
-              const midX = (selectedRoom.points[i].x + selectedRoom.points[j].x) / 2;
-              const midY = (selectedRoom.points[i].y + selectedRoom.points[j].y) / 2;
-              const dist = distance(point, { x: midX, y: midY });
-              if (dist < clickRadius) {
-                // Toggle transition on this edge
-                const existing = selectedRoom.edgeTransitions || [];
-                const hasTransition = existing.some(t => t.edgeIndex === i);
-                if (hasTransition) {
-                  dispatch({
-                    type: 'UPDATE_ROOM',
-                    roomId: selectedRoom.id,
-                    updates: { edgeTransitions: existing.filter(t => t.edgeIndex !== i) },
-                  });
-                  toast.success(`Removed transition from Edge ${i + 1}`);
-                } else {
-                  // Auto-detect adjacent room for this edge
-                  const sharedEdgesForRoom = detectSharedEdgesForNewRoom(
-                    { ...selectedRoom, points: selectedRoom.points } as Room,
-                    state.rooms.filter(r => r.id !== selectedRoom.id)
-                  );
-                  const sharedForEdge = sharedEdgesForRoom.find(se => se.newRoomEdgeIndex === i);
-                  const newTransition: EdgeTransition = {
-                    edgeIndex: i,
-                    adjacentRoomId: sharedForEdge?.existingRoomId,
-                    adjacentRoomName: sharedForEdge?.existingRoomName,
-                    transitionType: 'auto',
-                  };
-                  dispatch({
-                    type: 'UPDATE_ROOM',
-                    roomId: selectedRoom.id,
-                    updates: { edgeTransitions: [...existing, newTransition] },
-                  });
-                  toast.success(`Added transition to Edge ${i + 1}${sharedForEdge ? ` (→ ${sharedForEdge.existingRoomName})` : ''}`);
-                }
-                return; // Don't fall through to room selection
-              }
-            }
-          }
-        }
-
-        // Find clicked room
-        let clickedRoom: Room | null = null;
-        for (const room of state.rooms) {
-          if (isPointInPolygon(point, room.points)) {
-            clickedRoom = room;
-            break;
-          }
-        }
-        dispatch({ type: 'SELECT_ROOM', roomId: clickedRoom?.id || null });
+        // Defer selection to pointerUp for click-vs-pan detection
+        selectClickPointRef.current = point;
+        pointerDownPosRef.current = { x: e.clientX, y: e.clientY };
+        isSelectPanningRef.current = false;
+        selectPanStartRef.current = null;
         break;
       }
 
@@ -805,40 +885,42 @@ export function EditorCanvas({
 
       case 'hole': {
         // Must have a selected room
-        if (!state.selectedRoomId) return;
+        if (!state.selectedRoomId) {
+          toast.error('Select a room first to cut a hole');
+          return;
+        }
 
         const snap = findSnapPoint(point, state.rooms, 10 / state.viewTransform.zoom);
         const actualPoint = snap || point;
 
-        if (!isDrawing) {
-          setIsDrawing(true);
-          setDrawingPoints([actualPoint]);
+        if (!holeRectStart) {
+          // First click - set corner
+          setHoleRectStart(actualPoint);
         } else {
-          const startPoint = drawingPoints[0];
-          const distance = Math.sqrt(
-            Math.pow(actualPoint.x - startPoint.x, 2) +
-            Math.pow(actualPoint.y - startPoint.y, 2)
-          );
+          // Second click - create rectangular hole
+          const x1 = Math.min(holeRectStart.x, actualPoint.x);
+          const y1 = Math.min(holeRectStart.y, actualPoint.y);
+          const x2 = Math.max(holeRectStart.x, actualPoint.x);
+          const y2 = Math.max(holeRectStart.y, actualPoint.y);
 
-          if (distance < 15 / state.viewTransform.zoom && drawingPoints.length >= 3) {
-            // Create hole
+          if (Math.abs(x2 - x1) > 5 && Math.abs(y2 - y1) > 5) {
+            const holePoints: CanvasPoint[] = [
+              { x: x1, y: y1 },
+              { x: x2, y: y1 },
+              { x: x2, y: y2 },
+              { x: x1, y: y2 },
+            ];
             dispatch({
               type: 'ADD_HOLE',
               roomId: state.selectedRoomId,
               hole: {
                 id: generateHoleId(),
-                points: drawingPoints,
+                points: holePoints,
               },
             });
-            setIsDrawing(false);
-            setDrawingPoints([]);
-          } else {
-            let finalPoint = actualPoint;
-            if (orthoLocked && drawingPoints.length > 0) {
-              finalPoint = applyOrthoLock(actualPoint, drawingPoints[drawingPoints.length - 1]);
-            }
-            setDrawingPoints([...drawingPoints, finalPoint]);
+            toast.success('Hole created');
           }
+          setHoleRectStart(null);
         }
         break;
       }
@@ -1015,6 +1097,33 @@ export function EditorCanvas({
         return;
       }
 
+      // Handle select-mode panning (click + hold + drag)
+      if (activeTool === 'select' && pointerDownPosRef.current && !isDragging && !isSelectPanningRef.current) {
+        const moveDx = clientX - pointerDownPosRef.current.x;
+        const moveDy = clientY - pointerDownPosRef.current.y;
+        const moveDistance = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
+        if (moveDistance > 5) {
+          isSelectPanningRef.current = true;
+          selectPanStartRef.current = { x: clientX, y: clientY };
+          selectClickPointRef.current = null; // Cancel deferred selection
+        }
+      }
+
+      // Handle active select-mode panning
+      if (isSelectPanningRef.current && selectPanStartRef.current) {
+        const dx = clientX - selectPanStartRef.current.x;
+        const dy = clientY - selectPanStartRef.current.y;
+        dispatch({
+          type: 'SET_VIEW_TRANSFORM',
+          transform: {
+            offsetX: state.viewTransform.offsetX + dx,
+            offsetY: state.viewTransform.offsetY + dy,
+          },
+        });
+        selectPanStartRef.current = { x: clientX, y: clientY };
+        return;
+      }
+
       // Handle dragging in select mode
       if (activeTool === 'select' && isDragging) {
         updateDrag(point, orthoLocked);
@@ -1128,6 +1237,28 @@ export function EditorCanvas({
     if (isDragging) {
       endDrag();
     }
+
+    // Deferred selection in select mode (click, not pan or drag)
+    if (activeTool === 'select' && selectClickPointRef.current && !isSelectPanningRef.current && !isDragging) {
+      handleSelectClickRef.current(selectClickPointRef.current);
+    }
+
+    // Reset select-mode state
+    selectClickPointRef.current = null;
+    pointerDownPosRef.current = null;
+    isSelectPanningRef.current = false;
+    selectPanStartRef.current = null;
+  }, [isDragging, endDrag, activeTool]);
+
+  // Handle pointer leave (reset without selection)
+  const handlePointerLeave = useCallback(() => {
+    setIsPanning(false);
+    setPanStart(null);
+    if (isDragging) endDrag();
+    selectClickPointRef.current = null;
+    pointerDownPosRef.current = null;
+    isSelectPanningRef.current = false;
+    selectPanStartRef.current = null;
   }, [isDragging, endDrag]);
 
   // Handle double-click (for removing curves)
@@ -1224,6 +1355,7 @@ export function EditorCanvas({
   const getCursor = useCallback((): string => {
     if (isPanning) return 'grabbing';
     if (isDragging) return 'grabbing';
+    if (isSelectPanningRef.current) return 'grabbing';
     
     // Check for edit cursor in select mode
     if (activeTool === 'select' && cursorPosition) {
@@ -1301,7 +1433,7 @@ export function EditorCanvas({
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerUp}
+      onPointerLeave={handlePointerLeave}
       onDoubleClick={handleDoubleClickEvent}
       onWheel={handleWheel}
       onDrop={handleDrop}
@@ -1310,6 +1442,7 @@ export function EditorCanvas({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      onContextMenu={handleContextMenu}
     >
       <CanvasRenderer
         state={state}
@@ -1345,6 +1478,9 @@ export function EditorCanvas({
         activeTool={activeTool}
         projectMaterials={projectMaterials}
         scaleStart={scaleStart}
+        holeRectStart={holeRectStart}
+        hoveredHoleVertex={hoveredHoleVertex}
+        hoveredHoleWall={hoveredHoleWall}
       />
 
       {/* Material drag indicator */}
@@ -1357,9 +1493,16 @@ export function EditorCanvas({
       {/* Drawing indicator */}
       {isDrawing && !showDimensionInput && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-pulse">
-          {activeTool === 'hole' ? 'Drawing hole' : 'Drawing room'} • Click near start to close • L for length input • Esc to cancel
+          Drawing room • Click near start to close • L for length input • Esc to cancel
           {orthoLocked && ' • ORTHO'}
           {tempSnapDisabled && ' • SNAP OFF'}
+        </div>
+      )}
+
+      {/* Hole tool rectangle mode indicator */}
+      {activeTool === 'hole' && !isDrawing && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+          {holeRectStart ? 'Click opposite corner to cut hole • Esc to cancel' : 'Click first corner of cutout • Esc to cancel'}
         </div>
       )}
 
@@ -1583,6 +1726,51 @@ export function EditorCanvas({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Canvas Context Menu */}
+      <CanvasContextMenu
+        target={contextTarget}
+        position={contextMenuPos}
+        rooms={state.rooms}
+        onClose={() => { setContextTarget(null); setContextMenuPos(null); }}
+        onDeleteRoom={(roomId) => {
+          dispatch({ type: 'DELETE_ROOM', roomId });
+          toast.success('Room deleted');
+        }}
+        onDeleteHole={(roomId, holeId) => {
+          dispatch({ type: 'DELETE_HOLE', roomId, holeId });
+          toast.success('Cutout deleted');
+        }}
+        onEditRoom={(roomId) => {
+          dispatch({ type: 'SELECT_ROOM', roomId });
+        }}
+        onRotateFillDirection={(roomId) => {
+          const room = state.rooms.find(r => r.id === roomId);
+          if (room) {
+            const next = ((room.fillDirection || 0) + 45) % 360;
+            dispatch({ type: 'UPDATE_ROOM', roomId, updates: { fillDirection: next } });
+          }
+        }}
+        onToggleTransition={(roomId, edgeIndex) => {
+          const room = state.rooms.find(r => r.id === roomId);
+          if (!room) return;
+          const existing = room.edgeTransitions || [];
+          const hasTransition = existing.some(t => t.edgeIndex === edgeIndex);
+          if (hasTransition) {
+            dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: existing.filter(t => t.edgeIndex !== edgeIndex) } });
+          } else {
+            const newTransition: EdgeTransition = { edgeIndex, transitionType: 'auto' };
+            dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: [...existing, newTransition] } });
+          }
+        }}
+        onSetTransitionType={(roomId, edgeIndex, type) => {
+          const room = state.rooms.find(r => r.id === roomId);
+          if (!room) return;
+          const existing = room.edgeTransitions || [];
+          const updated = existing.map(t => t.edgeIndex === edgeIndex ? { ...t, transitionType: type } : t);
+          dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: updated } });
+        }}
+      />
     </div>
   );
 }

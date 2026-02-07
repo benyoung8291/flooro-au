@@ -50,6 +50,31 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
         ),
       };
     
+    case 'DELETE_HOLE':
+      return {
+        ...state,
+        rooms: state.rooms.map(room =>
+          room.id === action.roomId
+            ? { ...room, holes: room.holes.filter(h => h.id !== action.holeId) }
+            : room
+        ),
+      };
+    
+    case 'UPDATE_HOLE':
+      return {
+        ...state,
+        rooms: state.rooms.map(room =>
+          room.id === action.roomId
+            ? {
+                ...room,
+                holes: room.holes.map(h =>
+                  h.id === action.holeId ? { ...h, ...action.updates } : h
+                ),
+              }
+            : room
+        ),
+      };
+    
     case 'ADD_DOOR':
       return {
         ...state,
