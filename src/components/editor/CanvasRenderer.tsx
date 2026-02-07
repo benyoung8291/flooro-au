@@ -3,6 +3,7 @@ import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DE
 import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, getQuadraticBezierPoint, getEdgeMidpoint } from '@/lib/canvas/geometry';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { SharedEdge, detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
+import { HoveredHoleVertex, HoveredHoleWall } from '@/hooks/useCanvasEditing';
 
 interface HoveredCurveControl {
   roomId: string;
@@ -52,6 +53,11 @@ interface CanvasRendererProps {
   projectMaterials?: ProjectMaterial[];
   // Scale tool preview
   scaleStart?: CanvasPoint | null;
+  // Hole rectangle preview
+  holeRectStart?: CanvasPoint | null;
+  // Hole editing hover state
+  hoveredHoleVertex?: HoveredHoleVertex | null;
+  hoveredHoleWall?: HoveredHoleWall | null;
 }
 
 // Cache for loaded images
@@ -116,6 +122,9 @@ export function CanvasRenderer({
   activeTool,
   projectMaterials = [],
   scaleStart,
+  holeRectStart,
+  hoveredHoleVertex,
+  hoveredHoleWall,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -280,6 +289,37 @@ export function CanvasRenderer({
       if (showSeamLines && room.materialId && materialType === 'roll' && stripPlans?.has(room.id)) {
         const stripPlan = stripPlans.get(room.id)!;
         drawSeamLines(ctx, room, stripPlan, state.scale, zoom, state.selectedRoomId === room.id);
+      }
+      
+      // Draw hole vertices for selected room (for interactive editing)
+      if (room.id === state.selectedRoomId && room.holes.length > 0) {
+        room.holes.forEach(hole => {
+          // Draw hole wall hover highlighting
+          if (hoveredHoleWall?.roomId === room.id && hoveredHoleWall?.holeId === hole.id) {
+            const wallIdx = hoveredHoleWall.index;
+            const wp1 = hole.points[wallIdx];
+            const wp2 = hole.points[(wallIdx + 1) % hole.points.length];
+            ctx.strokeStyle = 'hsl(45 93% 47%)';
+            ctx.lineWidth = 4 / zoom;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.moveTo(wp1.x, wp1.y);
+            ctx.lineTo(wp2.x, wp2.y);
+            ctx.stroke();
+          }
+          
+          // Draw hole vertices
+          hole.points.forEach((p, idx) => {
+            const isHovered = hoveredHoleVertex?.roomId === room.id && hoveredHoleVertex?.holeId === hole.id && hoveredHoleVertex?.index === idx;
+            ctx.fillStyle = isHovered ? 'hsl(45 93% 47%)' : 'hsl(0 84% 60%)';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2 / zoom;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, (isHovered ? 7 : 4) / zoom, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          });
+        });
       }
     });
 
@@ -561,7 +601,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall]);
 
   useEffect(() => {
     render();

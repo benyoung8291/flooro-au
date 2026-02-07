@@ -16,7 +16,6 @@ import { DimensionUnit, SnapSettings } from '@/lib/canvas/types';
 import { 
   MousePointer2, 
   Pencil, 
-  SquareDashed,
   RectangleHorizontal,
   DoorOpen, 
   Ruler,
@@ -35,6 +34,17 @@ import {
   Scissors,
   Magnet,
 } from 'lucide-react';
+
+// Custom icon: dashed rectangle with scissors for "Cut Hole" tool
+const CutHoleIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <rect x="3" y="2" width="18" height="14" rx="2" strokeDasharray="4 2" />
+    <circle cx="8" cy="21" r="2" strokeWidth="1.5" />
+    <circle cx="16" cy="21" r="2" strokeWidth="1.5" />
+    <line x1="9.5" y1="19.5" x2="14.5" y2="14" strokeWidth="1.5" />
+    <line x1="14.5" y1="19.5" x2="9.5" y2="14" strokeWidth="1.5" />
+  </svg>
+);
 
 interface EditorToolbarProps {
   activeTool: EditorTool;
@@ -67,7 +77,7 @@ const toolGroups = {
   draw: [
     { id: 'draw' as EditorTool, icon: Pencil, label: 'Draw Room', shortcut: 'D' },
     { id: 'rectangle' as EditorTool, icon: RectangleHorizontal, label: 'Rectangle Room', shortcut: 'R' },
-    { id: 'hole' as EditorTool, icon: SquareDashed, label: 'Cut Hole/Void', shortcut: 'H' },
+    { id: 'hole' as EditorTool, icon: CutHoleIcon, label: 'Cut Hole/Void', shortcut: 'H' },
   ],
   elements: [
     { id: 'door' as EditorTool, icon: DoorOpen, label: 'Add Door', shortcut: 'O' },

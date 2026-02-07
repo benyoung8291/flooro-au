@@ -201,6 +201,8 @@ export type CanvasAction =
   | { type: 'REMOVE_BACKGROUND_IMAGE' }
   | { type: 'LOAD_STATE'; state: CanvasState }
   | { type: 'RESET' }
+  | { type: 'DELETE_HOLE'; roomId: string; holeId: string }
+  | { type: 'UPDATE_HOLE'; roomId: string; holeId: string; updates: Partial<Hole> }
   | { type: 'BATCH'; actions: CanvasAction[] };
 
 export const DOOR_WIDTHS = [
