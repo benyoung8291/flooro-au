@@ -118,7 +118,7 @@ export function EditorCanvas({
   // Scale input modal state
   const [scaleInputOpen, setScaleInputOpen] = useState(false);
   const [scaleInputValue, setScaleInputValue] = useState('');
-  const [scaleInputUnit, setScaleInputUnit] = useState<'mm' | 'cm' | 'm'>('mm');
+  const [scaleInputUnit, setScaleInputUnit] = useState<'mm' | 'cm' | 'm'>('m');
   const [pendingScalePixelLength, setPendingScalePixelLength] = useState<number | null>(null);
 
   // Rectangle tool state
@@ -879,7 +879,7 @@ export function EditorCanvas({
           // Open modal for real-world measurement input
           setPendingScalePixelLength(pixelLength);
           setScaleInputValue('');
-          setScaleInputUnit('mm');
+          // Keep the last-used unit (don't reset scaleInputUnit)
           setScaleInputOpen(true);
           setScaleStart(null);
         }
@@ -1238,7 +1238,7 @@ export function EditorCanvas({
       case 'pan':
         return 'grab';
       case 'scale':
-        return scaleStart ? 'crosshair' : 'help';
+        return 'crosshair';
       case 'door':
         return 'pointer';
       case 'merge':
@@ -1258,7 +1258,7 @@ export function EditorCanvas({
       default:
         return 'default';
     }
-  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, scaleStart, hoveredRoomId, mergeFirstRoom, mergeableRoomIds, splitRoom, splitStartPoint]);
+  }, [isPanning, isDragging, activeTool, cursorPosition, getEditCursor, hoveredRoomId, mergeFirstRoom, mergeableRoomIds, splitRoom, splitStartPoint]);
 
   // Touch event handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
