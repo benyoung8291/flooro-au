@@ -606,6 +606,9 @@ export function EditorCanvas({
     // Ignore during touch gestures
     if (isTouchGesture || isTwoFingerGesture()) return;
     
+    // Don't process canvas clicks while scale dialog is open
+    if (scaleInputOpen) return;
+    
     const point = getEventPoint(e);
 
     // Middle mouse or space + click for pan
@@ -973,7 +976,7 @@ export function EditorCanvas({
         break;
       }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, scaleInputOpen, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
 
   // Handle pointer move (RAF-throttled to avoid per-pixel expensive operations)
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -1491,7 +1494,7 @@ export function EditorCanvas({
           setPendingScalePixelLength(null);
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>Set Scale</DialogTitle>
             <DialogDescription>
