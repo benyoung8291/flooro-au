@@ -329,6 +329,231 @@ export type Database = {
           },
         ]
       }
+      quote_line_items: {
+        Row: {
+          cost_price: number
+          created_at: string
+          description: string
+          estimated_hours: number
+          id: string
+          is_active: boolean
+          is_from_price_book: boolean
+          is_optional: boolean
+          item_order: number
+          line_total: number
+          margin_percentage: number
+          metadata: Json
+          organization_id: string
+          parent_line_item_id: string | null
+          price_book_item_id: string | null
+          quantity: number
+          quote_id: string
+          sell_price: number
+          source_room_id: string | null
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          cost_price?: number
+          created_at?: string
+          description?: string
+          estimated_hours?: number
+          id?: string
+          is_active?: boolean
+          is_from_price_book?: boolean
+          is_optional?: boolean
+          item_order?: number
+          line_total?: number
+          margin_percentage?: number
+          metadata?: Json
+          organization_id: string
+          parent_line_item_id?: string | null
+          price_book_item_id?: string | null
+          quantity?: number
+          quote_id: string
+          sell_price?: number
+          source_room_id?: string | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          description?: string
+          estimated_hours?: number
+          id?: string
+          is_active?: boolean
+          is_from_price_book?: boolean
+          is_optional?: boolean
+          item_order?: number
+          line_total?: number
+          margin_percentage?: number
+          metadata?: Json
+          organization_id?: string
+          parent_line_item_id?: string | null
+          price_book_item_id?: string | null
+          quantity?: number
+          quote_id?: string
+          sell_price?: number
+          source_room_id?: string | null
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_line_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_line_items_parent_line_item_id_fkey"
+            columns: ["parent_line_item_id"]
+            isOneToOne: false
+            referencedRelation: "quote_line_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_line_items_price_book_item_id_fkey"
+            columns: ["price_book_item_id"]
+            isOneToOne: false
+            referencedRelation: "price_book_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_line_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quotes: {
+        Row: {
+          approved_at: string | null
+          client_address: string | null
+          client_email: string | null
+          client_name: string | null
+          client_phone: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          estimated_hours: number
+          id: string
+          internal_notes: string | null
+          notes: string | null
+          organization_id: string
+          parent_quote_id: string | null
+          project_id: string | null
+          quote_number: string
+          rejected_at: string | null
+          rejection_reason: string | null
+          sent_at: string | null
+          status: string
+          subtotal: number
+          tax_amount: number
+          tax_rate: number
+          terms_and_conditions: string | null
+          title: string | null
+          total_amount: number
+          total_cost: number
+          total_margin: number
+          updated_at: string
+          valid_until: string | null
+          version: number
+        }
+        Insert: {
+          approved_at?: string | null
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          estimated_hours?: number
+          id?: string
+          internal_notes?: string | null
+          notes?: string | null
+          organization_id: string
+          parent_quote_id?: string | null
+          project_id?: string | null
+          quote_number: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_rate?: number
+          terms_and_conditions?: string | null
+          title?: string | null
+          total_amount?: number
+          total_cost?: number
+          total_margin?: number
+          updated_at?: string
+          valid_until?: string | null
+          version?: number
+        }
+        Update: {
+          approved_at?: string | null
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          estimated_hours?: number
+          id?: string
+          internal_notes?: string | null
+          notes?: string | null
+          organization_id?: string
+          parent_quote_id?: string | null
+          project_id?: string | null
+          quote_number?: string
+          rejected_at?: string | null
+          rejection_reason?: string | null
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+          tax_amount?: number
+          tax_rate?: number
+          terms_and_conditions?: string | null
+          title?: string | null
+          total_amount?: number
+          total_cost?: number
+          total_margin?: number
+          updated_at?: string
+          valid_until?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quotes_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_parent_quote_id_fkey"
+            columns: ["parent_quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stripe_customers: {
         Row: {
           created_at: string
@@ -465,6 +690,7 @@ export type Database = {
         }
       }
       deny_access_request: { Args: { _request_id: string }; Returns: undefined }
+      generate_quote_number: { Args: { _org_id: string }; Returns: string }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
