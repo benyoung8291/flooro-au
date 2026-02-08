@@ -97,6 +97,7 @@ interface QuoteLineItemRowProps {
   isChild?: boolean;
   isExpanded?: boolean;
   hasChildren: boolean;
+  rowIndex: number;
   onUpdate: (id: string, updates: Partial<LineItem>) => void;
   onUpdatePricing: (id: string, field: 'cost' | 'sell' | 'margin', value: number) => void;
   onAddSubItem: (parentId: string) => void;
@@ -127,6 +128,7 @@ export function QuoteLineItemRow({
   isChild = false,
   isExpanded = true,
   hasChildren,
+  rowIndex,
   onUpdate,
   onUpdatePricing,
   onAddSubItem,
@@ -155,7 +157,6 @@ export function QuoteLineItemRow({
       else if (field === 'sell_price') onUpdatePricing(item.id, 'sell', val);
       else if (field === 'margin_percentage') onUpdatePricing(item.id, 'margin', val);
       else if (field === 'quantity') onUpdate(item.id, { quantity: val });
-      else if (field === 'estimated_hours') onUpdate(item.id, { estimated_hours: val });
     },
     [item.id, onUpdate, onUpdatePricing]
   );
@@ -164,7 +165,6 @@ export function QuoteLineItemRow({
   const displayCost = aggregated ? aggregated.cost_price : item.cost_price;
   const displaySell = aggregated ? aggregated.sell_price : item.sell_price;
   const displayMargin = aggregated ? aggregated.margin_percentage : item.margin_percentage;
-  const displayHours = aggregated ? aggregated.estimated_hours : item.estimated_hours;
 
   const handleDelete = () => {
     if (!isChild && hasChildren && onDeleteWithConfirm) {
@@ -174,18 +174,29 @@ export function QuoteLineItemRow({
     }
   };
 
+  const isEvenRow = rowIndex % 2 === 0;
+
   return (
     <tr
       className={cn(
-        'group border-b border-border/40 transition-colors hover:bg-muted/20',
-        isChild && 'bg-muted/5',
-        !isChild && hasChildren && 'bg-muted/10',
+        'group border-b transition-colors',
+        // Zebra striping
+        isEvenRow ? 'bg-transparent' : 'bg-muted/[0.03]',
+        // Parent group accent
+        !isChild && hasChildren && 'bg-muted/10 border-l-4 border-l-primary/60',
+        // Child indent styling
+        isChild && 'bg-muted/[0.02]',
+        // Stronger borders
+        isChild ? 'border-border/30' : 'border-border/60',
+        // Hover
+        'hover:bg-muted/20',
+        // Optional / new
         item.is_optional && 'opacity-60 italic',
         item._isNew && 'animate-slide-up'
       )}
     >
       {/* Reorder + expand */}
-      <td className="px-1 py-1.5 text-center">
+      <td className="px-1 py-2.5 text-center">
         {!isChild ? (
           <div className="flex items-center gap-0.5">
             <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
@@ -239,13 +250,13 @@ export function QuoteLineItemRow({
                 <ArrowDown className="w-3 h-3 text-muted-foreground" />
               </button>
             </div>
-            <span className="block w-3 h-px bg-border" />
+            <span className="block w-3 h-px bg-border/60" />
           </div>
         )}
       </td>
 
       {/* Description */}
-      <td className={cn('py-1.5 pr-2', isChild ? 'pl-8' : 'pl-1')}>
+      <td className={cn('py-2.5 pr-2', isChild ? 'pl-8' : 'pl-1')}>
         <input
           ref={descRef}
           value={item.description}
@@ -261,7 +272,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Qty */}
-      <td className="py-1.5 px-1">
+      <td className="py-2.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">—</span>
         ) : (
@@ -273,7 +284,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Cost */}
-      <td className="py-1.5 px-1">
+      <td className="py-2.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             ${displayCost.toFixed(2)}
@@ -288,7 +299,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Margin % */}
-      <td className="py-1.5 px-1">
+      <td className="py-2.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             {displayMargin.toFixed(1)}%
@@ -303,7 +314,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Sell */}
-      <td className="py-1.5 px-1">
+      <td className="py-2.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             ${displaySell.toFixed(2)}
@@ -317,27 +328,13 @@ export function QuoteLineItemRow({
         )}
       </td>
 
-      {/* Hours */}
-      <td className="py-1.5 px-1">
-        {isReadOnly ? (
-          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
-            {displayHours > 0 ? displayHours.toFixed(1) : '—'}
-          </span>
-        ) : (
-          <FormattedNumberInput
-            value={item.estimated_hours || ''}
-            onChange={(val) => handleNumberChange('estimated_hours', val)}
-          />
-        )}
-      </td>
-
-      {/* Total */}
-      <td className="py-1.5 px-2 text-right font-mono text-sm font-medium">
+      {/* Total — emphasized */}
+      <td className="py-2.5 px-2 text-right font-mono text-sm font-semibold tabular-nums">
         ${displayTotal.toFixed(2)}
       </td>
 
       {/* Actions */}
-      <td className="py-1.5 px-1 text-center">
+      <td className="py-2.5 px-1 text-center">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7">

@@ -128,7 +128,10 @@ export default function QuotePreview() {
             {quote.title && <p className="info-name">{quote.title}</p>}
             {quote.client_address && <p>📍 {quote.client_address}</p>}
             {quote.description && (
-              <p className="info-description">{quote.description}</p>
+              <div
+                className="info-description rich-text-content"
+                dangerouslySetInnerHTML={{ __html: quote.description }}
+              />
             )}
           </div>
           {quote.client_name && (

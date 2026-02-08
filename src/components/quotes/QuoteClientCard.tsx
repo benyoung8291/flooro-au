@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { User, Mail, Phone, MapPin, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RichTextEditor } from './RichTextEditor';
 import type { UpdateQuoteInput } from '@/hooks/useQuotes';
 
 interface QuoteClientCardProps {
@@ -41,12 +42,11 @@ export function QuoteClientCard({
         className="w-full text-xl font-semibold bg-transparent border-none outline-none placeholder:text-muted-foreground/40 focus:placeholder:text-muted-foreground/60"
       />
 
-      {/* Description */}
-      <input
-        value={description || ''}
-        onChange={(e) => onUpdate({ description: e.target.value || null })}
+      {/* Description — Rich text editor with formatting */}
+      <RichTextEditor
+        value={description}
+        onChange={(html) => onUpdate({ description: html })}
         placeholder="Add a scope or description..."
-        className="w-full text-sm text-muted-foreground bg-transparent border-none outline-none placeholder:text-muted-foreground/30"
       />
 
       {/* Client details — collapsible */}

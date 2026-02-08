@@ -26,7 +26,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { QuoteLineItemRow, FormattedNumberInput } from './QuoteLineItemRow';
+import { QuoteLineItemRow } from './QuoteLineItemRow';
+import { MobileTapToEditValue } from './MobileTapToEditValue';
 import { DeleteParentDialog } from './DeleteParentDialog';
 import { calculateAggregatedValues } from '@/hooks/useQuoteLineItems';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
@@ -58,7 +59,6 @@ const COL_LABELS: Record<string, string> = {
   cost: 'Cost',
   margin: 'Margin %',
   sell: 'Sell',
-  hours: 'Hours',
   total: 'Total',
 };
 
@@ -100,13 +100,14 @@ export function QuoteLineItemsTable({
       aggregated?: ReturnType<typeof calculateAggregatedValues>;
     }[] = [];
 
+    let flatIndex = 0;
     for (let pi = 0; pi < lineItems.length; pi++) {
       const parent = lineItems[pi];
       const hasChildren = parent.subItems.length > 0;
       const aggregated = hasChildren ? calculateAggregatedValues(parent) : undefined;
 
       result.push({
-        item: parent,
+        item: { ...parent, _flatIndex: flatIndex++ } as any,
         isChild: false,
         parentId: null,
         parentExpanded: parent._isExpanded ?? true,
@@ -121,7 +122,7 @@ export function QuoteLineItemsTable({
       if (parent._isExpanded !== false) {
         for (let ci = 0; ci < parent.subItems.length; ci++) {
           result.push({
-            item: parent.subItems[ci],
+            item: { ...parent.subItems[ci], _flatIndex: flatIndex++ } as any,
             isChild: true,
             parentId: parent.id,
             parentExpanded: true,
@@ -182,7 +183,6 @@ export function QuoteLineItemsTable({
       else if (field === 'sell_price') onUpdatePricing(id, 'sell', val);
       else if (field === 'margin_percentage') onUpdatePricing(id, 'margin', val);
       else if (field === 'quantity') onUpdate(id, { quantity: val });
-      else if (field === 'estimated_hours') onUpdate(id, { estimated_hours: val });
     },
     [onUpdate, onUpdatePricing]
   );
@@ -208,18 +208,16 @@ export function QuoteLineItemsTable({
     <>
       <div>
         {isMobile ? (
-          /* ═══════════ MOBILE: Card-based view ═══════════ */
-          <div className="space-y-3">
+          /* ═══════════ MOBILE: Compact card-based view ═══════════ */
+          <div className="space-y-2">
             {lineItems.map((parent, parentIndex) => {
               const hasChildren = parent.subItems.length > 0;
               const aggregated = hasChildren ? calculateAggregatedValues(parent) : undefined;
               const isReadOnly = hasChildren;
-              const highlights = parent._highlightFields || new Set<string>();
               const displayTotal = aggregated ? aggregated.line_total : parent.line_total;
               const displayCost = aggregated ? aggregated.cost_price : parent.cost_price;
               const displaySell = aggregated ? aggregated.sell_price : parent.sell_price;
               const displayMargin = aggregated ? aggregated.margin_percentage : parent.margin_percentage;
-              const displayHours = aggregated ? aggregated.estimated_hours : parent.estimated_hours;
               const canMoveUp = parentIndex > 0;
               const canMoveDown = parentIndex < lineItems.length - 1;
 
@@ -227,184 +225,163 @@ export function QuoteLineItemsTable({
                 <div
                   key={parent.id}
                   className={cn(
-                    'rounded-lg border border-border/60 bg-card shadow-sm overflow-hidden',
+                    'rounded-lg border border-border/50 bg-card shadow-sm overflow-hidden',
+                    hasChildren && 'border-l-4 border-l-primary/50',
                     parent.is_optional && 'opacity-60 italic',
                     parent._isNew && 'animate-slide-up'
                   )}
                 >
-                  {/* Parent header */}
-                  <div className={cn(
-                    'p-3',
-                    hasChildren && 'bg-muted/20 border-b border-border/40'
-                  )}>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        <div className="flex flex-col">
-                          <button
-                            onClick={() => onReorderParent(parent.id, 'up')}
-                            disabled={!canMoveUp}
-                            className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
-                          >
-                            <ArrowUp className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                          <button
-                            onClick={() => onReorderParent(parent.id, 'down')}
-                            disabled={!canMoveDown}
-                            className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
-                          >
-                            <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
-                          </button>
-                        </div>
-                        {hasChildren && (
-                          <button
-                            onClick={() => onToggleExpand(parent.id)}
-                            className="p-1 rounded hover:bg-muted"
-                          >
-                            {(parent._isExpanded !== false) ? (
-                              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            )}
-                          </button>
-                        )}
+                  {/* ── Parent header row ── */}
+                  <div className="flex items-center gap-1 px-2 py-2">
+                    {/* Reorder + expand compact */}
+                    <div className="flex items-center gap-0 shrink-0">
+                      <div className="flex flex-col">
+                        <button
+                          onClick={() => onReorderParent(parent.id, 'up')}
+                          disabled={!canMoveUp}
+                          className="p-0 h-4 w-4 flex items-center justify-center disabled:opacity-20"
+                        >
+                          <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                        </button>
+                        <button
+                          onClick={() => onReorderParent(parent.id, 'down')}
+                          disabled={!canMoveDown}
+                          className="p-0 h-4 w-4 flex items-center justify-center disabled:opacity-20"
+                        >
+                          <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                        </button>
                       </div>
-
-                      <input
-                        value={parent.description}
-                        onChange={(e) => onUpdate(parent.id, { description: e.target.value })}
-                        className="flex-1 min-w-0 h-11 px-2 text-sm rounded-md border border-transparent bg-transparent font-medium hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring"
-                        placeholder="Item description"
-                      />
-
-                      <span className="font-mono text-sm font-medium shrink-0 tabular-nums">
-                        ${displayTotal.toFixed(2)}
-                      </span>
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => onAddSubItem(parent.id)}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add sub-item
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => onUpdate(parent.id, { is_optional: !parent.is_optional })}>
-                            {parent.is_optional ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
-                            {parent.is_optional ? 'Mark as included' : 'Mark as optional'}
-                          </DropdownMenuItem>
-                          {hasChildren && (
-                            <DropdownMenuItem onClick={() => onUngroupParent(parent.id)}>
-                              <Ungroup className="w-4 h-4 mr-2" />
-                              Ungroup children
-                            </DropdownMenuItem>
+                      {hasChildren && (
+                        <button
+                          onClick={() => onToggleExpand(parent.id)}
+                          className="p-0.5 rounded"
+                        >
+                          {(parent._isExpanded !== false) ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                           )}
-                          {!hasChildren && (
-                            <DropdownMenuItem onClick={() => onCreateGroupFromItem(parent.id)}>
-                              <FolderPlus className="w-4 h-4 mr-2" />
-                              Create group
-                            </DropdownMenuItem>
-                          )}
-                          {!hasChildren && availableParentGroups.filter(p => p.id !== parent.id).length > 0 && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                                Move into group
-                              </div>
-                              {availableParentGroups
-                                .filter(p => p.id !== parent.id)
-                                .map(pg => (
-                                  <DropdownMenuItem key={pg.id} onClick={() => onGroupIntoParent(parent.id, pg.id)}>
-                                    <FolderInput className="w-4 h-4 mr-2" />
-                                    {pg.description || 'Untitled'}
-                                  </DropdownMenuItem>
-                                ))}
-                            </>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => onDuplicate(parent.id)}>
-                            <Copy className="w-4 h-4 mr-2" />
-                            Duplicate
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => handleMobileDelete(parent, hasChildren)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        </button>
+                      )}
                     </div>
 
-                    {/* Number fields — 2-column grid for better tap targets */}
-                    {!isReadOnly && (
-                      <div className="grid grid-cols-2 gap-2 mt-3">
-                        <div>
-                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Qty</label>
-                          <FormattedNumberInput
-                            value={parent.quantity || ''}
-                            onChange={(v) => handleMobileNumberChange(parent.id, 'quantity', v)}
-                            className="h-11"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Sell</label>
-                          <FormattedNumberInput
-                            value={parent.sell_price || ''}
-                            onChange={(v) => handleMobileNumberChange(parent.id, 'sell_price', v)}
-                            highlight={highlights.has('sell_price')}
-                            className="h-11"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Cost</label>
-                          <FormattedNumberInput
-                            value={parent.cost_price || ''}
-                            onChange={(v) => handleMobileNumberChange(parent.id, 'cost_price', v)}
-                            highlight={highlights.has('cost_price')}
-                            className="h-11"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Margin %</label>
-                          <FormattedNumberInput
-                            value={parent.margin_percentage || ''}
-                            onChange={(v) => handleMobileNumberChange(parent.id, 'margin_percentage', v)}
-                            highlight={highlights.has('margin_percentage')}
-                            className="h-11"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Hours</label>
-                          <FormattedNumberInput
-                            value={parent.estimated_hours || ''}
-                            onChange={(v) => handleMobileNumberChange(parent.id, 'estimated_hours', v)}
-                            className="h-11"
-                          />
-                        </div>
-                      </div>
-                    )}
+                    {/* Description */}
+                    <input
+                      value={parent.description}
+                      onChange={(e) => onUpdate(parent.id, { description: e.target.value })}
+                      className={cn(
+                        'flex-1 min-w-0 h-9 px-1.5 text-sm rounded border border-transparent bg-transparent',
+                        'focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
+                        hasChildren && 'font-semibold'
+                      )}
+                      placeholder="Item description"
+                    />
 
-                    {/* Read-only aggregated for parent groups */}
-                    {isReadOnly && (
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground font-mono">
-                        <span>Cost ${displayCost.toFixed(2)}</span>
-                        <span>Margin {displayMargin.toFixed(1)}%</span>
-                        <span>Sell ${displaySell.toFixed(2)}</span>
-                        {displayHours > 0 && <span>{displayHours.toFixed(1)}h</span>}
-                      </div>
-                    )}
+                    {/* Total */}
+                    <span className="font-mono text-sm font-semibold shrink-0 tabular-nums">
+                      ${displayTotal.toFixed(2)}
+                    </span>
+
+                    {/* Menu */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={() => onAddSubItem(parent.id)}>
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add sub-item
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onUpdate(parent.id, { is_optional: !parent.is_optional })}>
+                          {parent.is_optional ? <Eye className="w-4 h-4 mr-2" /> : <EyeOff className="w-4 h-4 mr-2" />}
+                          {parent.is_optional ? 'Mark as included' : 'Mark as optional'}
+                        </DropdownMenuItem>
+                        {hasChildren && (
+                          <DropdownMenuItem onClick={() => onUngroupParent(parent.id)}>
+                            <Ungroup className="w-4 h-4 mr-2" />
+                            Ungroup children
+                          </DropdownMenuItem>
+                        )}
+                        {!hasChildren && (
+                          <DropdownMenuItem onClick={() => onCreateGroupFromItem(parent.id)}>
+                            <FolderPlus className="w-4 h-4 mr-2" />
+                            Create group
+                          </DropdownMenuItem>
+                        )}
+                        {!hasChildren && availableParentGroups.filter(p => p.id !== parent.id).length > 0 && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                              Move into group
+                            </div>
+                            {availableParentGroups
+                              .filter(p => p.id !== parent.id)
+                              .map(pg => (
+                                <DropdownMenuItem key={pg.id} onClick={() => onGroupIntoParent(parent.id, pg.id)}>
+                                  <FolderInput className="w-4 h-4 mr-2" />
+                                  {pg.description || 'Untitled'}
+                                </DropdownMenuItem>
+                              ))}
+                          </>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onDuplicate(parent.id)}>
+                          <Copy className="w-4 h-4 mr-2" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => handleMobileDelete(parent, hasChildren)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
-                  {/* Children */}
+                  {/* ── Compact data chips ── */}
+                  {!isReadOnly && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pb-2.5 text-xs">
+                      <MobileTapToEditValue
+                        label="Qty"
+                        value={parent.quantity}
+                        onChange={(v) => handleMobileNumberChange(parent.id, 'quantity', v)}
+                      />
+                      <MobileTapToEditValue
+                        label="Cost"
+                        value={parent.cost_price}
+                        prefix="$"
+                        onChange={(v) => handleMobileNumberChange(parent.id, 'cost_price', v)}
+                      />
+                      <MobileTapToEditValue
+                        label="Sell"
+                        value={parent.sell_price}
+                        prefix="$"
+                        onChange={(v) => handleMobileNumberChange(parent.id, 'sell_price', v)}
+                      />
+                      <span className="text-muted-foreground font-mono tabular-nums">
+                        Margin {displayMargin.toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Read-only aggregated for parent groups */}
+                  {isReadOnly && (
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pb-2.5 text-xs text-muted-foreground font-mono tabular-nums">
+                      <span>Cost ${displayCost.toFixed(2)}</span>
+                      <span>Sell ${displaySell.toFixed(2)}</span>
+                      <span>Margin {displayMargin.toFixed(1)}%</span>
+                    </div>
+                  )}
+
+                  {/* ── Children ── */}
                   {hasChildren && parent._isExpanded !== false && (
-                    <div className="divide-y divide-border/30">
+                    <div className="border-t border-border/30">
                       {parent.subItems.map((child, childIndex) => {
-                        const childHighlights = child._highlightFields || new Set<string>();
                         const canChildMoveUp = childIndex > 0;
                         const canChildMoveDown = childIndex < parent.subItems.length - 1;
 
@@ -412,44 +389,45 @@ export function QuoteLineItemsTable({
                           <div
                             key={child.id}
                             className={cn(
-                              'p-3 pl-4 bg-background/50 border-l-2 border-primary/10 ml-3',
+                              'px-3 py-2 ml-3 border-l-2 border-primary/10 border-b border-border/20 last:border-b-0',
                               child.is_optional && 'opacity-60 italic',
                               child._isNew && 'animate-slide-up'
                             )}
                           >
-                            <div className="flex items-center gap-1.5">
+                            {/* Child header */}
+                            <div className="flex items-center gap-1">
                               <div className="flex flex-col shrink-0">
                                 <button
                                   onClick={() => onReorderSubItem(parent.id, child.id, 'up')}
                                   disabled={!canChildMoveUp}
-                                  className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                                  className="p-0 h-3.5 w-3.5 flex items-center justify-center disabled:opacity-20"
                                 >
-                                  <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                                  <ArrowUp className="w-2.5 h-2.5 text-muted-foreground" />
                                 </button>
                                 <button
                                   onClick={() => onReorderSubItem(parent.id, child.id, 'down')}
                                   disabled={!canChildMoveDown}
-                                  className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                                  className="p-0 h-3.5 w-3.5 flex items-center justify-center disabled:opacity-20"
                                 >
-                                  <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                                  <ArrowDown className="w-2.5 h-2.5 text-muted-foreground" />
                                 </button>
                               </div>
 
                               <input
                                 value={child.description}
                                 onChange={(e) => onUpdate(child.id, { description: e.target.value })}
-                                className="flex-1 min-w-0 h-11 px-2 text-sm rounded-md border border-transparent bg-transparent hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring"
+                                className="flex-1 min-w-0 h-8 px-1.5 text-sm rounded border border-transparent bg-transparent focus:border-input focus:outline-none focus:ring-1 focus:ring-ring text-muted-foreground"
                                 placeholder="Sub-item"
                               />
 
-                              <span className="font-mono text-sm font-medium shrink-0 tabular-nums">
+                              <span className="font-mono text-xs font-medium shrink-0 tabular-nums">
                                 ${child.line_total.toFixed(2)}
                               </span>
 
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
-                                    <MoreHorizontal className="w-4 h-4" />
+                                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                                    <MoreHorizontal className="w-3.5 h-3.5" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="w-48">
@@ -473,51 +451,28 @@ export function QuoteLineItemsTable({
                               </DropdownMenu>
                             </div>
 
-                            {/* Child number fields — 2-column */}
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <div>
-                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Qty</label>
-                                <FormattedNumberInput
-                                  value={child.quantity || ''}
-                                  onChange={(v) => handleMobileNumberChange(child.id, 'quantity', v)}
-                                  className="h-11"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Sell</label>
-                                <FormattedNumberInput
-                                  value={child.sell_price || ''}
-                                  onChange={(v) => handleMobileNumberChange(child.id, 'sell_price', v)}
-                                  highlight={childHighlights.has('sell_price')}
-                                  className="h-11"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Cost</label>
-                                <FormattedNumberInput
-                                  value={child.cost_price || ''}
-                                  onChange={(v) => handleMobileNumberChange(child.id, 'cost_price', v)}
-                                  highlight={childHighlights.has('cost_price')}
-                                  className="h-11"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Margin %</label>
-                                <FormattedNumberInput
-                                  value={child.margin_percentage || ''}
-                                  onChange={(v) => handleMobileNumberChange(child.id, 'margin_percentage', v)}
-                                  highlight={childHighlights.has('margin_percentage')}
-                                  className="h-11"
-                                />
-                              </div>
-                              <div className="col-span-2">
-                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Hours</label>
-                                <FormattedNumberInput
-                                  value={child.estimated_hours || ''}
-                                  onChange={(v) => handleMobileNumberChange(child.id, 'estimated_hours', v)}
-                                  className="h-11"
-                                />
-                              </div>
+                            {/* Child compact data chips */}
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-xs pl-4">
+                              <MobileTapToEditValue
+                                label="Qty"
+                                value={child.quantity}
+                                onChange={(v) => handleMobileNumberChange(child.id, 'quantity', v)}
+                              />
+                              <MobileTapToEditValue
+                                label="Cost"
+                                value={child.cost_price}
+                                prefix="$"
+                                onChange={(v) => handleMobileNumberChange(child.id, 'cost_price', v)}
+                              />
+                              <MobileTapToEditValue
+                                label="Sell"
+                                value={child.sell_price}
+                                prefix="$"
+                                onChange={(v) => handleMobileNumberChange(child.id, 'sell_price', v)}
+                              />
+                              <span className="text-muted-foreground font-mono tabular-nums">
+                                {child.margin_percentage.toFixed(1)}%
+                              </span>
                             </div>
                           </div>
                         );
@@ -536,7 +491,7 @@ export function QuoteLineItemsTable({
             )}
           </div>
         ) : (
-          /* ═══════════ DESKTOP: Clean flat table ═══════════ */
+          /* ═══════════ DESKTOP: Clean flat table with zebra striping ═══════════ */
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <colgroup>
@@ -546,20 +501,22 @@ export function QuoteLineItemsTable({
                 <col style={{ width: 100 }} />
                 <col style={{ width: 80 }} />
                 <col style={{ width: 100 }} />
-                <col style={{ width: 80 }} />
                 <col style={{ width: 110 }} />
                 <col style={{ width: 44 }} />
               </colgroup>
               <thead>
-                <tr className="border-b border-border">
+                <tr className="border-b-2 border-border bg-muted/30">
                   <th className="w-12" />
-                  <th className="text-left py-2.5 px-1 font-medium text-muted-foreground text-xs">
+                  <th className="text-left py-3 px-1 font-semibold text-foreground/80 text-xs tracking-wide">
                     Description
                   </th>
-                  {(['qty', 'cost', 'margin', 'sell', 'hours', 'total'] as const).map(col => (
+                  {(['qty', 'cost', 'margin', 'sell', 'total'] as const).map(col => (
                     <th
                       key={col}
-                      className="text-right py-2.5 px-1 font-medium text-muted-foreground text-xs"
+                      className={cn(
+                        'text-right py-3 px-1 font-semibold text-foreground/80 text-xs tracking-wide',
+                        col === 'total' && 'pr-2'
+                      )}
                     >
                       {COL_LABELS[col]}
                     </th>
@@ -568,13 +525,14 @@ export function QuoteLineItemsTable({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ item, isChild, parentId, hasChildren, parentIndex, childIndex, totalParents, totalSiblings, aggregated }) => (
+                {rows.map(({ item, isChild, parentId, hasChildren, parentIndex, childIndex, totalParents, totalSiblings, aggregated }, idx) => (
                   <QuoteLineItemRow
                     key={item.id}
                     item={item}
                     isChild={isChild}
                     isExpanded={item._isExpanded}
                     hasChildren={hasChildren}
+                    rowIndex={idx}
                     aggregated={aggregated}
                     onUpdate={onUpdate}
                     onUpdatePricing={onUpdatePricing}
@@ -607,7 +565,7 @@ export function QuoteLineItemsTable({
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-16 text-muted-foreground">
+                    <td colSpan={8} className="text-center py-16 text-muted-foreground">
                       No line items yet. Add an item or import from Price Book.
                     </td>
                   </tr>
