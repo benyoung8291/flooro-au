@@ -1,5 +1,5 @@
 /* =============================================
-   QUOTE PREVIEW – PRINT-OPTIMIZED STYLES
+   QUOTE PREVIEW – PROFESSIONAL LETTERHEAD STYLES
    Scoped under .quote-print-document
    ============================================= */
 
@@ -7,130 +7,185 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 2rem 1.5rem 3rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
   line-height: 1.55;
   color: hsl(var(--foreground));
 }
 
-/* ── Header ─────────────────────────────────── */
+/* ── Letterhead Header ──────────────────────── */
 
-.quote-print-document .quote-header {
+.quote-print-document .letterhead-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 3px solid hsl(var(--primary));
+  gap: 2rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 3px solid #1e293b;
 }
 
-.quote-print-document .company-block {
-  flex: 1;
+.quote-print-document .letterhead-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
-.quote-print-document .company-logo {
-  max-width: 120px;
+.quote-print-document .letterhead-logo {
+  max-width: 80px;
   max-height: 56px;
-  margin-bottom: 0.5rem;
   object-fit: contain;
 }
 
-.quote-print-document .company-name {
-  font-size: 20px;
+.quote-print-document .letterhead-company-name {
+  font-size: 22px;
   font-weight: 700;
-  color: hsl(var(--primary));
-  margin-bottom: 0.25rem;
+  color: #1e293b;
+  line-height: 1.2;
 }
 
-.quote-print-document .company-details {
+.quote-print-document .letterhead-abn {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+  letter-spacing: 0.25px;
+}
+
+.quote-print-document .letterhead-contact {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 1px;
   font-size: 11px;
-  color: hsl(var(--muted-foreground));
-}
-
-.quote-print-document .quote-title-block {
+  color: #64748b;
   text-align: right;
-  min-width: 160px;
+  flex-shrink: 0;
 }
 
-.quote-print-document .quote-title-label {
-  font-size: 26px;
+/* ── Quote Meta Bar ─────────────────────────── */
+
+.quote-print-document .quote-meta-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+}
+
+.quote-print-document .quote-meta-left {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.quote-print-document .quote-meta-label {
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: 2px;
-  color: hsl(var(--primary));
+  color: #1e293b;
 }
 
-.quote-print-document .quote-number {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-  color: hsl(var(--muted-foreground));
+.quote-print-document .quote-meta-number {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
 }
 
-.quote-print-document .quote-date {
+.quote-print-document .quote-meta-right {
+  display: flex;
+  gap: 2rem;
+}
+
+.quote-print-document .quote-meta-date {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   font-size: 12px;
-  color: hsl(var(--muted-foreground));
-  margin-top: 4px;
+  color: #334155;
 }
 
-.quote-print-document .quote-validity {
-  font-size: 11px;
-  color: hsl(var(--warning));
-  margin-top: 2px;
+.quote-print-document .quote-meta-date .meta-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  color: #94a3b8;
+  font-weight: 600;
+  margin-bottom: 1px;
 }
 
-/* ── Info Grid ──────────────────────────────── */
+/* ── Contact Grid ───────────────────────────── */
 
-.quote-print-document .info-grid {
+.quote-print-document .contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
-.quote-print-document .info-box {
-  background: hsl(var(--muted) / 0.5);
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border-left: 4px solid hsl(var(--primary));
+.quote-print-document .contact-box {
+  padding: 1rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
 }
 
-.quote-print-document .info-box h3 {
-  font-size: 10px;
+.quote-print-document .contact-box h3 {
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.75px;
-  color: hsl(var(--muted-foreground));
+  letter-spacing: 1px;
+  color: #94a3b8;
   margin-bottom: 0.5rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.quote-print-document .info-box p {
+.quote-print-document .contact-box p {
   font-size: 12px;
   margin: 2px 0;
-  color: hsl(var(--foreground));
+  color: #334155;
 }
 
-.quote-print-document .info-name {
+.quote-print-document .contact-name {
   font-weight: 600;
   font-size: 14px !important;
+  color: #1e293b !important;
   margin-bottom: 4px !important;
 }
 
-.quote-print-document .info-description {
-  color: hsl(var(--muted-foreground)) !important;
-  margin-top: 4px !important;
+/* ── Letter Body ────────────────────────────── */
+
+.quote-print-document .letter-body {
+  margin-bottom: 2rem;
+  padding: 1.25rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.quote-print-document .letter-subject {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.75rem;
+}
+
+.quote-print-document .letter-greeting {
+  font-size: 13px;
+  color: #334155;
+  margin-bottom: 0.75rem;
+}
+
+.quote-print-document .letter-content {
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.7;
 }
 
 /* Rich text content styling */
-.quote-print-document .rich-text-content {
-  font-size: 12px;
-  line-height: 1.6;
-}
-
 .quote-print-document .rich-text-content b,
 .quote-print-document .rich-text-content strong {
   font-weight: 600;
+  color: #334155;
 }
 
 .quote-print-document .rich-text-content i,
@@ -144,31 +199,31 @@
 
 .quote-print-document .rich-text-content ul {
   list-style: disc;
-  padding-left: 1.25rem;
-  margin: 4px 0;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
 }
 
 .quote-print-document .rich-text-content ol {
   list-style: decimal;
-  padding-left: 1.25rem;
-  margin: 4px 0;
+  padding-left: 1.5rem;
+  margin: 0.5rem 0;
 }
 
 .quote-print-document .rich-text-content li {
-  margin: 2px 0;
+  margin: 3px 0;
 }
 
 /* ── Section headings ───────────────────────── */
 
 .quote-print-document .section-heading {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.75px;
-  color: hsl(var(--foreground));
+  letter-spacing: 1px;
+  color: #1e293b;
   margin: 1.5rem 0 0.75rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid hsl(var(--border));
+  border-bottom: 2px solid #1e293b;
 }
 
 /* ── Items table ────────────────────────────── */
@@ -182,42 +237,45 @@
 
 .quote-print-document .items-table th {
   padding: 0.625rem 0.75rem;
-  background: hsl(var(--muted) / 0.5);
-  font-weight: 600;
-  color: hsl(var(--foreground));
-  font-size: 10px;
+  background: #f1f5f9;
+  font-weight: 700;
+  color: #334155;
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 2px solid hsl(var(--border));
+  letter-spacing: 0.75px;
+  border-bottom: 2px solid #cbd5e1;
+  border-top: 2px solid #cbd5e1;
 }
 
 .quote-print-document .items-table td {
   padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid hsl(var(--border) / 0.6);
-  color: hsl(var(--foreground));
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
 }
 
 .quote-print-document .items-table .parent-row td {
   padding-top: 0.625rem;
+  font-weight: 500;
 }
 
 .quote-print-document .items-table .child-row td {
   font-size: 11px;
-  color: hsl(var(--muted-foreground));
-  border-bottom-color: hsl(var(--border) / 0.35);
+  color: #64748b;
+  border-bottom-color: #f1f5f9;
 }
 
 .quote-print-document .items-table .child-row td:first-child {
-  border-left: 2px solid hsl(var(--primary) / 0.2);
+  border-left: 2px solid #cbd5e1;
+  padding-left: 1.25rem;
 }
 
 .quote-print-document .items-table .optional-row td {
   font-style: italic;
-  color: hsl(var(--muted-foreground));
+  color: #64748b;
 }
 
 .quote-print-document .optional-table {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 /* ── Optional group sections ────────────────── */
@@ -227,15 +285,15 @@
 }
 
 .quote-print-document .optional-group-divider {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: hsl(var(--primary));
+  letter-spacing: 0.75px;
+  color: #475569;
   padding: 0.5rem 0.75rem;
   margin-bottom: 0.5rem;
-  background: hsl(var(--primary) / 0.06);
-  border-left: 3px solid hsl(var(--primary));
+  background: #f1f5f9;
+  border-left: 3px solid #475569;
   border-radius: 0 0.25rem 0.25rem 0;
 }
 
@@ -259,9 +317,9 @@
   margin-left: auto;
   max-width: 320px;
   margin-top: 1.5rem;
-  border-radius: 0.5rem;
+  border-radius: 0.375rem;
   overflow: hidden;
-  border: 1px solid hsl(var(--border));
+  border: 1px solid #e2e8f0;
 }
 
 .quote-print-document .totals-row {
@@ -270,7 +328,8 @@
   align-items: center;
   padding: 0.625rem 1rem;
   font-size: 13px;
-  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  color: #334155;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 .quote-print-document .totals-row:last-child {
@@ -278,58 +337,53 @@
 }
 
 .quote-print-document .grand-total {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
+  background: #1e293b;
+  color: #ffffff;
   font-weight: 700;
   font-size: 16px;
   padding: 0.75rem 1rem;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
 /* ── Notes & Terms ──────────────────────────── */
 
 .quote-print-document .notes-box {
   margin-top: 1.5rem;
-  padding: 1rem;
-  background: hsl(var(--accent) / 0.08);
-  border-radius: 0.5rem;
-  border-left: 4px solid hsl(var(--accent));
+  padding: 1rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
 }
 
 .quote-print-document .notes-box h3,
 .quote-print-document .terms-box h3 {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 0.375rem;
-}
-
-.quote-print-document .notes-box h3 {
-  color: hsl(var(--accent));
+  letter-spacing: 0.75px;
+  margin-bottom: 0.5rem;
+  color: #64748b;
 }
 
 .quote-print-document .notes-box p {
   font-size: 12px;
-  color: hsl(var(--foreground));
+  color: #334155;
   white-space: pre-wrap;
+  line-height: 1.6;
 }
 
 .quote-print-document .terms-box {
-  margin-top: 1.25rem;
-  padding: 1rem;
-  background: hsl(var(--warning) / 0.06);
-  border-radius: 0.5rem;
-  border-left: 4px solid hsl(var(--warning));
-}
-
-.quote-print-document .terms-box h3 {
-  color: hsl(var(--warning));
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  background: #fafafa;
 }
 
 .quote-print-document .terms-box p {
-  font-size: 11px;
-  color: hsl(var(--foreground) / 0.8);
-  line-height: 1.6;
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.7;
 }
 
 /* ── Signature ──────────────────────────────── */
@@ -337,8 +391,9 @@
 .quote-print-document .signature-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
+  gap: 3rem;
   margin-top: 3rem;
+  padding-top: 1rem;
 }
 
 .quote-print-document .signature-box {
@@ -348,24 +403,31 @@
 }
 
 .quote-print-document .signature-line {
-  height: 40px;
-  border-bottom: 1px solid hsl(var(--foreground));
+  height: 48px;
+  border-bottom: 1px solid #334155;
 }
 
 .quote-print-document .signature-box span {
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #94a3b8;
+  font-weight: 500;
 }
 
 /* ── Footer ─────────────────────────────────── */
 
 .quote-print-document .document-footer {
   margin-top: 2.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid hsl(var(--border));
-  text-align: center;
-  font-size: 10px;
-  color: hsl(var(--muted-foreground));
+  padding-top: 0.75rem;
+  border-top: 2px solid #1e293b;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.5rem;
+  font-size: 9px;
+  color: #94a3b8;
+  letter-spacing: 0.25px;
 }
 
 /* ═══════════════════════════════════════════════
@@ -373,7 +435,6 @@
    ═══════════════════════════════════════════════ */
 
 @media print {
-  /* Hide app chrome */
   body {
     background: white !important;
     color: #1a1a1a !important;
@@ -386,133 +447,163 @@
     color: #1a1a1a;
   }
 
-  /* Override CSS variables with print-safe values */
-  .quote-print-document .quote-header {
-    border-bottom-color: #d97706;
+  /* Letterhead */
+  .quote-print-document .letterhead-header {
+    border-bottom-color: #1e293b;
   }
 
-  .quote-print-document .company-name,
-  .quote-print-document .quote-title-label {
-    color: #d97706;
+  .quote-print-document .letterhead-company-name {
+    color: #1e293b;
   }
 
-  .quote-print-document .company-details,
-  .quote-print-document .quote-number,
-  .quote-print-document .quote-date {
-    color: #6b7280;
+  .quote-print-document .letterhead-abn,
+  .quote-print-document .letterhead-contact {
+    color: #64748b;
   }
 
-  .quote-print-document .info-box {
-    border-left-color: #d97706;
-    background: #f9fafb;
+  /* Quote Meta */
+  .quote-print-document .quote-meta-bar {
+    background: #f8fafc;
+    border-color: #e2e8f0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .info-box h3 {
-    color: #6b7280;
+  .quote-print-document .quote-meta-label {
+    color: #1e293b;
   }
 
-  .quote-print-document .info-box p {
-    color: #1a1a1a;
+  .quote-print-document .quote-meta-number {
+    color: #64748b;
   }
 
+  /* Contact */
+  .quote-print-document .contact-box {
+    border-color: #e2e8f0;
+  }
+
+  .quote-print-document .contact-box h3 {
+    color: #94a3b8;
+  }
+
+  .quote-print-document .contact-box p {
+    color: #334155;
+  }
+
+  .quote-print-document .contact-name {
+    color: #1e293b !important;
+  }
+
+  /* Letter body */
+  .quote-print-document .letter-subject {
+    color: #1e293b;
+  }
+
+  .quote-print-document .letter-greeting {
+    color: #334155;
+  }
+
+  .quote-print-document .letter-content {
+    color: #475569;
+  }
+
+  /* Section heading */
   .quote-print-document .section-heading {
-    color: #1a1a1a;
-    border-bottom-color: #e5e7eb;
+    color: #1e293b;
+    border-bottom-color: #1e293b;
   }
 
+  /* Table */
   .quote-print-document .items-table th {
-    background: #f3f4f6;
-    color: #374151;
-    border-bottom-color: #d1d5db;
+    background: #f1f5f9;
+    color: #334155;
+    border-color: #cbd5e1;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .quote-print-document .items-table td {
-    color: #1a1a1a;
-    border-bottom-color: #e5e7eb;
+    color: #334155;
+    border-bottom-color: #e2e8f0;
   }
 
   .quote-print-document .items-table .child-row td {
-    color: #6b7280;
-    border-bottom-color: #f3f4f6;
+    color: #64748b;
+    border-bottom-color: #f1f5f9;
   }
 
   .quote-print-document .items-table .child-row td:first-child {
-    border-left-color: #fcd34d;
+    border-left-color: #cbd5e1;
   }
 
+  /* Optional group */
+  .quote-print-document .optional-group-divider {
+    background: #f1f5f9;
+    border-left-color: #475569;
+    color: #475569;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Totals */
   .quote-print-document .totals-box {
-    border-color: #e5e7eb;
+    border-color: #e2e8f0;
   }
 
   .quote-print-document .totals-row {
-    border-bottom-color: #f3f4f6;
+    color: #334155;
+    border-bottom-color: #f1f5f9;
   }
 
   .quote-print-document .grand-total {
-    background: #d97706 !important;
-    color: white !important;
+    background: #1e293b !important;
+    color: #ffffff !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
+  /* Notes & Terms */
   .quote-print-document .notes-box {
-    border-left-color: #d97706;
-    background: #fef3c7;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+    border-color: #e2e8f0;
   }
 
-  .quote-print-document .notes-box h3 {
-    color: #d97706;
+  .quote-print-document .notes-box h3,
+  .quote-print-document .terms-box h3 {
+    color: #64748b;
   }
 
   .quote-print-document .notes-box p {
-    color: #1a1a1a;
+    color: #334155;
   }
 
   .quote-print-document .terms-box {
-    border-left-color: #f59e0b;
-    background: #fffbeb;
+    border-color: #e2e8f0;
+    background: #fafafa;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-
-  .quote-print-document .terms-box h3 {
-    color: #f59e0b;
   }
 
   .quote-print-document .terms-box p {
-    color: #374151;
+    color: #64748b;
   }
 
-  /* Optional group dividers */
-  .quote-print-document .optional-group-divider {
-    background: #fef3c7;
-    border-left-color: #d97706;
-    color: #d97706;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
+  /* Signature */
   .quote-print-document .signature-line {
-    border-bottom-color: #1a1a1a;
+    border-bottom-color: #334155;
   }
 
   .quote-print-document .signature-box span {
-    color: #6b7280;
+    color: #94a3b8;
   }
 
+  /* Footer */
   .quote-print-document .document-footer {
-    border-top-color: #e5e7eb;
-    color: #9ca3af;
+    border-top-color: #1e293b;
+    color: #94a3b8;
   }
 
   /* Page breaks */
-  .quote-print-document .quote-header {
+  .quote-print-document .letterhead-header {
     page-break-after: avoid;
   }
 
@@ -528,7 +619,7 @@
     page-break-inside: avoid;
   }
 
-  .quote-print-document .info-grid {
+  .quote-print-document .contact-grid {
     page-break-inside: avoid;
   }
 

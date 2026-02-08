@@ -148,6 +148,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          abn: string | null
           address: string | null
           created_at: string
           email: string | null
@@ -161,6 +162,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          abn?: string | null
           address?: string | null
           created_at?: string
           email?: string | null
@@ -174,6 +176,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          abn?: string | null
           address?: string | null
           created_at?: string
           email?: string | null
@@ -249,6 +252,7 @@ export type Database = {
           full_name: string | null
           id: string
           organization_id: string | null
+          phone: string | null
           updated_at: string
         }
         Insert: {
@@ -258,6 +262,7 @@ export type Database = {
           full_name?: string | null
           id: string
           organization_id?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Update: {
@@ -267,6 +272,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           organization_id?: string | null
+          phone?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -670,6 +676,7 @@ export type Database = {
       create_organization_for_user: {
         Args: { _name: string }
         Returns: {
+          abn: string | null
           address: string | null
           created_at: string
           email: string | null

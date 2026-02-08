@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUserProfile, useUserOrganization } from '@/hooks/useUserProfile';
+import { useUserProfile, useUserOrganization, useUpdateProfile } from '@/hooks/useUserProfile';
 import { useUpdateOrganization } from '@/hooks/useOrganization';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ export default function Settings() {
     phone: '',
     email: '',
     website: '',
+    abn: '',
     termsAndConditions: '',
   });
 
@@ -53,6 +54,7 @@ export default function Settings() {
         phone: (organization as any).phone || '',
         email: (organization as any).email || '',
         website: (organization as any).website || '',
+        abn: (organization as any).abn || '',
         termsAndConditions: (organization as any).terms_and_conditions || '',
       });
       setLogoPreview(organization.logo_url || null);
@@ -122,6 +124,7 @@ export default function Settings() {
           phone: formData.phone || null,
           email: formData.email || null,
           website: formData.website || null,
+          abn: formData.abn || null,
           terms_and_conditions: formData.termsAndConditions || null,
         },
       });
@@ -279,6 +282,16 @@ export default function Settings() {
                     />
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="company-abn">ABN</Label>
+                    <Input
+                      id="company-abn"
+                      value={formData.abn}
+                      onChange={(e) => setFormData(prev => ({ ...prev, abn: e.target.value }))}
+                      placeholder="12 345 678 901"
+                    />
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="company-email">Email</Label>
@@ -343,27 +356,7 @@ export default function Settings() {
           </TabsContent>
 
           <TabsContent value="profile" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Profile</CardTitle>
-                <CardDescription>
-                  Manage your personal account settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input value={profile?.email || ''} disabled />
-                  <p className="text-xs text-muted-foreground">
-                    Email cannot be changed
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Full Name</Label>
-                  <Input value={profile?.full_name || ''} placeholder="Your name" />
-                </div>
-              </CardContent>
-            </Card>
+            <ProfileSettingsCard profile={profile} />
           </TabsContent>
 
           <TabsContent value="appearance" className="space-y-6">
@@ -408,5 +401,74 @@ function SettingsSkeleton() {
         <Skeleton className="h-96 rounded-lg" />
       </main>
     </div>
+  );
+}
+
+function ProfileSettingsCard({ profile }: { profile: any }) {
+  const { toast } = useToast();
+  const updateProfile = useUpdateProfile();
+  const [fullName, setFullName] = useState(profile?.full_name || '');
+  const [phone, setPhone] = useState(profile?.phone || '');
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || '');
+      setPhone(profile.phone || '');
+    }
+  }, [profile]);
+
+  const handleSaveProfile = async () => {
+    try {
+      await updateProfile.mutateAsync({ full_name: fullName, phone: phone || null });
+      toast({ title: 'Profile updated' });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your Profile</CardTitle>
+        <CardDescription>
+          Manage your personal account settings
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label>Email</Label>
+          <Input value={profile?.email || ''} disabled />
+          <p className="text-xs text-muted-foreground">
+            Email cannot be changed
+          </p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="profile-name">Full Name</Label>
+          <Input
+            id="profile-name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            placeholder="Your name"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="profile-phone">Phone</Label>
+          <Input
+            id="profile-phone"
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="0412 345 678"
+          />
+          <p className="text-xs text-muted-foreground">
+            Your direct phone number — appears on quotes you create
+          </p>
+        </div>
+        <Button onClick={handleSaveProfile} disabled={updateProfile.isPending}>
+          {updateProfile.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+          Save Profile
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
