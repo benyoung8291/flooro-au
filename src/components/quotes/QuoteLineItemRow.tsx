@@ -2,6 +2,13 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   ChevronRight,
   ChevronDown,
   Plus,
@@ -13,6 +20,8 @@ import {
   EyeOff,
   Ungroup,
   ArrowUpRight,
+  FolderInput,
+  FolderPlus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
@@ -101,6 +110,9 @@ interface QuoteLineItemRowProps {
   onUngroup?: () => void;
   onPromote?: () => void;
   onDeleteWithConfirm?: (id: string) => void;
+  onGroupInto?: (itemId: string, parentId: string) => void;
+  onCreateGroup?: (itemId: string) => void;
+  availableParents?: { id: string; description: string }[];
   canMoveUp: boolean;
   canMoveDown: boolean;
   aggregated?: {
@@ -128,6 +140,9 @@ export function QuoteLineItemRow({
   onUngroup,
   onPromote,
   onDeleteWithConfirm,
+  onGroupInto,
+  onCreateGroup,
+  availableParents,
   canMoveUp,
   canMoveDown,
   aggregated,
@@ -375,6 +390,55 @@ export function QuoteLineItemRow({
               title="Promote to standalone"
             >
               <ArrowUpRight className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {/* Group into existing parent or create new group — only for standalone items without children */}
+          {!isChild && !hasChildren && onGroupInto && onCreateGroup && availableParents && availableParents.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  title="Group into..."
+                >
+                  <FolderInput className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => onCreateGroup(item.id)}>
+                  <FolderPlus className="w-3.5 h-3.5 mr-2" />
+                  Create new group
+                </DropdownMenuItem>
+                {availableParents.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                      Move into existing group
+                    </div>
+                    {availableParents.map(parent => (
+                      <DropdownMenuItem
+                        key={parent.id}
+                        onClick={() => onGroupInto(item.id, parent.id)}
+                      >
+                        <FolderInput className="w-3.5 h-3.5 mr-2" />
+                        {parent.description || 'Untitled group'}
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {!isChild && !hasChildren && onCreateGroup && (!availableParents || availableParents.length === 0) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => onCreateGroup(item.id)}
+              title="Create group"
+            >
+              <FolderPlus className="w-3.5 h-3.5" />
             </Button>
           )}
           {!isChild && (

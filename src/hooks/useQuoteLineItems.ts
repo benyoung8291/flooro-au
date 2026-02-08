@@ -574,6 +574,118 @@ export function useQuoteLineItems(quoteId: string | undefined) {
     });
   }, []);
 
+  // Group: move a standalone item into an existing parent as a sub-item
+  const groupIntoParent = useCallback((itemId: string, targetParentId: string) => {
+    setEditedLineItems(prev => {
+      const itemIndex = prev.findIndex(p => p.id === itemId);
+      if (itemIndex < 0) return prev; // item not found or already a child
+      const item = prev[itemIndex];
+      if (item.subItems.length > 0) return prev; // can't nest groups
+
+      const child: LineItem = {
+        ...item,
+        parent_line_item_id: targetParentId,
+        subItems: [],
+      };
+
+      // Remove from top-level
+      const without = prev.filter(p => p.id !== itemId);
+
+      return without.map(parent => {
+        if (parent.id !== targetParentId) return parent;
+
+        // If target parent has no children yet and has pricing, migrate parent data first
+        const newChildren: LineItem[] = [];
+        if (parent.subItems.length === 0 && (parent.cost_price > 0 || parent.sell_price > 0)) {
+          newChildren.push({
+            id: generateTempId(),
+            quote_id: parent.quote_id,
+            parent_line_item_id: targetParentId,
+            description: parent.description || 'Item',
+            quantity: parent.quantity || 1,
+            cost_price: parent.cost_price,
+            sell_price: parent.sell_price,
+            margin_percentage: parent.margin_percentage,
+            unit_price: parent.unit_price,
+            line_total: parent.line_total,
+            estimated_hours: parent.estimated_hours,
+            item_order: 0,
+            is_optional: false,
+            is_active: true,
+            price_book_item_id: parent.price_book_item_id,
+            is_from_price_book: parent.is_from_price_book,
+            source_room_id: parent.source_room_id,
+            metadata: {},
+            subItems: [],
+            _isNew: true,
+            _isExpanded: false,
+          });
+        }
+
+        const allChildren = [...parent.subItems, ...newChildren, {
+          ...child,
+          item_order: parent.subItems.length + newChildren.length,
+        }];
+        const newParent: LineItem = {
+          ...parent,
+          _isExpanded: true,
+          subItems: allChildren,
+        };
+        return recalcParentFromChildren(newParent);
+      }).map((item, i) => ({ ...item, item_order: i }));
+    });
+  }, []);
+
+  // Create new group: wrap a standalone item in a new parent group
+  const createGroupFromItem = useCallback((itemId: string, groupName = 'New Group') => {
+    if (!quoteId) return;
+    setEditedLineItems(prev => {
+      const itemIndex = prev.findIndex(p => p.id === itemId);
+      if (itemIndex < 0) return prev;
+      const item = prev[itemIndex];
+      if (item.subItems.length > 0) return prev; // already a group
+
+      const newParentId = generateTempId();
+      const child: LineItem = {
+        ...item,
+        parent_line_item_id: newParentId,
+        item_order: 0,
+        subItems: [],
+      };
+
+      const newParent: LineItem = {
+        id: newParentId,
+        quote_id: quoteId,
+        parent_line_item_id: null,
+        description: groupName,
+        quantity: 1,
+        cost_price: 0,
+        sell_price: 0,
+        margin_percentage: 0,
+        unit_price: 0,
+        line_total: 0,
+        estimated_hours: 0,
+        item_order: item.item_order,
+        is_optional: item.is_optional,
+        is_active: true,
+        price_book_item_id: null,
+        is_from_price_book: false,
+        source_room_id: null,
+        metadata: {},
+        subItems: [child],
+        _isNew: true,
+        _isExpanded: true,
+      };
+
+      const before = prev.slice(0, itemIndex);
+      const after = prev.slice(itemIndex + 1);
+      return [...before, recalcParentFromChildren(newParent), ...after].map((p, i) => ({
+        ...p,
+        item_order: i,
+      }));
+    });
+  }, [quoteId]);
+
   const duplicateLineItem = useCallback((itemId: string) => {
     setEditedLineItems(prev => {
       const newItems = [...prev];
@@ -807,6 +919,8 @@ export function useQuoteLineItems(quoteId: string | undefined) {
     reorderSubItem,
     ungroupParent,
     promoteSubItem,
+    groupIntoParent,
+    createGroupFromItem,
     saveLineItems,
     setEditedLineItems,
   };

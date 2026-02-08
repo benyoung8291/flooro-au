@@ -33,6 +33,8 @@ export default function QuoteEditor() {
     reorderSubItem,
     ungroupParent,
     promoteSubItem,
+    groupIntoParent,
+    createGroupFromItem,
     saveLineItems,
   } = useQuoteLineItems(quoteId);
 
@@ -197,6 +199,8 @@ export default function QuoteEditor() {
               onReorderSubItem={reorderSubItem}
               onUngroupParent={ungroupParent}
               onPromoteSubItem={promoteSubItem}
+              onGroupIntoParent={groupIntoParent}
+              onCreateGroupFromItem={createGroupFromItem}
               onOpenPriceBook={() => {
                 setPriceBookParentId(null);
                 setPriceBookOpen(true);
