@@ -80,7 +80,7 @@ export function FormattedNumberInput({
       onBlur={handleBlur}
       onFocus={handleFocus}
       className={cn(
-        'flex h-8 w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-right font-mono transition-all',
+        'flex h-8 w-full rounded-md border border-border/50 bg-transparent px-2 py-1 text-sm text-right font-mono transition-all',
         'hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
         highlight && 'bg-primary/10 ring-1 ring-primary/30',
         className
@@ -181,13 +181,13 @@ export function QuoteLineItemRow({
       className={cn(
         'group border-b transition-colors',
         // Zebra striping
-        isEvenRow ? 'bg-transparent' : 'bg-muted/[0.03]',
+        isEvenRow ? 'bg-transparent' : 'bg-muted/[0.08]',
         // Parent group accent
-        !isChild && hasChildren && 'bg-muted/10 border-l-4 border-l-primary/60',
+        !isChild && hasChildren && 'bg-muted/20 border-l-4 border-l-primary',
         // Child indent styling
-        isChild && 'bg-muted/[0.02]',
+        isChild && 'bg-muted/[0.04]',
         // Stronger borders
-        isChild ? 'border-border/30' : 'border-border/60',
+        'border-border',
         // Hover
         'hover:bg-muted/20',
         // Optional / new
@@ -250,7 +250,7 @@ export function QuoteLineItemRow({
                 <ArrowDown className="w-3 h-3 text-muted-foreground" />
               </button>
             </div>
-            <span className="block w-3 h-px bg-border/60" />
+            <span className="block w-3 h-px bg-border" />
           </div>
         )}
       </td>
@@ -262,7 +262,7 @@ export function QuoteLineItemRow({
           value={item.description}
           onChange={(e) => onUpdate(item.id, { description: e.target.value })}
           className={cn(
-            'w-full h-8 px-2 text-sm rounded-md border border-transparent bg-transparent transition-all',
+            'w-full h-8 px-2 text-sm rounded-md border border-border/50 bg-transparent transition-all',
             'hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
             !isChild && hasChildren && 'font-semibold',
             isChild && 'text-muted-foreground'
@@ -329,7 +329,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Total — emphasized */}
-      <td className="py-2.5 px-2 text-right font-mono text-sm font-semibold tabular-nums">
+      <td className="py-2.5 px-2 text-right font-mono text-sm font-bold tabular-nums text-foreground">
         ${displayTotal.toFixed(2)}
       </td>
 

@@ -76,7 +76,7 @@ export function QuoteClientCard({
                 value={clientName || ''}
                 onChange={(e) => onUpdate({ client_name: e.target.value || null })}
                 placeholder="Client name"
-                className="h-9 text-sm border-transparent bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
             </div>
             <div className="space-y-1">
@@ -88,7 +88,7 @@ export function QuoteClientCard({
                 value={clientEmail || ''}
                 onChange={(e) => onUpdate({ client_email: e.target.value || null })}
                 placeholder="client@example.com"
-                className="h-9 text-sm border-transparent bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
             </div>
             <div className="space-y-1">
@@ -99,7 +99,7 @@ export function QuoteClientCard({
                 value={clientPhone || ''}
                 onChange={(e) => onUpdate({ client_phone: e.target.value || null })}
                 placeholder="Phone number"
-                className="h-9 text-sm border-transparent bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
             </div>
             <div className="space-y-1">
@@ -110,7 +110,7 @@ export function QuoteClientCard({
                 value={clientAddress || ''}
                 onChange={(e) => onUpdate({ client_address: e.target.value || null })}
                 placeholder="Site / delivery address"
-                className="h-9 text-sm border-transparent bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
             </div>
           </div>

@@ -97,22 +97,22 @@ export function QuoteSummaryPanel({
           {/* Totals */}
           <div className="flex items-center gap-4 sm:gap-6 text-sm shrink-0">
             <div>
-              <span className="text-muted-foreground text-xs block leading-none mb-0.5">Subtotal</span>
+              <span className="text-foreground/60 text-xs block leading-none mb-0.5">Subtotal</span>
               <span className="font-mono font-medium">${totalSell.toFixed(2)}</span>
             </div>
             <div className="hidden sm:block">
-              <span className="text-muted-foreground text-xs block leading-none mb-0.5">Margin</span>
+              <span className="text-foreground/60 text-xs block leading-none mb-0.5">Margin</span>
               <span className="font-mono">{margin.toFixed(1)}%</span>
             </div>
             <div>
-              <span className="text-muted-foreground text-xs block leading-none mb-0.5">
+              <span className="text-foreground/60 text-xs block leading-none mb-0.5">
                 GST ({taxRate}%)
               </span>
               <span className="font-mono">${taxAmount.toFixed(2)}</span>
             </div>
             <Separator orientation="vertical" className="h-8" />
             <div>
-              <span className="text-muted-foreground text-xs block leading-none mb-0.5">Total</span>
+              <span className="text-foreground text-xs font-medium block leading-none mb-0.5">Total</span>
               <span className="font-mono font-bold text-base">${grandTotal.toFixed(2)}</span>
             </div>
           </div>

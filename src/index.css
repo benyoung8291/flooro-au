@@ -31,7 +31,7 @@
 
     /* Muted */
     --muted: 35 20% 94%;
-    --muted-foreground: 30 10% 45%;
+    --muted-foreground: 30 10% 38%;
 
     /* Accent - Soft terracotta */
     --accent: 20 50% 65%;
@@ -49,8 +49,8 @@
     --destructive: 0 72% 55%;
     --destructive-foreground: 40 33% 99%;
 
-    --border: 35 20% 88%;
-    --input: 35 20% 88%;
+    --border: 35 15% 82%;
+    --input: 35 15% 82%;
     --ring: 20 65% 58%;
 
     --radius: 0.75rem;

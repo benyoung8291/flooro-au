@@ -173,7 +173,7 @@ export default function QuotesList() {
             </Button>
           </div>
         ) : (
-          <div className="divide-y divide-border/50">
+          <div className="divide-y divide-border">
             {filteredQuotes.map(quote => (
               <div
                 key={quote.id}
@@ -183,7 +183,7 @@ export default function QuotesList() {
                 {/* Left: quote info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-mono text-xs text-muted-foreground">
+                    <span className="font-mono text-xs text-foreground/60">
                       {quote.quote_number}
                     </span>
                     {quote.title && (
