@@ -328,7 +328,7 @@ export function QuoteLineItemRow({
 
       {/* Actions */}
       <td className="w-32 py-1.5 px-1">
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5">
           {!isChild && (
             <Button
               variant="ghost"
