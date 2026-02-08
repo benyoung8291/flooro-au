@@ -78,13 +78,13 @@ export function QuoteSummaryPanel({
     <div className="space-y-4">
       {/* Totals */}
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-3 px-4 sm:px-6">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">Quote Summary</CardTitle>
             <QuoteStatusBadge status={quote.status} />
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 px-4 sm:px-6">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Total Cost</span>

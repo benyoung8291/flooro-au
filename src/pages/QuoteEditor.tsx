@@ -139,7 +139,7 @@ export default function QuoteEditor() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between gap-3">
+        <div className="px-4 lg:px-6 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/quotes')}>
               <ArrowLeft className="w-4 h-4" />
@@ -171,11 +171,11 @@ export default function QuoteEditor() {
         </div>
       </header>
 
-      {/* Body — two-column layout */}
-      <main className="container mx-auto px-4 py-6">
+      {/* Body — full-width layout */}
+      <main className="px-4 lg:px-6 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left column — 70% */}
-          <div className="flex-1 lg:max-w-[70%] space-y-4">
+          {/* Main content — full width */}
+          <div className="flex-1 min-w-0 space-y-4">
             <QuoteClientCard
               clientName={quote.client_name}
               clientEmail={quote.client_email}
@@ -208,8 +208,8 @@ export default function QuoteEditor() {
             />
           </div>
 
-          {/* Right column — 30% */}
-          <aside className="lg:w-[30%] lg:min-w-[280px]">
+          {/* Summary sidebar */}
+          <aside className="lg:w-[280px] lg:shrink-0">
             <div className="lg:sticky lg:top-20">
               <QuoteSummaryPanel
                 quote={quote}

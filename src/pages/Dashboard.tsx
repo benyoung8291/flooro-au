@@ -52,41 +52,55 @@ export default function Dashboard() {
       {/* Header */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/favicon.png" alt="Flooro" className="w-9 h-9" />
-            <span className="text-xl font-semibold text-foreground">Flooro</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <img src="/favicon.png" alt="Flooro" className="w-9 h-9 shrink-0" />
+            <span className="text-xl font-semibold text-foreground shrink-0">Flooro</span>
             {organization && (
               <>
-                <span className="text-muted-foreground">/</span>
-                <span className="text-foreground font-medium">{organization.name}</span>
+                <span className="text-muted-foreground hidden sm:inline">/</span>
+                <span className="text-foreground font-medium truncate hidden sm:inline">{organization.name}</span>
               </>
             )}
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {isPlatformAdmin && (
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin')}>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin')} className="hidden sm:inline-flex">
                 <Shield className="w-4 h-4 mr-2" />
                 Admin
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => navigate('/materials')}>
+            {isPlatformAdmin && (
+              <Button variant="outline" size="icon" onClick={() => navigate('/admin')} className="sm:hidden h-8 w-8">
+                <Shield className="w-4 h-4" />
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => navigate('/materials')} className="hidden sm:inline-flex">
               <Package className="w-4 h-4 mr-2" />
               Materials
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/price-book')}>
+            <Button variant="outline" size="icon" onClick={() => navigate('/materials')} className="sm:hidden h-8 w-8">
+              <Package className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/price-book')} className="hidden sm:inline-flex">
               <BookOpen className="w-4 h-4 mr-2" />
               Price Book
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/quotes')}>
+            <Button variant="outline" size="icon" onClick={() => navigate('/price-book')} className="sm:hidden h-8 w-8">
+              <BookOpen className="w-4 h-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/quotes')} className="hidden sm:inline-flex">
               <FileText className="w-4 h-4 mr-2" />
               Quotes
             </Button>
+            <Button variant="outline" size="icon" onClick={() => navigate('/quotes')} className="sm:hidden h-8 w-8">
+              <FileText className="w-4 h-4" />
+            </Button>
             <ThemeToggle />
-            <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} className="h-8 w-8">
               <Settings className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleSignOut}>
+            <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-8 w-8">
               <LogOut className="w-4 h-4" />
             </Button>
           </div>
@@ -180,7 +194,7 @@ function DashboardSkeleton() {
       <main className="container mx-auto px-4 py-8">
         <Skeleton className="h-10 w-64 mb-2" />
         <Skeleton className="h-5 w-48 mb-8" />
-        <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[1, 2, 3, 4].map(i => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}

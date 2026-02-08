@@ -22,13 +22,14 @@ import {
   ArrowUpRight,
   FolderInput,
   FolderPlus,
+  MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
 
 // ─── Formatted Number Input ──────────────────────────────────────────
 
-function FormattedNumberInput({
+export function FormattedNumberInput({
   value,
   onChange,
   className,
@@ -192,7 +193,7 @@ export function QuoteLineItemRow({
       )}
     >
       {/* Reorder + expand */}
-      <td className="w-12 px-1 py-1.5 text-center">
+      <td className="px-1 py-1.5 text-center">
         {!isChild ? (
           <div className="flex items-center gap-0.5">
             <div className="flex flex-col">
@@ -266,7 +267,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Qty */}
-      <td className="w-20 py-1.5 px-1">
+      <td className="py-1.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">—</span>
         ) : (
@@ -278,7 +279,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Cost */}
-      <td className="w-24 py-1.5 px-1">
+      <td className="py-1.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             ${displayCost.toFixed(2)}
@@ -293,7 +294,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Margin % */}
-      <td className="w-20 py-1.5 px-1">
+      <td className="py-1.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             {displayMargin.toFixed(1)}%
@@ -308,7 +309,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Sell */}
-      <td className="w-24 py-1.5 px-1">
+      <td className="py-1.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             ${displaySell.toFixed(2)}
@@ -323,7 +324,7 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Hours */}
-      <td className="w-20 py-1.5 px-1">
+      <td className="py-1.5 px-1">
         {isReadOnly ? (
           <span className="block text-right text-sm font-mono text-muted-foreground px-2">
             {displayHours > 0 ? displayHours.toFixed(1) : '—'}
@@ -337,131 +338,93 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Total */}
-      <td className="w-28 py-1.5 px-2 text-right font-mono text-sm font-medium">
+      <td className="py-1.5 px-2 text-right font-mono text-sm font-medium">
         ${displayTotal.toFixed(2)}
       </td>
 
-      {/* Actions */}
-      <td className="w-32 py-1.5 px-1">
-        <div className="flex items-center gap-0.5">
-          {!isChild && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onAddSubItem(item.id)}
-              title="Add sub-item"
-            >
-              <Plus className="w-3.5 h-3.5" />
+      {/* Actions — dropdown menu */}
+      <td className="py-1.5 px-1 text-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <MoreHorizontal className="w-4 h-4" />
             </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7"
-            onClick={() =>
-              onUpdate(item.id, { is_optional: !item.is_optional })
-            }
-            title={item.is_optional ? 'Mark as included' : 'Mark as optional'}
-          >
-            {item.is_optional ? (
-              <EyeOff className="w-3.5 h-3.5" />
-            ) : (
-              <Eye className="w-3.5 h-3.5" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            {!isChild && (
+              <DropdownMenuItem onClick={() => onAddSubItem(item.id)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add sub-item
+              </DropdownMenuItem>
             )}
-          </Button>
-          {!isChild && hasChildren && onUngroup && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onUngroup}
-              title="Ungroup children"
+            <DropdownMenuItem
+              onClick={() => onUpdate(item.id, { is_optional: !item.is_optional })}
             >
-              <Ungroup className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          {isChild && onPromote && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onPromote}
-              title="Promote to standalone"
-            >
-              <ArrowUpRight className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          {/* Group into existing parent or create new group — only for standalone items without children */}
-          {!isChild && !hasChildren && onGroupInto && onCreateGroup && availableParents && availableParents.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  title="Group into..."
-                >
-                  <FolderInput className="w-3.5 h-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => onCreateGroup(item.id)}>
-                  <FolderPlus className="w-3.5 h-3.5 mr-2" />
-                  Create new group
+              {item.is_optional ? (
+                <Eye className="w-4 h-4 mr-2" />
+              ) : (
+                <EyeOff className="w-4 h-4 mr-2" />
+              )}
+              {item.is_optional ? 'Mark as included' : 'Mark as optional'}
+            </DropdownMenuItem>
+            {!isChild && hasChildren && onUngroup && (
+              <DropdownMenuItem onClick={onUngroup}>
+                <Ungroup className="w-4 h-4 mr-2" />
+                Ungroup children
+              </DropdownMenuItem>
+            )}
+            {isChild && onPromote && (
+              <DropdownMenuItem onClick={onPromote}>
+                <ArrowUpRight className="w-4 h-4 mr-2" />
+                Promote to standalone
+              </DropdownMenuItem>
+            )}
+            {!isChild && !hasChildren && onCreateGroup && (
+              <DropdownMenuItem onClick={() => onCreateGroup(item.id)}>
+                <FolderPlus className="w-4 h-4 mr-2" />
+                Create group
+              </DropdownMenuItem>
+            )}
+            {!isChild &&
+              !hasChildren &&
+              onGroupInto &&
+              availableParents &&
+              availableParents.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                    Move into group
+                  </div>
+                  {availableParents.map((parent) => (
+                    <DropdownMenuItem
+                      key={parent.id}
+                      onClick={() => onGroupInto(item.id, parent.id)}
+                    >
+                      <FolderInput className="w-4 h-4 mr-2" />
+                      {parent.description || 'Untitled'}
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            {!isChild && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => onDuplicate(item.id)}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Duplicate
                 </DropdownMenuItem>
-                {availableParents.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                      Move into existing group
-                    </div>
-                    {availableParents.map(parent => (
-                      <DropdownMenuItem
-                        key={parent.id}
-                        onClick={() => onGroupInto(item.id, parent.id)}
-                      >
-                        <FolderInput className="w-3.5 h-3.5 mr-2" />
-                        {parent.description || 'Untitled group'}
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          {!isChild && !hasChildren && onCreateGroup && (!availableParents || availableParents.length === 0) && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onCreateGroup(item.id)}
-              title="Create group"
+              </>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={handleDelete}
             >
-              <FolderPlus className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          {!isChild && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onDuplicate(item.id)}
-              title="Duplicate"
-            >
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={handleDelete}
-            title="Remove"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
-        </div>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </td>
     </tr>
   );
