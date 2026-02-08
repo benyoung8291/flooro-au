@@ -179,18 +179,9 @@ export function QuoteLineItemRow({
   return (
     <tr
       className={cn(
-        'group border-b transition-colors',
-        // Zebra striping
-        isEvenRow ? 'bg-transparent' : 'bg-muted/[0.08]',
-        // Parent group accent
-        !isChild && hasChildren && 'bg-muted/20 border-l-4 border-l-primary',
-        // Child indent styling
-        isChild && 'bg-muted/[0.04]',
-        // Stronger borders
-        'border-border',
-        // Hover
-        'hover:bg-muted/20',
-        // Optional / new
+        'group border-b border-border/40 transition-colors',
+        'bg-background',
+        'hover:bg-muted/30',
         item.is_optional && 'opacity-60 italic',
         item._isNew && 'animate-slide-up'
       )}
