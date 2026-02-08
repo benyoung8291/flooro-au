@@ -547,6 +547,53 @@ export function TakeoffPanel({
                               </div>
                             )}
                             
+                            {/* Waste % editor */}
+                            {material && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-muted-foreground">Waste %</span>
+                                <div className="flex items-center gap-1">
+                                  <Input
+                                    type="number"
+                                    value={room.wastePercent ?? (material.specs as any).wastePercent ?? 10}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value);
+                                      if (!isNaN(val) && val >= 0 && val <= 100) {
+                                        onUpdateRoom?.(room.id, { wastePercent: val });
+                                      }
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="w-14 h-6 text-xs font-mono px-1.5"
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                  />
+                                  <span className="text-muted-foreground">%</span>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const wasteVal = room.wastePercent ?? (material.specs as any).wastePercent ?? 10;
+                                          // Apply to all rooms with same material
+                                          rooms.forEach(r => {
+                                            if (r.materialId === room.materialId && r.id !== room.id) {
+                                              onUpdateRoom?.(r.id, { wastePercent: wasteVal });
+                                            }
+                                          });
+                                        }}
+                                      >
+                                        <LayoutGrid className="w-3 h-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">Apply to all rooms with this material</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                            )}
+                            
                             {/* Accessory summary */}
                             {material && (
                               <div className="flex items-center justify-between text-xs">

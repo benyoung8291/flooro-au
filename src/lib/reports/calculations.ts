@@ -205,16 +205,31 @@ function calculateAccessoryCosts(
     hasAny = true;
   }
 
-  // Weld Rod: quantity = sum of seam line lengths
+  // Weld Rod: use actual seam length from strip plan (not extended rendering coordinates)
   if (accessories.weldRod?.enabled) {
     let weldRodLength = 0;
-    if (stripPlan && stripPlan.seamLines.length > 0 && scale) {
-      for (const seam of stripPlan.seamLines) {
-        const dx = seam.x2 - seam.x1;
-        const dy = seam.y2 - seam.y1;
-        const lengthPx = Math.sqrt(dx * dx + dy * dy);
-        weldRodLength += lengthPx / scale.pixelsPerMm / 1000; // convert to meters
+    if (stripPlan) {
+      weldRodLength = stripPlan.totalSeamLengthM || 0;
+    }
+    // Add perimeter when coving is enabled (weld rod needed at floor-to-wall junction)
+    if (accessories.coving?.enabled) {
+      let covingPerimeter = netPerimeterM;
+      if (accessories.coving.excludeWalls && accessories.coving.excludeWalls.length > 0 && scale) {
+        const points = room.points;
+        let excludedLength = 0;
+        for (const wallIdx of accessories.coving.excludeWalls) {
+          if (wallIdx >= 0 && wallIdx < points.length) {
+            const p1 = points[wallIdx];
+            const p2 = points[(wallIdx + 1) % points.length];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const lengthPx = Math.sqrt(dx * dx + dy * dy);
+            excludedLength += lengthPx / scale.pixelsPerMm / 1000;
+          }
+        }
+        covingPerimeter = Math.max(0, covingPerimeter - excludedLength);
       }
+      weldRodLength += covingPerimeter;
     }
     const wrUnitPrice = 0; // Use unitPrice when material linked
     const wrCost = weldRodLength * wrUnitPrice;
@@ -276,8 +291,10 @@ export function calculateRoomCost(
     };
   }
   
-  // Use override if provided, otherwise use material default
-  const wastePercent = wasteOverride !== undefined ? wasteOverride : getWastePercent(material.specs);
+  // Use room-level waste override first, then override param, then material default
+  const wastePercent = room.wastePercent !== undefined ? room.wastePercent 
+                     : wasteOverride !== undefined ? wasteOverride 
+                     : getWastePercent(material.specs);
   const wasteFactor = 1 + wastePercent / 100;
   const unitPrice = getPrimaryPrice(material.specs);
   
@@ -291,12 +308,14 @@ export function calculateRoomCost(
     case 'roll': {
       // Use Greedy Strip algorithm for roll goods
       const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
+      const covingHeightMm = room.accessories?.coving?.enabled ? (room.accessories.coving.heightMm || 100) : 0;
       stripPlan = calculateStripPlan(room, rollSpecs, scale, {
         fillDirection: room.fillDirection || 0,
         firstSeamOffset: room.seamOptions?.firstSeamOffset || 0,
         manualSeams: room.seamOptions?.manualSeams || [],
         avoidSeamZones: room.seamOptions?.avoidZones || [],
-        wasteOverride: wasteOverride,
+        wasteOverride: wastePercent,
+        covingHeightMm,
       });
       
       grossAreaM2 = stripPlan.totalMaterialAreaM2;
