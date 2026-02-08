@@ -8,7 +8,7 @@ import { QuoteClientCard } from '@/components/quotes/QuoteClientCard';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
 import { PriceBookPickerDialog } from '@/components/quotes/PriceBookPickerDialog';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Save } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function QuoteEditor() {
@@ -41,7 +41,6 @@ export default function QuoteEditor() {
   const [priceBookOpen, setPriceBookOpen] = useState(false);
   const [priceBookParentId, setPriceBookParentId] = useState<string | null>(null);
 
-  // Unsaved changes warning
   useEffect(() => {
     if (!hasUnsavedChanges) return;
     const handler = (e: BeforeUnloadEvent) => {
@@ -79,7 +78,7 @@ export default function QuoteEditor() {
     try {
       await saveLineItems();
     } catch {
-      // Error toast handled in hook
+      // handled in hook
     }
   }, [saveLineItems]);
 
@@ -95,8 +94,6 @@ export default function QuoteEditor() {
     }) => {
       if (priceBookParentId) {
         addSubItem(priceBookParentId, item.description);
-        // We need to update the sub-item after it's created
-        // The addSubItem creates with defaults, so we update via the table
       } else {
         const newId = addLineItem(item.description);
         if (newId) {
@@ -106,7 +103,7 @@ export default function QuoteEditor() {
             margin_percentage: item.margin_percentage,
             price_book_item_id: item.price_book_item_id,
             is_from_price_book: item.is_from_price_book,
-            line_total: item.sell_price, // qty defaults to 1
+            line_total: item.sell_price,
             metadata: item.metadata,
           });
         }
@@ -136,8 +133,8 @@ export default function QuoteEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
+    <div className="min-h-screen bg-background pb-20">
+      {/* ── Minimal sticky header ─────────────────────────── */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="px-4 lg:px-6 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -145,66 +142,53 @@ export default function QuoteEditor() {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <span className="font-mono font-semibold text-sm">{quote.quote_number}</span>
-            <span className="text-muted-foreground hidden sm:inline">—</span>
-            <span className="text-muted-foreground text-sm truncate hidden sm:inline">
-              {quote.title || 'Untitled Quote'}
-            </span>
             <QuoteStatusBadge status={quote.status} />
             {hasUnsavedChanges && (
-              <span className="w-2 h-2 rounded-full bg-warning shrink-0" title="Unsaved changes" />
+              <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" title="Unsaved changes" />
             )}
           </div>
 
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving || !hasUnsavedChanges}
-            className="gap-1.5 shrink-0"
-          >
-            {isSaving ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Save className="w-3.5 h-3.5" />
-            )}
-            Save
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => navigate(`/quotes/${quoteId}/preview`)}
+              title="Preview PDF"
+            >
+              <FileText className="w-4 h-4" />
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving || !hasUnsavedChanges}
+              className="gap-1.5 shrink-0"
+            >
+              {isSaving ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              Save
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Body — full-width layout */}
-      <main className="px-4 lg:px-6 py-6 space-y-4">
-        {/* Top section: client details + summary sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="flex-1 min-w-0">
-            <QuoteClientCard
-              clientName={quote.client_name}
-              clientEmail={quote.client_email}
-              clientPhone={quote.client_phone}
-              clientAddress={quote.client_address}
-              title={quote.title}
-              description={quote.description}
-              onUpdate={handleUpdateQuote}
-            />
-          </div>
+      {/* ── Content — single column ─────────────────────── */}
+      <main className="px-4 lg:px-6 py-6 space-y-6 max-w-5xl mx-auto">
+        {/* Title + Client (collapsible) */}
+        <QuoteClientCard
+          clientName={quote.client_name}
+          clientEmail={quote.client_email}
+          clientPhone={quote.client_phone}
+          clientAddress={quote.client_address}
+          title={quote.title}
+          description={quote.description}
+          onUpdate={handleUpdateQuote}
+        />
 
-          {/* Summary sidebar */}
-          <aside className="lg:w-[280px] lg:shrink-0">
-            <div className="lg:sticky lg:top-20">
-              <QuoteSummaryPanel
-                quote={quote}
-                lineItems={lineItems}
-                isSaving={isSaving}
-                hasUnsavedChanges={hasUnsavedChanges}
-                onSave={handleSave}
-                onUpdateQuote={handleUpdateQuote}
-                onStatusChange={handleStatusChange}
-                onNavigatePreview={() => navigate(`/quotes/${quoteId}/preview`)}
-              />
-            </div>
-          </aside>
-        </div>
-
-        {/* Line items — full width, not constrained by sidebar */}
+        {/* Line items — full width */}
         <QuoteLineItemsTable
           lineItems={lineItems}
           onUpdate={updateLineItem}
@@ -227,7 +211,18 @@ export default function QuoteEditor() {
         />
       </main>
 
-      {/* Price Book Picker */}
+      {/* ── Bottom summary bar ──────────────────────────── */}
+      <QuoteSummaryPanel
+        quote={quote}
+        lineItems={lineItems}
+        isSaving={isSaving}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onSave={handleSave}
+        onUpdateQuote={handleUpdateQuote}
+        onStatusChange={handleStatusChange}
+        onNavigatePreview={() => navigate(`/quotes/${quoteId}/preview`)}
+      />
+
       <PriceBookPickerDialog
         open={priceBookOpen}
         onOpenChange={setPriceBookOpen}

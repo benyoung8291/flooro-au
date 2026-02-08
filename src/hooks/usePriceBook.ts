@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 
 export type PriceBookCategory = 'installation_labor' | 'sundry' | 'accessory' | 'other';
 export type PricingType = 'per_m2' | 'per_linear_m' | 'per_unit' | 'fixed' | 'per_hour';
@@ -131,17 +132,17 @@ export function useCreatePriceBookItem() {
       
       const { data, error } = await supabase
         .from('price_book_items')
-        .insert({
+        .insert([{
           name: input.name,
           category: input.category,
           pricing_type: input.pricing_type,
           cost_rate: input.cost_rate,
           sell_rate: input.sell_rate,
           description: input.description || null,
-          specs: input.specs || {},
+          specs: (input.specs || {}) as Json,
           organization_id: profile.organization_id,
           is_global: false,
-        })
+        }])
         .select()
         .single();
       
@@ -163,7 +164,11 @@ export function useUpdatePriceBookItem() {
   
   return useMutation({
     mutationFn: async (input: UpdatePriceBookItemInput) => {
-      const { id, ...updates } = input;
+      const { id, specs, ...rest } = input;
+      const updates = {
+        ...rest,
+        ...(specs !== undefined ? { specs: specs as unknown as Json } : {}),
+      };
       
       const { data, error } = await supabase
         .from('price_book_items')

@@ -62,14 +62,13 @@ export default function QuotePreview() {
     );
   }
 
-  // Separate required and optional items
   const requiredItems = lineItems.filter(item => !item.is_optional);
   const optionalItems = lineItems.filter(item => item.is_optional);
   const termsText = quote.terms_and_conditions || org?.terms_and_conditions;
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* ── Header Toolbar (hidden when printing) ────────────── */}
+      {/* ── Unified Header (hidden when printing) ─────────── */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
           <Button
@@ -83,8 +82,9 @@ export default function QuotePreview() {
             {quote.quote_number}
           </span>
           <QuoteStatusBadge status={quote.status} />
-          <span className="text-muted-foreground text-sm">— Preview</span>
-          <div className="ml-auto">
+
+          <div className="ml-auto flex items-center gap-2">
+            <PreviewToolbar settings={settings} onUpdate={update} />
             <Button size="sm" onClick={() => window.print()}>
               <Printer className="w-4 h-4 mr-2" />
               Print / PDF
@@ -93,10 +93,7 @@ export default function QuotePreview() {
         </div>
       </header>
 
-      {/* ── Display Toggle Toolbar ───────────────────────────── */}
-      <PreviewToolbar settings={settings} onUpdate={update} />
-
-      {/* ── Print-optimized document ─────────────────────────── */}
+      {/* ── Print-optimized document ─────────────────────── */}
       <main className="quote-print-document">
         {/* Company Header */}
         <div className="quote-header">
@@ -124,7 +121,7 @@ export default function QuotePreview() {
           </div>
         </div>
 
-        {/* Info Grid: Project + Client */}
+        {/* Info Grid */}
         <div className="info-grid">
           <div className="info-box">
             <h3>Project</h3>
@@ -145,7 +142,7 @@ export default function QuotePreview() {
           )}
         </div>
 
-        {/* Required Line Items Table */}
+        {/* Required Items */}
         {requiredItems.length > 0 && (
           <>
             <h2 className="section-heading">Quoted Items</h2>
@@ -159,7 +156,7 @@ export default function QuotePreview() {
           </>
         )}
 
-        {/* Optional Items — Grouped Sections */}
+        {/* Optional Items */}
         <OptionalGroupSections
           optionalItems={optionalItems}
           baseSubtotal={quote.subtotal}
@@ -170,27 +167,21 @@ export default function QuotePreview() {
           showTotalColumn={showTotalColumn}
         />
 
-        {/* Totals Summary */}
+        {/* Totals */}
         <div className="totals-box">
           <div className="totals-row">
             <span>Subtotal</span>
-            <span className="font-mono-numbers">
-              {formatCurrency(quote.subtotal)}
-            </span>
+            <span className="font-mono">{formatCurrency(quote.subtotal)}</span>
           </div>
           {quote.tax_rate > 0 && (
             <div className="totals-row">
               <span>GST ({quote.tax_rate}%)</span>
-              <span className="font-mono-numbers">
-                {formatCurrency(quote.tax_amount)}
-              </span>
+              <span className="font-mono">{formatCurrency(quote.tax_amount)}</span>
             </div>
           )}
           <div className="totals-row grand-total">
             <span>Total (inc. GST)</span>
-            <span className="font-mono-numbers">
-              {formatCurrency(quote.total_amount)}
-            </span>
+            <span className="font-mono">{formatCurrency(quote.total_amount)}</span>
           </div>
         </div>
 
@@ -202,7 +193,7 @@ export default function QuotePreview() {
           </div>
         )}
 
-        {/* Terms & Conditions */}
+        {/* Terms */}
         {termsText && (
           <div className="terms-box">
             <h3>Terms & Conditions</h3>

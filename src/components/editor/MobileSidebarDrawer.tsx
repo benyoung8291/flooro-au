@@ -34,7 +34,7 @@ import { RoomContextHeader } from './RoomContextHeader';
 import { ReportTab } from '@/components/reports/ReportTab';
 import { Room, ScaleCalibration } from '@/lib/canvas/types';
 import { Separator } from '@/components/ui/separator';
-import { calculatePolygonArea, calculateRoomNetArea } from '@/lib/canvas/geometry';
+import { calculatePolygonArea, calculateRoomNetArea, pixelAreaToRealArea } from '@/lib/canvas/geometry';
 import { cn } from '@/lib/utils';
 
 interface MobileSidebarDrawerProps {
@@ -114,8 +114,8 @@ export function MobileSidebarDrawer({
     let unassignedCount = 0;
 
     rooms.forEach(room => {
-      const grossArea = calculatePolygonArea(room.points) * Math.pow(scale.pixelsPerMeter, -2);
-      const netArea = calculateRoomNetArea(room, scale);
+      const grossArea = calculatePolygonArea(room.points) * Math.pow(scale.pixelsPerMm, -2);
+      const netArea = pixelAreaToRealArea(calculateRoomNetArea(room), scale) / 1_000_000; // mm² to m²
       totalArea += netArea;
 
       if (!room.materialId) {
@@ -307,7 +307,7 @@ export function MobileSidebarDrawer({
                   <div className="space-y-1.5">
                     {rooms.map(room => {
                       const material = room.materialId ? materials?.find(m => m.id === room.materialId) : null;
-                      const netArea = scale ? calculateRoomNetArea(room, scale) : 0;
+                      const netArea = scale ? pixelAreaToRealArea(calculateRoomNetArea(room), scale) / 1_000_000 : 0;
                       const waste = room.wastePercent ?? 10;
                       const orderArea = netArea * (1 + waste / 100);
                       const Icon = material ? (typeIcons[material.type] || Square) : Square;

@@ -348,6 +348,7 @@
     padding: 0;
     max-width: none;
     font-size: 12px;
+    color: #1a1a1a;
   }
 
   /* Override CSS variables with print-safe values */
@@ -360,6 +361,12 @@
     color: #d97706;
   }
 
+  .quote-print-document .company-details,
+  .quote-print-document .quote-number,
+  .quote-print-document .quote-date {
+    color: #6b7280;
+  }
+
   .quote-print-document .info-box {
     border-left-color: #d97706;
     background: #f9fafb;
@@ -367,10 +374,47 @@
     print-color-adjust: exact;
   }
 
+  .quote-print-document .info-box h3 {
+    color: #6b7280;
+  }
+
+  .quote-print-document .info-box p {
+    color: #1a1a1a;
+  }
+
+  .quote-print-document .section-heading {
+    color: #1a1a1a;
+    border-bottom-color: #e5e7eb;
+  }
+
   .quote-print-document .items-table th {
     background: #f3f4f6;
+    color: #374151;
+    border-bottom-color: #d1d5db;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .quote-print-document .items-table td {
+    color: #1a1a1a;
+    border-bottom-color: #e5e7eb;
+  }
+
+  .quote-print-document .items-table .child-row td {
+    color: #6b7280;
+    border-bottom-color: #f3f4f6;
+  }
+
+  .quote-print-document .items-table .child-row td:first-child {
+    border-left-color: #fcd34d;
+  }
+
+  .quote-print-document .totals-box {
+    border-color: #e5e7eb;
+  }
+
+  .quote-print-document .totals-row {
+    border-bottom-color: #f3f4f6;
   }
 
   .quote-print-document .grand-total {
@@ -387,11 +431,27 @@
     print-color-adjust: exact;
   }
 
+  .quote-print-document .notes-box h3 {
+    color: #d97706;
+  }
+
+  .quote-print-document .notes-box p {
+    color: #1a1a1a;
+  }
+
   .quote-print-document .terms-box {
     border-left-color: #f59e0b;
     background: #fffbeb;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .quote-print-document .terms-box h3 {
+    color: #f59e0b;
+  }
+
+  .quote-print-document .terms-box p {
+    color: #374151;
   }
 
   /* Optional group dividers */
@@ -403,7 +463,24 @@
     print-color-adjust: exact;
   }
 
+  .quote-print-document .signature-line {
+    border-bottom-color: #1a1a1a;
+  }
+
+  .quote-print-document .signature-box span {
+    color: #6b7280;
+  }
+
+  .quote-print-document .document-footer {
+    border-top-color: #e5e7eb;
+    color: #9ca3af;
+  }
+
   /* Page breaks */
+  .quote-print-document .quote-header {
+    page-break-after: avoid;
+  }
+
   .quote-print-document .signature-grid {
     page-break-inside: avoid;
   }
@@ -413,6 +490,18 @@
   }
 
   .quote-print-document .optional-group {
+    page-break-inside: avoid;
+  }
+
+  .quote-print-document .info-grid {
+    page-break-inside: avoid;
+  }
+
+  .quote-print-document .notes-box {
+    page-break-inside: avoid;
+  }
+
+  .quote-print-document .terms-box {
     page-break-inside: avoid;
   }
 

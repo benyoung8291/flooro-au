@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -46,7 +45,6 @@ export function FormattedNumberInput({
   const [displayValue, setDisplayValue] = useState(value === 0 || value === '' ? '' : String(value));
 
   useEffect(() => {
-    // Only update display if external value changed (not during editing)
     if (!document.activeElement || document.activeElement !== inputRef.current) {
       setDisplayValue(value === 0 || value === '' ? '' : Number(value).toFixed(2));
     }
@@ -56,7 +54,6 @@ export function FormattedNumberInput({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
-    // Only allow digits and single decimal point
     if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
     setDisplayValue(raw);
     const num = parseFloat(raw) || 0;
@@ -84,7 +81,7 @@ export function FormattedNumberInput({
       onFocus={handleFocus}
       className={cn(
         'flex h-8 w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-right font-mono transition-all',
-        'hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
+        'hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
         highlight && 'bg-primary/10 ring-1 ring-primary/30',
         className
       )}
@@ -154,17 +151,11 @@ export function QuoteLineItemRow({
 
   const handleNumberChange = useCallback(
     (field: string, val: number) => {
-      if (field === 'cost_price') {
-        onUpdatePricing(item.id, 'cost', val);
-      } else if (field === 'sell_price') {
-        onUpdatePricing(item.id, 'sell', val);
-      } else if (field === 'margin_percentage') {
-        onUpdatePricing(item.id, 'margin', val);
-      } else if (field === 'quantity') {
-        onUpdate(item.id, { quantity: val });
-      } else if (field === 'estimated_hours') {
-        onUpdate(item.id, { estimated_hours: val });
-      }
+      if (field === 'cost_price') onUpdatePricing(item.id, 'cost', val);
+      else if (field === 'sell_price') onUpdatePricing(item.id, 'sell', val);
+      else if (field === 'margin_percentage') onUpdatePricing(item.id, 'margin', val);
+      else if (field === 'quantity') onUpdate(item.id, { quantity: val });
+      else if (field === 'estimated_hours') onUpdate(item.id, { estimated_hours: val });
     },
     [item.id, onUpdate, onUpdatePricing]
   );
@@ -186,8 +177,9 @@ export function QuoteLineItemRow({
   return (
     <tr
       className={cn(
-        'group border-b border-border/50 transition-colors hover:bg-muted/30',
-        isChild && 'bg-muted/10',
+        'group border-b border-border/40 transition-colors hover:bg-muted/20',
+        isChild && 'bg-muted/5',
+        !isChild && hasChildren && 'bg-muted/10',
         item.is_optional && 'opacity-60 italic',
         item._isNew && 'animate-slide-up'
       )}
@@ -196,7 +188,7 @@ export function QuoteLineItemRow({
       <td className="px-1 py-1.5 text-center">
         {!isChild ? (
           <div className="flex items-center gap-0.5">
-            <div className="flex flex-col">
+            <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={onMoveUp}
                 disabled={!canMoveUp}
@@ -229,7 +221,7 @@ export function QuoteLineItemRow({
           </div>
         ) : (
           <div className="flex items-center gap-0.5 ml-3">
-            <div className="flex flex-col">
+            <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={onMoveUp}
                 disabled={!canMoveUp}
@@ -254,15 +246,17 @@ export function QuoteLineItemRow({
 
       {/* Description */}
       <td className={cn('py-1.5 pr-2', isChild ? 'pl-8' : 'pl-1')}>
-        <Input
+        <input
           ref={descRef}
           value={item.description}
           onChange={(e) => onUpdate(item.id, { description: e.target.value })}
           className={cn(
-            'h-8 text-sm border-transparent bg-transparent hover:border-input focus:border-input',
-            !isChild && 'font-medium'
+            'w-full h-8 px-2 text-sm rounded-md border border-transparent bg-transparent transition-all',
+            'hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
+            !isChild && hasChildren && 'font-semibold',
+            isChild && 'text-muted-foreground'
           )}
-          placeholder={isChild ? 'Sub-item description' : 'Group name'}
+          placeholder={isChild ? 'Sub-item description' : hasChildren ? 'Group name' : 'Item description'}
         />
       </td>
 
@@ -342,7 +336,7 @@ export function QuoteLineItemRow({
         ${displayTotal.toFixed(2)}
       </td>
 
-      {/* Actions — dropdown menu */}
+      {/* Actions */}
       <td className="py-1.5 px-1 text-center">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
