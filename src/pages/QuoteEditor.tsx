@@ -275,6 +275,7 @@ export default function QuoteEditor() {
             </TabsList>
 
             <TabsContent value="line-items" className="space-y-6">
+              <div className="bg-white dark:bg-card rounded-lg">
               <QuoteLineItemsTable
                 lineItems={lineItems}
                 onUpdate={updateLineItem}
@@ -302,6 +303,7 @@ export default function QuoteEditor() {
                 taxRate={quote.tax_rate}
                 onUpdateTaxRate={(rate) => handleUpdateQuote({ tax_rate: rate })}
               />
+              </div>
             </TabsContent>
 
             <TabsContent value="details">

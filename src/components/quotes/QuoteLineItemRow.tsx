@@ -180,7 +180,7 @@ export function QuoteLineItemRow({
     <tr
       className={cn(
         'group border-b border-border/40 transition-colors',
-        'bg-background',
+        'bg-white dark:bg-card',
         'hover:bg-muted/30',
         item.is_optional && 'opacity-60 italic',
         item._isNew && 'animate-slide-up'
