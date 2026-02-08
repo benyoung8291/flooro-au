@@ -1,112 +1,162 @@
 
 
-# Quote Editor: Details Tab and Layout Optimisation
+# Rich Text Toolbar Fix + Description Templates
 
-Three changes to streamline the quote editor layout based on the screenshot reference.
-
----
-
-## 1. Remove the "Quote Title" section from the Details tab
-
-The `QuoteClientCard` component currently renders a "Quote Title" label and input at the top (lines 37-47). Since the title is already editable via the `QuoteEditorHeader` component above the tabs, this is redundant and will be removed.
-
-**File**: `src/components/quotes/QuoteClientCard.tsx`
-- Remove the `title` prop and its debounced field
-- Remove the "Quote Title" section (lines 37-47)
-- Remove the `titleField` from `useDebouncedField`
-
-**File**: `src/pages/QuoteEditor.tsx`
-- Remove the `title` prop from `QuoteClientCard` (line 339)
+Two changes: make the formatting toolbar always visible, and add the ability to save/load description templates from the database.
 
 ---
 
-## 2. Move client details above the tabbed menu
+## 1. Always-visible formatting toolbar
 
-The client details form (name, email, phone, address) will move from the Details tab into the `QuoteEditorHeader` component, sitting directly below the title and always visible.
+Currently the toolbar in `RichTextEditor.tsx` is hidden (`opacity-0`, `pointer-events-none`) when the editor is not focused. This will be changed so the toolbar is always visible and clickable.
 
-**File**: `src/components/quotes/QuoteEditorHeader.tsx`
-- Add client detail fields (name, email, phone, address) as compact inline inputs
-- Display as a 2x2 or 4-column grid of small labeled inputs with icons
-- Use `useDebouncedField` for each field (same pattern as `QuoteClientCard`)
-- Add the required props: `client_phone` and update callbacks
-
-**File**: `src/pages/QuoteEditor.tsx`
-- Pass the full quote object (or the additional client fields) to `QuoteEditorHeader`
-- The "Details" tab content will now only contain the Scope/Description editor
-
-**File**: `src/components/quotes/QuoteClientCard.tsx`
-- Rename to something like `QuoteScopeCard` or simplify it
-- Remove all client field inputs (they moved to the header)
-- Keep only the Scope/Description `RichTextEditor` with a white background wrapper
+**File**: `src/components/quotes/RichTextEditor.tsx`
+- Remove the conditional opacity/translate/pointer-events classes from the toolbar wrapper
+- The toolbar will always render with `opacity-100` and be interactive regardless of focus state
+- Keep the `onMouseDown preventDefault` pattern so clicking toolbar buttons doesn't blur the editor
 
 ---
 
-## 3. Add white background behind Scope/Description
+## 2. Description templates (save and load)
 
-The rich text editor for scope/description currently sits on the cream page background. It will be wrapped in a white container.
+### Database
 
-**File**: `src/pages/QuoteEditor.tsx` (Details tab)
-- Wrap the scope/description content in a `bg-white dark:bg-card rounded-lg border border-border/40 p-4` container
+Create a new `description_templates` table to store reusable scope/description templates per organization:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | uuid | Primary key, default gen_random_uuid() |
+| organization_id | uuid | Foreign key to organizations, NOT NULL |
+| name | text | Template name, NOT NULL |
+| content | text | HTML content of the template |
+| created_by | uuid | User who created it |
+| created_at | timestamptz | Default now() |
+| updated_at | timestamptz | Default now() |
+
+RLS policies:
+- SELECT: users can read templates belonging to their organization
+- INSERT: users can create templates for their organization
+- UPDATE: users can update templates in their organization
+- DELETE: users can delete templates in their organization
+
+### New hook: `useDescriptionTemplates.ts`
+
+A React Query hook providing:
+- `useDescriptionTemplates()` -- fetches all templates for the user's organization
+- `useSaveDescriptionTemplate()` -- mutation to insert a new template (name + content)
+- `useDeleteDescriptionTemplate()` -- mutation to remove a template
+
+### Updated UI: Template controls in `QuoteClientCard.tsx`
+
+Add two buttons next to the "Scope / Description" label:
+- **Save as Template** button -- opens a small dialog asking for a template name, then saves the current description HTML as a new template
+- **Load Template** button -- opens a dropdown/popover listing saved templates. Clicking one replaces the current description content.
+
+The layout will look like:
+
+```text
+Scope / Description          [Save as Template] [Load Template]
++----------------------------------------------------------+
+| B  I  U  := :=                                           |
+|                                                          |
+| (rich text editor content)                               |
+|                                                          |
++----------------------------------------------------------+
+```
+
+### Files to create/modify
+
+| File | Action | Description |
+|------|--------|-------------|
+| Database migration | Create | `description_templates` table with RLS |
+| `src/hooks/useDescriptionTemplates.ts` | Create | React Query hooks for CRUD |
+| `src/components/quotes/RichTextEditor.tsx` | Modify | Make toolbar always visible |
+| `src/components/quotes/QuoteClientCard.tsx` | Modify | Add Save/Load template buttons and dialogs |
 
 ---
 
 ## Technical Details
 
-### QuoteEditorHeader.tsx -- updated component
+### RichTextEditor.tsx toolbar fix
 
-The header will expand to include compact client fields:
-
-```text
-+------------------------------------------+
-| [Title input - "Untitled Quote"]         |
-| +------+-------+--------+---------+     |
-| | Name | Email | Phone  | Address |     |
-| +------+-------+--------+---------+     |
-+------------------------------------------+
+Change line 80-83 from:
+```tsx
+'flex items-center gap-0.5 mb-1.5 transition-all',
+isFocused ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1 pointer-events-none'
+```
+To:
+```tsx
+'flex items-center gap-0.5 mb-1.5'
 ```
 
-- Each field uses a small `h-8` input with an icon and muted label
-- Fields are displayed in a responsive grid: 4 columns on desktop, 2 on mobile
-- The component will accept the full set of client fields plus `onUpdate`
+The toolbar becomes a static, always-visible row of formatting buttons.
 
-### QuoteClientCard.tsx -- simplified to scope only
-
-After removing title and client fields, the Details tab content becomes:
+### useDescriptionTemplates.ts
 
 ```tsx
-<div className="space-y-2">
-  <Label className="text-xs text-muted-foreground">Scope / Description</Label>
-  <div className="bg-white dark:bg-card rounded-lg border border-border/40 p-4">
-    <RichTextEditor
-      value={description}
-      onChange={(html) => onUpdate({ description: html })}
-      placeholder="Add a scope or description..."
-    />
-  </div>
-</div>
+// useDescriptionTemplates() - query
+queryKey: ['description-templates', profile?.organization_id]
+queryFn: supabase.from('description_templates')
+  .select('*')
+  .eq('organization_id', orgId)
+  .order('name')
+
+// useSaveDescriptionTemplate() - mutation
+mutationFn: insert { organization_id, name, content, created_by }
+
+// useDeleteDescriptionTemplate() - mutation  
+mutationFn: delete by id
 ```
 
-### QuoteEditor.tsx -- updated layout structure
+### QuoteClientCard.tsx template UI
 
-```text
-+-------------------------------------+
-| Quote header (number, status, save) |
-+-------------------------------------+
-| [Title input]                       |
-| [Name] [Email] [Phone] [Address]   |  <-- client fields always visible
-+-------------------------------------+
-| [Line Items] [Details] [Notes]      |
-+-------------------------------------+
-| Details tab -> Scope/Description    |
-|   in white box                      |
-+-------------------------------------+
+- A "Save as Template" ghost button triggers a small Dialog with a name input and save button
+- A "Load Template" ghost button triggers a Popover with a scrollable list of template names
+- Each template in the list shows the name and a delete icon button
+- Selecting a template calls `onUpdate({ description: template.content })` to replace the editor content
+- The save dialog captures the current `description` prop value and saves it with the entered name
+
+### Database migration SQL
+
+```sql
+CREATE TABLE public.description_templates (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id uuid NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  content text,
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.description_templates ENABLE ROW LEVEL SECURITY;
+
+-- RLS: org members can read their org's templates
+CREATE POLICY "Users can view own org templates"
+  ON public.description_templates FOR SELECT
+  USING (organization_id IN (
+    SELECT organization_id FROM public.profiles WHERE id = auth.uid()
+  ));
+
+-- RLS: org members can insert templates  
+CREATE POLICY "Users can create templates"
+  ON public.description_templates FOR INSERT
+  WITH CHECK (organization_id IN (
+    SELECT organization_id FROM public.profiles WHERE id = auth.uid()
+  ));
+
+-- RLS: org members can update templates
+CREATE POLICY "Users can update own org templates"
+  ON public.description_templates FOR UPDATE
+  USING (organization_id IN (
+    SELECT organization_id FROM public.profiles WHERE id = auth.uid()
+  ));
+
+-- RLS: org members can delete templates
+CREATE POLICY "Users can delete own org templates"
+  ON public.description_templates FOR DELETE
+  USING (organization_id IN (
+    SELECT organization_id FROM public.profiles WHERE id = auth.uid()
+  ));
 ```
-
-### Files modified
-
-| File | Changes |
-|------|---------|
-| `src/components/quotes/QuoteEditorHeader.tsx` | Add client detail input fields (name, email, phone, address) with debounced updates |
-| `src/components/quotes/QuoteClientCard.tsx` | Remove title section and client fields; keep only Scope/Description with white background |
-| `src/pages/QuoteEditor.tsx` | Update props passed to header and client card components |
 
