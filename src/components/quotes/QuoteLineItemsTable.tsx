@@ -225,8 +225,8 @@ export function QuoteLineItemsTable({
                 <div
                   key={parent.id}
                   className={cn(
-                    'rounded-lg border border-border/50 bg-card shadow-sm overflow-hidden',
-                    hasChildren && 'border-l-4 border-l-primary/50',
+                    'rounded-lg border border-border bg-card shadow-sm overflow-hidden',
+                    hasChildren && 'border-l-4 border-l-primary',
                     parent.is_optional && 'opacity-60 italic',
                     parent._isNew && 'animate-slide-up'
                   )}
@@ -363,7 +363,7 @@ export function QuoteLineItemsTable({
                         prefix="$"
                         onChange={(v) => handleMobileNumberChange(parent.id, 'sell_price', v)}
                       />
-                      <span className="text-muted-foreground font-mono tabular-nums">
+                      <span className="text-foreground font-mono tabular-nums">
                         Margin {displayMargin.toFixed(1)}%
                       </span>
                     </div>
@@ -380,7 +380,7 @@ export function QuoteLineItemsTable({
 
                   {/* ── Children ── */}
                   {hasChildren && parent._isExpanded !== false && (
-                    <div className="border-t border-border/30">
+                    <div className="border-t border-border">
                       {parent.subItems.map((child, childIndex) => {
                         const canChildMoveUp = childIndex > 0;
                         const canChildMoveDown = childIndex < parent.subItems.length - 1;
@@ -389,7 +389,7 @@ export function QuoteLineItemsTable({
                           <div
                             key={child.id}
                             className={cn(
-                              'px-3 py-2 ml-3 border-l-2 border-primary/10 border-b border-border/20 last:border-b-0',
+                              'px-3 py-2 ml-3 border-l-2 border-primary/30 border-b border-border/60 last:border-b-0',
                               child.is_optional && 'opacity-60 italic',
                               child._isNew && 'animate-slide-up'
                             )}
@@ -470,7 +470,7 @@ export function QuoteLineItemsTable({
                                 prefix="$"
                                 onChange={(v) => handleMobileNumberChange(child.id, 'sell_price', v)}
                               />
-                              <span className="text-muted-foreground font-mono tabular-nums">
+                              <span className="text-foreground font-mono tabular-nums">
                                 {child.margin_percentage.toFixed(1)}%
                               </span>
                             </div>
@@ -505,16 +505,16 @@ export function QuoteLineItemsTable({
                 <col style={{ width: 44 }} />
               </colgroup>
               <thead>
-                <tr className="border-b-2 border-border bg-muted/30">
+                <tr className="border-b-2 border-border bg-muted/50">
                   <th className="w-12" />
-                  <th className="text-left py-3 px-1 font-semibold text-foreground/80 text-xs tracking-wide">
+                  <th className="text-left py-3 px-1 font-semibold text-foreground text-xs tracking-wide">
                     Description
                   </th>
                   {(['qty', 'cost', 'margin', 'sell', 'total'] as const).map(col => (
                     <th
                       key={col}
                       className={cn(
-                        'text-right py-3 px-1 font-semibold text-foreground/80 text-xs tracking-wide',
+                        'text-right py-3 px-1 font-semibold text-foreground text-xs tracking-wide',
                         col === 'total' && 'pr-2'
                       )}
                     >
