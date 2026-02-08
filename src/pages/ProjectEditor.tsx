@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { ReportPreviewDialog } from '@/components/reports/ReportPreviewDialog';
-import { QuoteSummaryDialog } from '@/components/reports/QuoteSummaryDialog';
+// QuoteSummaryDialog removed — replaced by standalone /quotes pages
 import { FinishesScheduleDialog } from '@/components/reports/FinishesScheduleDialog';
 import { generateReport } from '@/lib/reports/calculations';
 import { calculateStripPlan, extractRollMaterialSpecs } from '@/lib/rollGoods';
@@ -77,7 +77,7 @@ export default function ProjectEditor() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
-  const [quoteSummaryOpen, setQuoteSummaryOpen] = useState(false);
+  // quoteSummaryOpen removed — quotes are now a standalone page
   const [roomsOverviewOpen, setRoomsOverviewOpen] = useState(false);
   const [finishesScheduleOpen, setFinishesScheduleOpen] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
@@ -170,7 +170,7 @@ export default function ProjectEditor() {
           setShortcutsPanelOpen(true);
           break;
         case 'q':
-          setQuoteSummaryOpen(true);
+          navigate('/quotes');
           break;
         case 'l':
           setRoomsOverviewOpen(true);
@@ -842,7 +842,7 @@ export default function ProjectEditor() {
         setSidebarCollapsed(false);
         break;
       case 'quote':
-        setQuoteSummaryOpen(true);
+        navigate('/quotes');
         break;
     }
   }, []);
@@ -920,16 +920,16 @@ export default function ProjectEditor() {
             </Button>
           )}
 
-          {/* Quote Button - Desktop Only */}
+          {/* Quotes Navigation - Desktop Only */}
           {!isMobile && rooms.length > 0 && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setQuoteSummaryOpen(true)}
+              onClick={() => navigate('/quotes')}
               className="hidden md:flex"
             >
               <FileText className="w-4 h-4 mr-2" />
-              Quote
+              Quotes
             </Button>
           )}
 
@@ -965,9 +965,9 @@ export default function ProjectEditor() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setQuoteSummaryOpen(true)}>
+              <DropdownMenuItem onClick={() => navigate('/quotes')}>
                 <FileText className="w-4 h-4 mr-2" />
-                View Quote (Q)
+                Quotes
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setRoomsOverviewOpen(true)}>
                 <LayoutGrid className="w-4 h-4 mr-2" />
@@ -1093,10 +1093,11 @@ export default function ProjectEditor() {
             onRenameRoom={handleRenameRoom}
             onUpdateRoom={handleUpdateRoom}
             onMaterialSelect={handleMaterialSelectForRoom}
+            projectId={projectId}
             projectName={project.name}
+            projectAddress={project.address || undefined}
             stripPlans={stripPlans}
             onOpenFinishesSchedule={() => setFinishesScheduleOpen(true)}
-            onOpenQuoteSummary={() => setQuoteSummaryOpen(true)}
             projectMaterials={projectMaterials}
           />
         )}
@@ -1149,20 +1150,7 @@ export default function ProjectEditor() {
         projectMaterials={projectMaterials}
       />
 
-      {/* Quote Summary Dialog */}
-      <QuoteSummaryDialog
-        open={quoteSummaryOpen}
-        onOpenChange={setQuoteSummaryOpen}
-        rooms={rooms}
-        materials={materials || []}
-        scale={scale}
-        projectName={project.name}
-        projectAddress={project.address || undefined}
-        onExportPDF={() => {
-          setQuoteSummaryOpen(false);
-          setReportPreviewOpen(true);
-        }}
-      />
+      {/* QuoteSummaryDialog removed — quotes are now at /quotes */}
 
       {/* Rooms Overview Dialog */}
       <RoomsOverviewDialog
