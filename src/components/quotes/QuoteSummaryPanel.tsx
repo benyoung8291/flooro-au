@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,9 +16,7 @@ import {
   Send,
   CheckCircle2,
   XCircle,
-  Clock,
   ChevronDown,
-  ChevronRight,
   Settings2,
 } from 'lucide-react';
 import type { Quote, QuoteStatus, UpdateQuoteInput } from '@/hooks/useQuotes';
@@ -38,7 +36,6 @@ interface QuoteSummaryPanelProps {
 function computeTotals(items: LineItem[]) {
   let totalCost = 0;
   let totalSell = 0;
-  let totalHours = 0;
 
   for (const parent of items) {
     if (parent.is_optional) continue;
@@ -47,17 +44,15 @@ function computeTotals(items: LineItem[]) {
         if (child.is_optional) continue;
         totalCost += (child.quantity || 0) * (child.cost_price || 0);
         totalSell += (child.quantity || 0) * (child.sell_price || 0);
-        totalHours += child.estimated_hours || 0;
       }
     } else {
       totalCost += (parent.quantity || 0) * (parent.cost_price || 0);
       totalSell += (parent.quantity || 0) * (parent.sell_price || 0);
-      totalHours += parent.estimated_hours || 0;
     }
   }
 
   const margin = totalCost > 0 ? ((totalSell - totalCost) / totalCost) * 100 : 0;
-  return { totalCost, totalSell, margin, totalHours };
+  return { totalCost, totalSell, margin };
 }
 
 export function QuoteSummaryPanel({
@@ -70,7 +65,7 @@ export function QuoteSummaryPanel({
   onStatusChange,
   onNavigatePreview,
 }: QuoteSummaryPanelProps) {
-  const { totalCost, totalSell, margin, totalHours } = useMemo(
+  const { totalCost, totalSell, margin } = useMemo(
     () => computeTotals(lineItems),
     [lineItems]
   );
@@ -120,12 +115,6 @@ export function QuoteSummaryPanel({
               <span className="text-muted-foreground text-xs block leading-none mb-0.5">Total</span>
               <span className="font-mono font-bold text-base">${grandTotal.toFixed(2)}</span>
             </div>
-            {totalHours > 0 && (
-              <div className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                {totalHours.toFixed(1)}h
-              </div>
-            )}
           </div>
 
           {/* Spacer */}
