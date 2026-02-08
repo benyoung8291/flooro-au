@@ -232,12 +232,35 @@ export function useUpdateQuote() {
       if (error) throw error;
       return parseQuote(data);
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['quote', data.id] });
+    onMutate: async ({ id, updates }) => {
+      // Cancel outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['quote', id] });
+
+      // Snapshot previous value
+      const previous = queryClient.getQueryData<Quote>(['quote', id]);
+
+      // Optimistically update the cache so inputs don't lose their value
+      if (previous) {
+        queryClient.setQueryData<Quote>(['quote', id], {
+          ...previous,
+          ...updates,
+        } as Quote);
+      }
+
+      return { previous };
     },
-    onError: (error: Error) => {
+    onError: (error: Error, { id }, context) => {
+      // Roll back to previous value on error
+      if (context?.previous) {
+        queryClient.setQueryData(['quote', id], context.previous);
+      }
       toast.error(`Failed to update quote: ${error.message}`);
+    },
+    onSuccess: (data) => {
+      // Update cache with server response (source of truth) without triggering refetch
+      queryClient.setQueryData(['quote', data.id], data);
+      // Only invalidate the list view, not the individual quote
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
     },
   });
 }
