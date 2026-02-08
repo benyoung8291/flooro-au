@@ -1,0 +1,380 @@
+/* =============================================
+   QUOTE PREVIEW – PRINT-OPTIMIZED STYLES
+   Scoped under .quote-print-document
+   ============================================= */
+
+.quote-print-document {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 3rem;
+  font-size: 13px;
+  line-height: 1.55;
+  color: hsl(var(--foreground));
+}
+
+/* ── Header ─────────────────────────────────── */
+
+.quote-print-document .quote-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 3px solid hsl(var(--primary));
+}
+
+.quote-print-document .company-block {
+  flex: 1;
+}
+
+.quote-print-document .company-logo {
+  max-width: 120px;
+  max-height: 56px;
+  margin-bottom: 0.5rem;
+  object-fit: contain;
+}
+
+.quote-print-document .company-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: hsl(var(--primary));
+  margin-bottom: 0.25rem;
+}
+
+.quote-print-document .company-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.quote-print-document .quote-title-block {
+  text-align: right;
+  min-width: 160px;
+}
+
+.quote-print-document .quote-title-label {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: hsl(var(--primary));
+}
+
+.quote-print-document .quote-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+
+.quote-print-document .quote-date {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  margin-top: 4px;
+}
+
+.quote-print-document .quote-validity {
+  font-size: 11px;
+  color: hsl(var(--warning));
+  margin-top: 2px;
+}
+
+/* ── Info Grid ──────────────────────────────── */
+
+.quote-print-document .info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.quote-print-document .info-box {
+  background: hsl(var(--muted) / 0.5);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid hsl(var(--primary));
+}
+
+.quote-print-document .info-box h3 {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  color: hsl(var(--muted-foreground));
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.quote-print-document .info-box p {
+  font-size: 12px;
+  margin: 2px 0;
+  color: hsl(var(--foreground));
+}
+
+.quote-print-document .info-name {
+  font-weight: 600;
+  font-size: 14px !important;
+  margin-bottom: 4px !important;
+}
+
+.quote-print-document .info-description {
+  color: hsl(var(--muted-foreground)) !important;
+  font-style: italic;
+  margin-top: 4px !important;
+}
+
+/* ── Section headings ───────────────────────── */
+
+.quote-print-document .section-heading {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  color: hsl(var(--foreground));
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* ── Items table ────────────────────────────── */
+
+.quote-print-document .items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1.25rem;
+  font-size: 12px;
+}
+
+.quote-print-document .items-table th {
+  padding: 0.625rem 0.75rem;
+  background: hsl(var(--muted) / 0.5);
+  font-weight: 600;
+  color: hsl(var(--foreground));
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid hsl(var(--border));
+}
+
+.quote-print-document .items-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.6);
+  color: hsl(var(--foreground));
+}
+
+.quote-print-document .items-table .parent-row td {
+  padding-top: 0.625rem;
+}
+
+.quote-print-document .items-table .child-row td {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  border-bottom-color: hsl(var(--border) / 0.35);
+}
+
+.quote-print-document .items-table .child-row td:first-child {
+  border-left: 2px solid hsl(var(--primary) / 0.2);
+}
+
+.quote-print-document .items-table .optional-row td {
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+.quote-print-document .optional-table {
+  opacity: 0.85;
+}
+
+/* ── Totals box ─────────────────────────────── */
+
+.quote-print-document .totals-box {
+  margin-left: auto;
+  max-width: 320px;
+  margin-top: 1.5rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border));
+}
+
+.quote-print-document .totals-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.625rem 1rem;
+  font-size: 13px;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+}
+
+.quote-print-document .totals-row:last-child {
+  border-bottom: none;
+}
+
+.quote-print-document .grand-total {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 700;
+  font-size: 16px;
+  padding: 0.75rem 1rem;
+}
+
+/* ── Notes & Terms ──────────────────────────── */
+
+.quote-print-document .notes-box {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: hsl(var(--accent) / 0.08);
+  border-radius: 0.5rem;
+  border-left: 4px solid hsl(var(--accent));
+}
+
+.quote-print-document .notes-box h3,
+.quote-print-document .terms-box h3 {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.375rem;
+}
+
+.quote-print-document .notes-box h3 {
+  color: hsl(var(--accent));
+}
+
+.quote-print-document .notes-box p {
+  font-size: 12px;
+  color: hsl(var(--foreground));
+  white-space: pre-wrap;
+}
+
+.quote-print-document .terms-box {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: hsl(var(--warning) / 0.06);
+  border-radius: 0.5rem;
+  border-left: 4px solid hsl(var(--warning));
+}
+
+.quote-print-document .terms-box h3 {
+  color: hsl(var(--warning));
+}
+
+.quote-print-document .terms-box p {
+  font-size: 11px;
+  color: hsl(var(--foreground) / 0.8);
+  line-height: 1.6;
+}
+
+/* ── Signature ──────────────────────────────── */
+
+.quote-print-document .signature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+  margin-top: 3rem;
+}
+
+.quote-print-document .signature-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quote-print-document .signature-line {
+  height: 40px;
+  border-bottom: 1px solid hsl(var(--foreground));
+}
+
+.quote-print-document .signature-box span {
+  font-size: 10px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ── Footer ─────────────────────────────────── */
+
+.quote-print-document .document-footer {
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border));
+  text-align: center;
+  font-size: 10px;
+  color: hsl(var(--muted-foreground));
+}
+
+/* ═══════════════════════════════════════════════
+   PRINT OVERRIDES
+   ═══════════════════════════════════════════════ */
+
+@media print {
+  /* Hide app chrome */
+  body {
+    background: white !important;
+    color: #1a1a1a !important;
+  }
+
+  .quote-print-document {
+    padding: 0;
+    max-width: none;
+    font-size: 12px;
+  }
+
+  /* Override CSS variables with print-safe values */
+  .quote-print-document .quote-header {
+    border-bottom-color: #d97706;
+  }
+
+  .quote-print-document .company-name,
+  .quote-print-document .quote-title-label {
+    color: #d97706;
+  }
+
+  .quote-print-document .info-box {
+    border-left-color: #d97706;
+    background: #f9fafb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quote-print-document .items-table th {
+    background: #f3f4f6;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quote-print-document .grand-total {
+    background: #d97706 !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quote-print-document .notes-box {
+    border-left-color: #d97706;
+    background: #fef3c7;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quote-print-document .terms-box {
+    border-left-color: #f59e0b;
+    background: #fffbeb;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page breaks */
+  .quote-print-document .signature-grid {
+    page-break-inside: avoid;
+  }
+
+  .quote-print-document .totals-box {
+    page-break-inside: avoid;
+  }
+
+  .quote-print-document .items-table {
+    page-break-inside: auto;
+  }
+
+  .quote-print-document .items-table tr {
+    page-break-inside: avoid;
+  }
+}
