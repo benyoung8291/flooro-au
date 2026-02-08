@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +38,8 @@ import {
   Percent,
   DollarSign,
   Clock,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
@@ -45,6 +48,7 @@ import { calculatePolygonArea, calculateRoomNetArea } from '@/lib/canvas/geometr
 import { formatCurrency } from '@/lib/reports/calculations';
 import { RoomDetailView } from './RoomDetailView';
 import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
+import { useGenerateQuoteFromProject, useProjectQuote } from '@/hooks/useGenerateQuoteFromProject';
 import { cn } from '@/lib/utils';
 
 interface TakeoffPanelProps {
@@ -58,10 +62,11 @@ interface TakeoffPanelProps {
   onRenameRoom?: (roomId: string, name: string) => void;
   onUpdateRoom?: (roomId: string, updates: Partial<Room>) => void;
   onMaterialSelect?: (material: Material, roomId: string) => void;
+  projectId?: string;
   projectName?: string;
+  projectAddress?: string;
   stripPlans?: Map<string, StripPlanResult>;
   onOpenFinishesSchedule?: () => void;
-  onOpenQuoteSummary?: () => void;
   // Project materials support
   projectMaterials?: ProjectMaterial[];
 }
@@ -83,15 +88,21 @@ export function TakeoffPanel({
   onRenameRoom,
   onUpdateRoom,
   onMaterialSelect,
+  projectId,
   projectName,
+  projectAddress,
   stripPlans,
   onOpenFinishesSchedule,
-  onOpenQuoteSummary,
   projectMaterials = [],
 }: TakeoffPanelProps) {
+  const navigate = useNavigate();
   const { data: materials, isLoading } = useMaterials();
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
+  const { generateAndNavigate, isGenerating } = useGenerateQuoteFromProject();
+  const { checkExistingQuote } = useProjectQuote(projectId);
+  const [existingQuoteId, setExistingQuoteId] = useState<string | null>(null);
+  const [checkingQuote, setCheckingQuote] = useState(false);
 
   // Combine project materials (priority) with library materials for lookup
   const allMaterialsMap = useMemo(() => {
@@ -824,15 +835,54 @@ export function TakeoffPanel({
               <Library className="w-3.5 h-3.5 mr-1.5" />
               Project Materials
             </Button>
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="w-full"
-              onClick={onOpenQuoteSummary}
-            >
-              <FileText className="w-3.5 h-3.5 mr-1.5" />
-              Generate Quote
-            </Button>
+            {existingQuoteId ? (
+              <Button 
+                variant="default" 
+                size="sm" 
+                className="w-full"
+                onClick={() => navigate(`/quotes/${existingQuoteId}`)}
+              >
+                <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
+                View Quote
+              </Button>
+            ) : (
+              <Button 
+                variant="default" 
+                size="sm" 
+                className="w-full"
+                disabled={isGenerating || rooms.filter(r => r.materialId).length === 0}
+                onClick={async () => {
+                  // Check for existing quote first
+                  setCheckingQuote(true);
+                  const existing = await checkExistingQuote();
+                  setCheckingQuote(false);
+                  
+                  if (existing) {
+                    setExistingQuoteId(existing);
+                    navigate(`/quotes/${existing}`);
+                    return;
+                  }
+
+                  await generateAndNavigate({
+                    projectId: projectId || '',
+                    projectName: projectName || 'Untitled Project',
+                    projectAddress,
+                    rooms,
+                    scale,
+                    materials: materials || [],
+                    projectMaterials,
+                    stripPlans,
+                  });
+                }}
+              >
+                {isGenerating || checkingQuote ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <FileText className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Generate Quote
+              </Button>
+            )}
           </div>
         </>
       )}
