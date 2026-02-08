@@ -1,166 +1,153 @@
 
 
-# FieldFlow Quote Logic Gap Analysis and Implementation Plan
+# Quote Preview/PDF Overhaul -- FieldFlow Feature Parity
 
-After thoroughly reviewing both the FieldFlow reference repo (`useSimpleQuoteLineItems.ts` + `InlineQuoteLineItems.tsx` + `QuoteDetails.tsx`) and Flooro's current implementation, here are the significant gaps that need to be addressed.
+## What FieldFlow Has vs. What Flooro Has
+
+After reviewing the FieldFlow repository's `QuotePDFPreview.tsx`, `QuotePDFDocument.tsx`, and the `src/lib/pdf/` support library, here is a comprehensive gap analysis. FieldFlow gives users extensive control over how their quote PDF looks before downloading it.
 
 ---
 
-## Gap Analysis: What's Missing from Flooro
+## Gap Analysis
 
-### 1. Pricing Calculation Formula Mismatch (Critical)
+### 1. Display Control Toggles (Critical -- Missing Entirely)
 
-**FieldFlow** uses a markup-style formula:
-```
-sell = cost * (1 + margin / 100)
-```
-- When margin is 30%, cost $100 -> sell = $130
-- When sell changes, margin recalculates: `margin = ((sell - cost) / cost) * 100`
-- Cost changes always keep margin fixed, recalculate sell
-- Sell changes always recalculate margin
+FieldFlow provides a toolbar with toggle switches that let users customize what appears on the PDF **in real-time**:
 
-**Flooro** uses a gross margin formula:
-```
-sell = cost / (1 - margin / 100)
-```
-- When margin is 30%, cost $100 -> sell = $142.86
-- This is a completely different business model
+| Toggle | FieldFlow | Flooro |
+|--------|-----------|--------|
+| **Show Sub-items** | Toggle to show/hide sub-item rows under parents | Always shows all sub-items |
+| **Hide Qty** (parent) | Hides the quantity column for parent rows | No option |
+| **Hide Pricing** (parent) | Hides unit price and total columns for parents | No option |
+| **Hide Sub Qty** | Hides quantity for sub-items (when shown) | No option |
+| **Hide Sub Pricing** | Hides unit price and total for sub-items | No option |
 
-**Action**: Replace Flooro's pricing formulas to match FieldFlow's markup-based calculations.
+These toggles are **persisted to localStorage** so users' preferences are remembered across sessions.
 
-### 2. Parent Data Migration on Add Sub-Item (Critical)
+### 2. Column Visibility Logic (Critical)
 
-**FieldFlow** has a key behavior when adding the first sub-item to a parent: if the parent already has pricing data (cost, sell, quantity), it automatically:
-1. Creates a first sub-item from the parent's data
-2. Clears the parent's cost/sell/margin fields
-3. Then adds the new blank sub-item
+When both parent and sub-item pricing/quantity are hidden, the entire column disappears from the table, and the Description column expands to fill the extra space. This is handled by `getVisibleColumns()` and `getColumnWidth()` in the `DynamicLineItemsTable`.
 
-This prevents data loss when converting a standalone item into a group.
+### 3. Zoom Controls (Important)
 
-**Flooro** is missing this entirely -- adding a sub-item just appends a blank child without migrating parent data.
+FieldFlow has zoom in/out buttons with percentage display, and **auto-zoom to fit container width** using a `ResizeObserver`. Flooro has no zoom controls.
 
-### 3. Parent Row Behavior with Sub-Items (Critical)
+### 4. Page Count Display (Nice-to-have)
 
-**FieldFlow**:
-- Parent rows with sub-items show **aggregated values** (sum of children's costs, sells, and a calculated overall margin)
-- Parent quantity is forced to "1" when it has sub-items
-- Parent cost/sell/margin fields become **read-only** showing aggregated totals
-- Parent `line_total` = sum of all children's `line_total`
+FieldFlow shows the number of pages in the preview toolbar (e.g., "2 pages").
 
-**Flooro**:
-- Parent rows still show editable cost/sell/margin fields even with sub-items
-- Parent totals don't aggregate from children
-- No logic to disable editing on parent pricing when children exist
+### 5. Settings Persistence (Important)
 
-### 4. Reorder Controls (Up/Down Arrows) (Important)
+All PDF preview settings (toggle states) are saved to `localStorage` under `quote-pdf-settings` and restored on mount.
 
-**FieldFlow**: Has up/down arrow buttons on both parent rows and sub-item rows to reorder within their level.
+### 6. Parent Row Aggregation in PDF (Critical)
 
-**Flooro**: Has a GripVertical icon (visual only, no drag implemented) and no up/down arrow buttons.
+When sub-items are shown, parent rows display the **aggregated total** (sum of children) as the parent's unit price is derived from `line_total / qty`. When sub-items are hidden, parents show their own unit price and total directly.
 
-### 5. Delete Confirmation for Parents with Children (Important)
+### 7. Optional Items as Grouped Sections (Important)
 
-**FieldFlow**: Shows an AlertDialog with three choices:
-- "Cancel" -- abort
-- "Keep Sub-items" -- ungroups children to standalone parents, then deletes the parent
-- "Delete All" -- removes parent + all children
+FieldFlow supports **optional groups** with named sections (e.g., "Option A", "Option B") displayed as separate divider sections in the PDF, each with their own sub-total. There are two modes:
+- **Alternatives (OR)**: Each option shows "Quote Total with Option X" breakdown
+- **Add-ons (AND)**: Options show their subtotals, and the main totals section shows a combined total
 
-**Flooro**: Deletes immediately without any confirmation or option to keep children.
-
-### 6. Ungroup / Promote Sub-Item (Medium)
-
-**FieldFlow** has two extra actions:
-- **Ungroup**: Converts all sub-items of a parent into standalone line items
-- **Promote Sub-Item**: Moves a single sub-item out of its parent to become its own standalone parent
-
-**Flooro**: Has neither of these operations.
-
-### 7. Estimated Hours Column (Medium)
-
-**FieldFlow**: Has a dedicated "Hours" column in the line items table for estimated hours per item, with sub-item hours also editable.
-
-**Flooro**: Has `estimated_hours` in the data model but no column in the table UI.
-
-### 8. Field Highlight Animation on Recalculation (Nice-to-have)
-
-**FieldFlow**: When margin changes and sell recalculates (or vice versa), the affected cell gets a brief green flash/highlight animation (`bg-primary/10 ring-1 ring-primary/30`) to show the user what changed.
-
-**Flooro**: No visual feedback when dependent fields change.
-
-### 9. Number Input Formatting (Important)
-
-**FieldFlow**: Uses `type="text"` with `inputMode="decimal"` for all numeric fields, with:
-- Regex validation to only allow digits and single decimal point
-- `onBlur` formatting to `.toFixed(2)`
-- Prevents typing non-numeric characters
-
-**Flooro**: Uses `type="number"` which has browser inconsistencies, no format-on-blur, and can produce unexpected values.
-
-### 10. Sell Price Floor Validation (Important)
-
-**FieldFlow**: When sell price changes, it validates `Math.max(sellNum, costNum)` -- sell can never go below cost.
-
-**Flooro**: No sell price floor -- users can set sell below cost, leading to negative margins.
+Flooro currently just separates items into "Required" and "Optional" tables.
 
 ---
 
 ## Implementation Plan
 
-### Phase A: Fix Pricing Calculations (useQuoteLineItems.ts)
+Since Flooro uses a CSS-based `window.print()` approach rather than `@react-pdf/renderer`, the implementation will adapt FieldFlow's toggle/control concepts to work with Flooro's existing HTML/CSS print system. This keeps things simpler and avoids adding heavy PDF rendering dependencies.
 
-1. Replace `calculateSellFromMargin` and `calculateMarginFromSell` to use FieldFlow's markup formula:
-   - `sell = cost * (1 + margin / 100)` 
-   - `margin = ((sell - cost) / cost) * 100`
-2. Add sell price floor validation (sell >= cost)
-3. Add format-on-blur behavior for cost/sell/margin inputs
+### Phase 1: Preview Toolbar with Display Toggles
 
-### Phase B: Parent-Child Interaction Logic (useQuoteLineItems.ts)
+Add a toolbar below the existing header with all the visibility controls:
 
-1. **Data migration on addSubItem**: When adding the first sub-item to a parent with data, migrate parent's pricing into a new first child, then clear parent pricing
-2. **Aggregated parent values**: Add `calculateAggregatedValues(parent)` function that computes:
-   - Total cost = sum(child.qty * child.cost)
-   - Total sell = sum(child.qty * child.sell) 
-   - Margin = ((totalSell - totalCost) / totalCost) * 100
-3. **Parent line_total auto-calculation**: When any child changes, recalculate parent's `line_total` as sum of children's totals
-4. **Force parent qty = 1** when sub-items exist
+**New state variables (with localStorage persistence):**
+- `showSubItems` (boolean, default: true)
+- `hideParentQty` (boolean, default: false)
+- `hideParentPricing` (boolean, default: false)
+- `hideSubItemQty` (boolean, default: false)
+- `hideSubItemPricing` (boolean, default: true -- FieldFlow's default)
 
-### Phase C: Enhanced Row UI (QuoteLineItemRow.tsx + QuoteLineItemsTable.tsx)
+**Toolbar UI:**
+- Row of Switch + Label pairs matching FieldFlow's layout
+- Conditional visibility: "Hide Sub Qty" and "Hide Sub Pricing" only appear when "Show Sub-items" is ON
+- Settings saved to localStorage on change, restored on mount
 
-1. **Parent row with children shows aggregated read-only values** instead of editable inputs for cost/sell/margin
-2. **Add estimated hours column** to the table
-3. **Add up/down arrow reorder buttons** for both parents and sub-items (replacing the non-functional GripVertical)
-4. **Add ungroup action** on parent rows (converts children to standalone)
-5. **Add promote action** on sub-item rows (moves to standalone parent)
-6. **Add delete confirmation dialog** for parents with children (Keep Sub-items / Delete All / Cancel)
-7. **Add field highlight animation** when dependent fields recalculate
-8. **Switch numeric inputs** from `type="number"` to `type="text"` with `inputMode="decimal"` and regex validation + onBlur formatting
+### Phase 2: Dynamic Table Column Rendering
 
-### Phase D: QuoteSummaryPanel Totals Fix
+Update the `LineItemRow` component and table headers to respect the toggle states:
 
-1. Update `computeTotals` to correctly aggregate from children (it already does this but needs to align with the new pricing formulas)
-2. Ensure the total calculation matches FieldFlow's approach where parent items with children have their totals derived purely from children
+- When `hideParentQty` is true, parent rows show empty Qty cells
+- When `hideParentPricing` is true, parent rows show empty Unit Price and Total cells
+- When `hideSubItemQty` is true, sub-item rows show empty Qty cells
+- When `hideSubItemPricing` is true, sub-item rows show empty Unit Price and Total cells
+- When both parent AND sub-item versions of a column are hidden, the entire column header is removed and the Description column gets wider
+- Sub-item rows are conditionally rendered based on `showSubItems`
+
+### Phase 3: Parent Aggregation Display
+
+When sub-items ARE shown:
+- Parent rows display aggregated total from children
+- Parent unit_price is derived as `line_total / quantity`
+- Parent quantity shows as "1" (group quantity)
+
+When sub-items are NOT shown:
+- Parent rows display their own pre-aggregated values (already calculated in the hook)
+- This gives a clean summary view with just parent totals
+
+### Phase 4: Optional Group Sections
+
+Enhance the optional items handling to support named groups:
+
+- Group optional items by a group identifier (we can use the parent item as the group name, since Flooro's parent/child hierarchy naturally creates groups)
+- Each optional group gets its own divider and sub-total
+- Show "Quote Total with [Group Name]" calculation for alternatives mode
+
+### Phase 5: Print CSS Updates
+
+Update `quote-print.css` to support:
+- Hidden columns (`.col-hidden` class that applies `display: none`)
+- Dynamic description column width when columns are hidden
+- Proper print rendering for the new toolbar (already `print:hidden`)
 
 ---
 
 ## Technical Details
 
-### New/Modified Files
+### Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/hooks/useQuoteLineItems.ts` | Replace pricing formulas, add data migration on addSubItem, add aggregation logic, add ungroup/promote operations |
-| `src/components/quotes/QuoteLineItemRow.tsx` | Add hours column, switch to text inputs with formatting, show aggregated values for parents with children, add reorder buttons, add promote/ungroup actions |
-| `src/components/quotes/QuoteLineItemsTable.tsx` | Add hours column header, add delete confirmation dialog, pass new props, add field highlight state |
-| `src/components/quotes/QuoteSummaryPanel.tsx` | Align totals with new pricing model |
+| `src/pages/QuotePreview.tsx` | Major rewrite: add toolbar with toggles, dynamic column rendering, optional group handling, localStorage persistence |
+| `src/styles/quote-print.css` | Add column visibility classes, dynamic widths, optional group divider styles |
 
-### Key Behavioral Rules (from FieldFlow)
+### No New Files Needed
 
-1. **Cost changes**: Keep margin fixed, recalculate sell = `cost * (1 + margin/100)`
-2. **Margin changes**: Keep cost fixed, recalculate sell = `cost * (1 + margin/100)`
-3. **Sell changes**: Keep cost fixed, recalculate margin = `((sell - cost) / cost) * 100`, enforce sell >= cost
-4. **Parent with children**: Cost/Sell/Margin cells become read-only showing aggregated values; parent line_total = sum of child line_totals
-5. **First sub-item added**: Migrate parent data to first child, clear parent, add blank second child
-6. **Delete parent with children**: Show dialog with Cancel / Keep Sub-items (ungroup) / Delete All
-7. **Sub-item promote**: Extract sub-item, create standalone parent after the original parent
-8. **Ungroup parent**: Convert all children to standalone parents, remove the parent shell
+Everything fits within the existing QuotePreview page and CSS.
+
+### Key Implementation Notes
+
+1. **Column visibility logic**: A helper function `getVisibleColumns()` determines which columns to render based on the combination of parent and sub-item hide settings. If both parent qty AND sub-item qty are hidden (or sub-items are off), the Qty column header disappears entirely.
+
+2. **Dynamic width redistribution**: When columns are hidden from the table, the Description column should expand. This can be done with CSS classes that set different `width` percentages based on which columns are visible.
+
+3. **localStorage key**: `quote-pdf-settings` to match FieldFlow's pattern. Settings are loaded on mount and saved on every toggle change.
+
+4. **Optional group totals**: For each optional group, calculate:
+   - Group subtotal (sum of items in group)
+   - GST rate derived from the main quote's tax_rate
+   - "Quote Total with Option" = base subtotal + group subtotal + combined GST
+
+5. **No additional dependencies**: Everything uses existing Flooro components (Switch, Label, Select from Radix UI) and CSS print media queries. No need for `@react-pdf/renderer` or `react-pdf`.
+
+### Toggle Defaults (matching FieldFlow)
+
+```
+showSubItems: true
+hideParentQty: false
+hideParentPricing: false
+hideSubItemQty: false
+hideSubItemPricing: true  (FieldFlow hides sub-item pricing by default)
+```
 
