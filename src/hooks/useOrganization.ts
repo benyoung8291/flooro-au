@@ -9,6 +9,7 @@ interface OrganizationUpdate {
   email?: string | null;
   website?: string | null;
   terms_and_conditions?: string | null;
+  abn?: string | null;
 }
 
 export function useUpdateOrganization() {

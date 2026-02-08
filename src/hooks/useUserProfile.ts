@@ -7,6 +7,7 @@ interface Profile {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
+  phone: string | null;
   organization_id: string | null;
   created_at: string;
   updated_at: string;
@@ -132,7 +133,7 @@ export function useUpdateProfile() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url'>>) => {
+    mutationFn: async (updates: Partial<Pick<Profile, 'full_name' | 'avatar_url' | 'phone'>>) => {
       if (!user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase

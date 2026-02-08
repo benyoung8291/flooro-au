@@ -11,6 +11,7 @@ export interface OrganizationBranding {
   website: string | null;
   logo_url: string | null;
   terms_and_conditions: string | null;
+  abn: string | null;
 }
 
 export function useOrganizationBranding() {
@@ -23,7 +24,7 @@ export function useOrganizationBranding() {
 
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, address, phone, email, website, logo_url, terms_and_conditions')
+        .select('id, name, address, phone, email, website, logo_url, terms_and_conditions, abn')
         .eq('id', profile.organization_id)
         .single();
 

@@ -3,6 +3,7 @@ import { useQuote } from '@/hooks/useQuotes';
 import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
 import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
 import { useQuotePdfSettings } from '@/hooks/useQuotePdfSettings';
+import { useQuoteOwnerProfile } from '@/hooks/useQuoteOwnerProfile';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
@@ -32,6 +33,7 @@ export default function QuotePreview() {
   const { data: quote, isLoading: quoteLoading } = useQuote(quoteId);
   const { lineItems, isLoading: itemsLoading } = useQuoteLineItems(quoteId);
   const { data: org } = useOrganizationBranding();
+  const { data: owner } = useQuoteOwnerProfile(quote?.created_by);
   const {
     settings,
     update,
@@ -68,7 +70,7 @@ export default function QuotePreview() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* ── Unified Header (hidden when printing) ─────────── */}
+      {/* ── Screen Header (hidden when printing) ─────────── */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
           <Button
@@ -93,59 +95,86 @@ export default function QuotePreview() {
         </div>
       </header>
 
-      {/* ── Print-optimized document ─────────────────────── */}
+      {/* ── Print-optimized Letterhead Document ──────────── */}
       <main className="quote-print-document">
-        {/* Company Header */}
-        <div className="quote-header">
-          <div className="company-block">
+
+        {/* ── Letterhead Header ──────────────────────────── */}
+        <div className="letterhead-header">
+          <div className="letterhead-brand">
             {org?.logo_url && (
-              <img src={org.logo_url} alt="Logo" className="company-logo" />
+              <img src={org.logo_url} alt="Logo" className="letterhead-logo" />
             )}
-            <div className="company-name">{org?.name || 'Your Company'}</div>
-            <div className="company-details">
-              {org?.address && <span>{org.address}</span>}
-              {org?.phone && <span>📞 {org.phone}</span>}
-              {org?.email && <span>✉ {org.email}</span>}
-              {org?.website && <span>🌐 {org.website}</span>}
+            <div className="letterhead-info">
+              <div className="letterhead-company-name">{org?.name || 'Your Company'}</div>
+              {org?.abn && <div className="letterhead-abn">ABN: {org.abn}</div>}
             </div>
           </div>
-          <div className="quote-title-block">
-            <div className="quote-title-label">QUOTE</div>
-            <div className="quote-number">{quote.quote_number}</div>
-            <div className="quote-date">{formatDate(quote.created_at)}</div>
+          <div className="letterhead-contact">
+            {org?.address && <span>{org.address}</span>}
+            {org?.phone && <span>Ph: {org.phone}</span>}
+            {org?.email && <span>{org.email}</span>}
+            {org?.website && <span>{org.website}</span>}
+          </div>
+        </div>
+
+        {/* ── Quote Meta Bar ─────────────────────────────── */}
+        <div className="quote-meta-bar">
+          <div className="quote-meta-left">
+            <div className="quote-meta-label">QUOTE</div>
+            <div className="quote-meta-number">{quote.quote_number}</div>
+          </div>
+          <div className="quote-meta-right">
+            <div className="quote-meta-date">
+              <span className="meta-label">Date</span>
+              <span>{formatDate(quote.created_at)}</span>
+            </div>
             {quote.valid_until && (
-              <div className="quote-validity">
-                Valid until {formatDate(quote.valid_until)}
+              <div className="quote-meta-date">
+                <span className="meta-label">Valid Until</span>
+                <span>{formatDate(quote.valid_until)}</span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Info Grid */}
-        <div className="info-grid">
-          <div className="info-box">
-            <h3>Project</h3>
-            {quote.title && <p className="info-name">{quote.title}</p>}
-            {quote.client_address && <p>📍 {quote.client_address}</p>}
-            {quote.description && (
-              <div
-                className="info-description rich-text-content"
-                dangerouslySetInnerHTML={{ __html: quote.description }}
-              />
-            )}
-          </div>
+        {/* ── Contact Grid ───────────────────────────────── */}
+        <div className="contact-grid">
           {quote.client_name && (
-            <div className="info-box">
-              <h3>Client</h3>
-              <p className="info-name">{quote.client_name}</p>
+            <div className="contact-box">
+              <h3>Prepared For</h3>
+              <p className="contact-name">{quote.client_name}</p>
               {quote.client_address && <p>{quote.client_address}</p>}
-              {quote.client_phone && <p>📞 {quote.client_phone}</p>}
-              {quote.client_email && <p>✉ {quote.client_email}</p>}
+              {quote.client_email && <p>{quote.client_email}</p>}
+              {quote.client_phone && <p>Ph: {quote.client_phone}</p>}
+            </div>
+          )}
+          {owner && (
+            <div className="contact-box">
+              <h3>Your Contact</h3>
+              <p className="contact-name">{owner.full_name || 'Team Member'}</p>
+              {owner.email && <p>{owner.email}</p>}
+              {owner.phone && <p>Ph: {owner.phone}</p>}
             </div>
           )}
         </div>
 
-        {/* Required Items */}
+        {/* ── Letter Body (Scope/Description) ────────────── */}
+        {(quote.title || quote.description) && (
+          <div className="letter-body">
+            {quote.title && <div className="letter-subject">Re: {quote.title}</div>}
+            {quote.client_name && (
+              <p className="letter-greeting">Dear {quote.client_name},</p>
+            )}
+            {quote.description && (
+              <div
+                className="letter-content rich-text-content"
+                dangerouslySetInnerHTML={{ __html: quote.description }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* ── Required Items ─────────────────────────────── */}
         {requiredItems.length > 0 && (
           <>
             <h2 className="section-heading">Quoted Items</h2>
@@ -159,7 +188,7 @@ export default function QuotePreview() {
           </>
         )}
 
-        {/* Optional Items */}
+        {/* ── Optional Items ─────────────────────────────── */}
         <OptionalGroupSections
           optionalItems={optionalItems}
           baseSubtotal={quote.subtotal}
@@ -170,7 +199,7 @@ export default function QuotePreview() {
           showTotalColumn={showTotalColumn}
         />
 
-        {/* Totals */}
+        {/* ── Totals ─────────────────────────────────────── */}
         <div className="totals-box">
           <div className="totals-row">
             <span>Subtotal</span>
@@ -188,7 +217,7 @@ export default function QuotePreview() {
           </div>
         </div>
 
-        {/* Notes */}
+        {/* ── Notes ──────────────────────────────────────── */}
         {quote.notes && (
           <div className="notes-box">
             <h3>Notes</h3>
@@ -196,7 +225,7 @@ export default function QuotePreview() {
           </div>
         )}
 
-        {/* Terms */}
+        {/* ── Terms ──────────────────────────────────────── */}
         {termsText && (
           <div className="terms-box">
             <h3>Terms & Conditions</h3>
@@ -204,7 +233,7 @@ export default function QuotePreview() {
           </div>
         )}
 
-        {/* Signature */}
+        {/* ── Signature ──────────────────────────────────── */}
         <div className="signature-grid">
           <div className="signature-box">
             <div className="signature-line" />
@@ -216,12 +245,12 @@ export default function QuotePreview() {
           </div>
         </div>
 
-        {/* Footer */}
+        {/* ── Footer ─────────────────────────────────────── */}
         <div className="document-footer">
-          <p>
-            Generated by {org?.name || 'Flooro'} •{' '}
-            {formatDate(new Date().toISOString())}
-          </p>
+          <span>{org?.name || 'Flooro'}</span>
+          {org?.abn && <span>ABN: {org.abn}</span>}
+          {org?.phone && <span>Ph: {org.phone}</span>}
+          {org?.email && <span>{org.email}</span>}
         </div>
       </main>
     </div>
