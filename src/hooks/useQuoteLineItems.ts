@@ -29,6 +29,7 @@ export interface LineItem {
   // UI-only flags
   _isNew?: boolean;
   _isExpanded?: boolean;
+  _highlightFields?: Set<string>;
 }
 
 interface DbLineItem {
@@ -55,24 +56,23 @@ interface DbLineItem {
   updated_at: string;
 }
 
-// ─── Pricing Calculations (matching FieldFlow's calculatePricing) ────
+// ─── Pricing Calculations (FieldFlow markup formula) ─────────────────
 
 export function calculateSellFromMargin(costPrice: number, marginPercentage: number): number {
-  if (marginPercentage >= 100) return costPrice * 10; // cap
   if (marginPercentage <= 0) return costPrice;
-  return costPrice / (1 - marginPercentage / 100);
+  return costPrice * (1 + marginPercentage / 100);
 }
 
 export function calculateMarginFromSell(costPrice: number, sellPrice: number): number {
-  if (sellPrice <= 0) return 0;
-  return ((sellPrice - costPrice) / sellPrice) * 100;
+  if (costPrice <= 0) return 0;
+  return ((sellPrice - costPrice) / costPrice) * 100;
 }
 
 export function calculatePricing(
   field: 'cost' | 'sell' | 'margin',
   value: number,
   current: { cost_price: number; sell_price: number; margin_percentage: number }
-): { cost_price: number; sell_price: number; margin_percentage: number } {
+): { cost_price: number; sell_price: number; margin_percentage: number; _changedField?: string } {
   switch (field) {
     case 'cost': {
       const newSell = calculateSellFromMargin(value, current.margin_percentage);
@@ -80,14 +80,18 @@ export function calculatePricing(
         cost_price: value,
         sell_price: Math.round(newSell * 100) / 100,
         margin_percentage: current.margin_percentage,
+        _changedField: 'sell_price',
       };
     }
     case 'sell': {
-      const newMargin = calculateMarginFromSell(current.cost_price, value);
+      // Enforce sell >= cost
+      const clampedSell = Math.max(value, current.cost_price);
+      const newMargin = calculateMarginFromSell(current.cost_price, clampedSell);
       return {
         cost_price: current.cost_price,
-        sell_price: value,
+        sell_price: clampedSell,
         margin_percentage: Math.round(newMargin * 100) / 100,
+        _changedField: 'margin_percentage',
       };
     }
     case 'margin': {
@@ -96,9 +100,50 @@ export function calculatePricing(
         cost_price: current.cost_price,
         sell_price: Math.round(newSell * 100) / 100,
         margin_percentage: value,
+        _changedField: 'sell_price',
       };
     }
   }
+}
+
+// ─── Aggregation ─────────────────────────────────────────────────────
+
+export function calculateAggregatedValues(parent: LineItem): {
+  cost_price: number;
+  sell_price: number;
+  margin_percentage: number;
+  line_total: number;
+  estimated_hours: number;
+} {
+  if (parent.subItems.length === 0) {
+    return {
+      cost_price: parent.cost_price,
+      sell_price: parent.sell_price,
+      margin_percentage: parent.margin_percentage,
+      line_total: parent.line_total,
+      estimated_hours: parent.estimated_hours,
+    };
+  }
+
+  let totalCost = 0;
+  let totalSell = 0;
+  let totalHours = 0;
+
+  for (const child of parent.subItems) {
+    totalCost += (child.quantity || 0) * (child.cost_price || 0);
+    totalSell += (child.quantity || 0) * (child.sell_price || 0);
+    totalHours += child.estimated_hours || 0;
+  }
+
+  const margin = totalCost > 0 ? ((totalSell - totalCost) / totalCost) * 100 : 0;
+
+  return {
+    cost_price: Math.round(totalCost * 100) / 100,
+    sell_price: Math.round(totalSell * 100) / 100,
+    margin_percentage: Math.round(margin * 100) / 100,
+    line_total: Math.round(totalSell * 100) / 100,
+    estimated_hours: totalHours,
+  };
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────
@@ -137,7 +182,6 @@ function buildHierarchy(flatItems: DbLineItem[]): LineItem[] {
   const parentItems: LineItem[] = [];
   const childMap = new Map<string, LineItem[]>();
 
-  // Separate parents and children
   for (const item of flatItems) {
     const lineItem = dbToLineItem(item);
     if (item.parent_line_item_id) {
@@ -149,7 +193,6 @@ function buildHierarchy(flatItems: DbLineItem[]): LineItem[] {
     }
   }
 
-  // Attach children to parents
   for (const parent of parentItems) {
     parent.subItems = (childMap.get(parent.id) || [])
       .sort((a, b) => a.item_order - b.item_order);
@@ -159,13 +202,19 @@ function buildHierarchy(flatItems: DbLineItem[]): LineItem[] {
   return parentItems.sort((a, b) => a.item_order - b.item_order);
 }
 
-function flattenHierarchy(items: LineItem[]): Omit<LineItem, 'subItems' | '_isNew' | '_isExpanded'>[] {
-  const flat: Omit<LineItem, 'subItems' | '_isNew' | '_isExpanded'>[] = [];
+function flattenHierarchy(items: LineItem[]): Omit<LineItem, 'subItems' | '_isNew' | '_isExpanded' | '_highlightFields'>[] {
+  const flat: Omit<LineItem, 'subItems' | '_isNew' | '_isExpanded' | '_highlightFields'>[] = [];
   for (const parent of items) {
-    const { subItems, _isNew, _isExpanded, ...parentData } = parent;
-    flat.push(parentData);
+    const { subItems, _isNew, _isExpanded, _highlightFields, ...parentData } = parent;
+    // For parents with children, store aggregated values
+    if (subItems.length > 0) {
+      const agg = calculateAggregatedValues(parent);
+      flat.push({ ...parentData, ...agg, quantity: 1 });
+    } else {
+      flat.push(parentData);
+    }
     for (const child of subItems) {
-      const { subItems: _, _isNew: __, _isExpanded: ___, ...childData } = child;
+      const { subItems: _, _isNew: __, _isExpanded: ___, _highlightFields: ____, ...childData } = child;
       flat.push(childData);
     }
   }
@@ -174,6 +223,21 @@ function flattenHierarchy(items: LineItem[]): Omit<LineItem, 'subItems' | '_isNe
 
 function snapshotKey(items: LineItem[]): string {
   return JSON.stringify(flattenHierarchy(items));
+}
+
+// Helper to recalculate parent aggregated values after child changes
+function recalcParentFromChildren(parent: LineItem): LineItem {
+  if (parent.subItems.length === 0) return parent;
+  const agg = calculateAggregatedValues(parent);
+  return {
+    ...parent,
+    cost_price: agg.cost_price,
+    sell_price: agg.sell_price,
+    margin_percentage: agg.margin_percentage,
+    line_total: agg.line_total,
+    estimated_hours: agg.estimated_hours,
+    quantity: 1,
+  };
 }
 
 // ─── Main Hook ───────────────────────────────────────────────────────
@@ -247,25 +311,29 @@ export function useQuoteLineItems(quoteId: string | undefined) {
     setEditedLineItems(prev => prev.map(parent => {
       if (parent.id === itemId) {
         const updated = { ...parent, ...updates };
-        // Recalc line_total if qty or sell changed
         if ('quantity' in updates || 'sell_price' in updates) {
           updated.line_total = (updated.quantity || 0) * (updated.sell_price || 0);
         }
         return updated;
       }
-      return {
-        ...parent,
-        subItems: parent.subItems.map(child => {
-          if (child.id === itemId) {
-            const updated = { ...child, ...updates };
-            if ('quantity' in updates || 'sell_price' in updates) {
-              updated.line_total = (updated.quantity || 0) * (updated.sell_price || 0);
-            }
-            return updated;
+      // Check children
+      const updatedSubItems = parent.subItems.map(child => {
+        if (child.id === itemId) {
+          const updated = { ...child, ...updates };
+          if ('quantity' in updates || 'sell_price' in updates) {
+            updated.line_total = (updated.quantity || 0) * (updated.sell_price || 0);
           }
-          return child;
-        }),
-      };
+          return updated;
+        }
+        return child;
+      });
+
+      const childChanged = updatedSubItems !== parent.subItems;
+      if (childChanged) {
+        const newParent = { ...parent, subItems: updatedSubItems };
+        return recalcParentFromChildren(newParent);
+      }
+      return parent;
     }));
   }, []);
 
@@ -277,27 +345,44 @@ export function useQuoteLineItems(quoteId: string | undefined) {
     setEditedLineItems(prev => prev.map(parent => {
       if (parent.id === itemId) {
         const pricing = calculatePricing(field, value, parent);
+        const { _changedField, ...pricingData } = pricing;
         return {
           ...parent,
-          ...pricing,
-          line_total: parent.quantity * pricing.sell_price,
+          ...pricingData,
+          line_total: parent.quantity * pricingData.sell_price,
+          _highlightFields: _changedField ? new Set([_changedField]) : undefined,
         };
       }
-      return {
-        ...parent,
-        subItems: parent.subItems.map(child => {
-          if (child.id === itemId) {
-            const pricing = calculatePricing(field, value, child);
-            return {
-              ...child,
-              ...pricing,
-              line_total: child.quantity * pricing.sell_price,
-            };
-          }
-          return child;
-        }),
-      };
+      const updatedSubItems = parent.subItems.map(child => {
+        if (child.id === itemId) {
+          const pricing = calculatePricing(field, value, child);
+          const { _changedField, ...pricingData } = pricing;
+          return {
+            ...child,
+            ...pricingData,
+            line_total: child.quantity * pricingData.sell_price,
+            _highlightFields: _changedField ? new Set([_changedField]) : undefined,
+          };
+        }
+        return child;
+      });
+
+      const childChanged = updatedSubItems.some((c, i) => c !== parent.subItems[i]);
+      if (childChanged) {
+        const newParent = { ...parent, subItems: updatedSubItems };
+        return recalcParentFromChildren(newParent);
+      }
+      return parent;
     }));
+
+    // Clear highlights after animation
+    setTimeout(() => {
+      setEditedLineItems(prev => prev.map(parent => ({
+        ...parent,
+        _highlightFields: undefined,
+        subItems: parent.subItems.map(child => ({ ...child, _highlightFields: undefined })),
+      })));
+    }, 600);
   }, []);
 
   const addLineItem = useCallback((description = 'New Item') => {
@@ -333,52 +418,158 @@ export function useQuoteLineItems(quoteId: string | undefined) {
   const addSubItem = useCallback((parentId: string, description = 'New Sub-item') => {
     if (!quoteId) return;
     setEditedLineItems(prev => prev.map(parent => {
-      if (parent.id === parentId) {
-        const maxOrder = parent.subItems.reduce((max, item) => Math.max(max, item.item_order), -1);
-        const newChild: LineItem = {
+      if (parent.id !== parentId) return parent;
+
+      const newChildren: LineItem[] = [];
+
+      // If this is the first sub-item and parent has pricing data, migrate it
+      if (parent.subItems.length === 0 && (parent.cost_price > 0 || parent.sell_price > 0)) {
+        const migratedChild: LineItem = {
           id: generateTempId(),
           quote_id: quoteId,
           parent_line_item_id: parentId,
-          description,
-          quantity: 1,
-          cost_price: 0,
-          sell_price: 0,
-          margin_percentage: 0,
-          unit_price: 0,
-          line_total: 0,
-          estimated_hours: 0,
-          item_order: maxOrder + 1,
+          description: parent.description || 'Item',
+          quantity: parent.quantity || 1,
+          cost_price: parent.cost_price,
+          sell_price: parent.sell_price,
+          margin_percentage: parent.margin_percentage,
+          unit_price: parent.unit_price,
+          line_total: parent.line_total,
+          estimated_hours: parent.estimated_hours,
+          item_order: 0,
           is_optional: false,
           is_active: true,
-          price_book_item_id: null,
-          is_from_price_book: false,
-          source_room_id: null,
+          price_book_item_id: parent.price_book_item_id,
+          is_from_price_book: parent.is_from_price_book,
+          source_room_id: parent.source_room_id,
           metadata: {},
           subItems: [],
           _isNew: true,
           _isExpanded: false,
         };
-        return {
-          ...parent,
-          _isExpanded: true,
-          subItems: [...parent.subItems, newChild],
-        };
+        newChildren.push(migratedChild);
       }
-      return parent;
+
+      const maxOrder = [...parent.subItems, ...newChildren].reduce(
+        (max, item) => Math.max(max, item.item_order), -1
+      );
+      const newChild: LineItem = {
+        id: generateTempId(),
+        quote_id: quoteId,
+        parent_line_item_id: parentId,
+        description,
+        quantity: 1,
+        cost_price: 0,
+        sell_price: 0,
+        margin_percentage: 0,
+        unit_price: 0,
+        line_total: 0,
+        estimated_hours: 0,
+        item_order: maxOrder + 1,
+        is_optional: false,
+        is_active: true,
+        price_book_item_id: null,
+        is_from_price_book: false,
+        source_room_id: null,
+        metadata: {},
+        subItems: [],
+        _isNew: true,
+        _isExpanded: false,
+      };
+
+      const allChildren = [...parent.subItems, ...newChildren, newChild];
+      const newParent: LineItem = {
+        ...parent,
+        _isExpanded: true,
+        subItems: allChildren,
+        // Clear parent pricing since children now hold it
+        cost_price: 0,
+        sell_price: 0,
+        margin_percentage: 0,
+        unit_price: 0,
+        quantity: 1,
+      };
+
+      return recalcParentFromChildren(newParent);
     }));
   }, [quoteId]);
 
   const removeLineItem = useCallback((itemId: string) => {
     setEditedLineItems(prev => {
-      // Check if it's a parent
       const isParent = prev.some(p => p.id === itemId);
       if (isParent) {
         return prev.filter(p => p.id !== itemId);
       }
-      // It's a child
-      return prev.map(parent => ({
-        ...parent,
-        subItems: parent.subItems.filter(c => c.id !== itemId),
+      return prev.map(parent => {
+        const newSubs = parent.subItems.filter(c => c.id !== itemId);
+        if (newSubs.length !== parent.subItems.length) {
+          const newParent = { ...parent, subItems: newSubs };
+          return recalcParentFromChildren(newParent);
+        }
+        return parent;
+      });
+    });
+  }, []);
+
+  // Ungroup: convert all children to standalone parents, remove the parent shell
+  const ungroupParent = useCallback((parentId: string) => {
+    setEditedLineItems(prev => {
+      const parentIndex = prev.findIndex(p => p.id === parentId);
+      if (parentIndex < 0) return prev;
+      const parent = prev[parentIndex];
+      if (parent.subItems.length === 0) return prev;
+
+      const promotedChildren = parent.subItems.map((child, i) => ({
+        ...child,
+        parent_line_item_id: null,
+        item_order: parent.item_order + i + 1,
+        subItems: [],
+        _isNew: child.id.startsWith('temp-') ? true : child._isNew,
+      }));
+
+      const before = prev.slice(0, parentIndex);
+      const after = prev.slice(parentIndex + 1).map(item => ({
+        ...item,
+        item_order: item.item_order + parent.subItems.length,
+      }));
+
+      return [...before, ...promotedChildren, ...after].map((item, i) => ({
+        ...item,
+        item_order: i,
+      }));
+    });
+  }, []);
+
+  // Promote: move a single sub-item to become its own standalone parent
+  const promoteSubItem = useCallback((childId: string) => {
+    setEditedLineItems(prev => {
+      let promotedItem: LineItem | null = null;
+      let parentIndex = -1;
+
+      const newItems = prev.map((parent, idx) => {
+        const childIndex = parent.subItems.findIndex(c => c.id === childId);
+        if (childIndex < 0) return parent;
+
+        parentIndex = idx;
+        promotedItem = {
+          ...parent.subItems[childIndex],
+          parent_line_item_id: null,
+          subItems: [],
+        };
+
+        const newSubs = parent.subItems.filter(c => c.id !== childId);
+        const newParent = { ...parent, subItems: newSubs };
+        return recalcParentFromChildren(newParent);
+      });
+
+      if (!promotedItem || parentIndex < 0) return prev;
+
+      // Insert after the parent
+      const before = newItems.slice(0, parentIndex + 1);
+      const after = newItems.slice(parentIndex + 1);
+      return [...before, promotedItem, ...after].map((item, i) => ({
+        ...item,
+        item_order: i,
       }));
     });
   }, []);
@@ -386,7 +577,6 @@ export function useQuoteLineItems(quoteId: string | undefined) {
   const duplicateLineItem = useCallback((itemId: string) => {
     setEditedLineItems(prev => {
       const newItems = [...prev];
-      // Find parent to duplicate
       const parentIndex = newItems.findIndex(p => p.id === itemId);
       if (parentIndex >= 0) {
         const source = newItems[parentIndex];
@@ -404,7 +594,6 @@ export function useQuoteLineItems(quoteId: string | undefined) {
             _isNew: true,
           })),
         };
-        // Re-order items after the duplicate
         const after = newItems.slice(parentIndex + 1).map(item => ({
           ...item,
           item_order: item.item_order + 1,
@@ -428,13 +617,39 @@ export function useQuoteLineItems(quoteId: string | undefined) {
     }));
   }, []);
 
-  const reorderParents = useCallback((fromIndex: number, toIndex: number) => {
+  // Reorder parents (up/down)
+  const reorderParent = useCallback((parentId: string, direction: 'up' | 'down') => {
     setEditedLineItems(prev => {
+      const index = prev.findIndex(p => p.id === parentId);
+      if (index < 0) return prev;
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= prev.length) return prev;
+
       const items = [...prev];
-      const [moved] = items.splice(fromIndex, 1);
-      items.splice(toIndex, 0, moved);
+      const [moved] = items.splice(index, 1);
+      items.splice(targetIndex, 0, moved);
       return items.map((item, i) => ({ ...item, item_order: i }));
     });
+  }, []);
+
+  // Reorder sub-items (up/down within parent)
+  const reorderSubItem = useCallback((parentId: string, childId: string, direction: 'up' | 'down') => {
+    setEditedLineItems(prev => prev.map(parent => {
+      if (parent.id !== parentId) return parent;
+
+      const childIndex = parent.subItems.findIndex(c => c.id === childId);
+      if (childIndex < 0) return parent;
+      const targetIndex = direction === 'up' ? childIndex - 1 : childIndex + 1;
+      if (targetIndex < 0 || targetIndex >= parent.subItems.length) return parent;
+
+      const subs = [...parent.subItems];
+      const [moved] = subs.splice(childIndex, 1);
+      subs.splice(targetIndex, 0, moved);
+      return {
+        ...parent,
+        subItems: subs.map((item, i) => ({ ...item, item_order: i })),
+      };
+    }));
   }, []);
 
   // ─── Save to DB (batch diff) ───────────────────────────────────────
@@ -448,15 +663,11 @@ export function useQuoteLineItems(quoteId: string | undefined) {
       const dbFlat = dbItems || [];
       const dbIds = new Set(dbFlat.map(d => d.id));
 
-      // Items to insert (temp IDs)
       const toInsert = currentFlat.filter(item => item.id.startsWith('temp-'));
-      // Items to update (existing IDs still present)
       const toUpdate = currentFlat.filter(item => !item.id.startsWith('temp-') && dbIds.has(item.id));
-      // Items to delete (in DB but not in current)
       const currentIds = new Set(currentFlat.map(c => c.id));
       const toDelete = dbFlat.filter(d => !currentIds.has(d.id)).map(d => d.id);
 
-      // We need to handle parent items first for new inserts to get real IDs
       const tempIdMap = new Map<string, string>();
 
       // Insert parents first
@@ -592,7 +803,10 @@ export function useQuoteLineItems(quoteId: string | undefined) {
     removeLineItem,
     duplicateLineItem,
     toggleExpanded,
-    reorderParents,
+    reorderParent,
+    reorderSubItem,
+    ungroupParent,
+    promoteSubItem,
     saveLineItems,
     setEditedLineItems,
   };
@@ -609,24 +823,36 @@ async function updateQuoteTotals(quoteId: string) {
 
   if (fetchErr) throw fetchErr;
 
-  // Only count non-optional items in totals
-  const activeItems = (items || []).filter((item: any) => !item.is_optional);
+  // Build hierarchy to correctly compute totals from children
+  const allItems = (items || []) as DbLineItem[];
+  const parents = allItems.filter(i => !i.parent_line_item_id);
+  const children = allItems.filter(i => i.parent_line_item_id);
 
-  const subtotal = activeItems.reduce((sum: number, item: any) => {
-    return sum + (Number(item.quantity) || 0) * (Number(item.sell_price) || 0);
-  }, 0);
+  let subtotal = 0;
+  let totalCost = 0;
+  let estimatedHours = 0;
 
-  const totalCost = activeItems.reduce((sum: number, item: any) => {
-    return sum + (Number(item.quantity) || 0) * (Number(item.cost_price) || 0);
-  }, 0);
+  for (const parent of parents) {
+    if (parent.is_optional) continue;
 
-  const totalMargin = subtotal > 0 ? ((subtotal - totalCost) / subtotal) * 100 : 0;
+    const parentChildren = children.filter(c => c.parent_line_item_id === parent.id);
 
-  const estimatedHours = (items || []).reduce((sum: number, item: any) => {
-    return sum + (Number(item.estimated_hours) || 0);
-  }, 0);
+    if (parentChildren.length > 0) {
+      for (const child of parentChildren) {
+        if (child.is_optional) continue;
+        subtotal += (Number(child.quantity) || 0) * (Number(child.sell_price) || 0);
+        totalCost += (Number(child.quantity) || 0) * (Number(child.cost_price) || 0);
+        estimatedHours += Number(child.estimated_hours) || 0;
+      }
+    } else {
+      subtotal += (Number(parent.quantity) || 0) * (Number(parent.sell_price) || 0);
+      totalCost += (Number(parent.quantity) || 0) * (Number(parent.cost_price) || 0);
+      estimatedHours += Number(parent.estimated_hours) || 0;
+    }
+  }
 
-  // Get current quote for tax rate
+  const totalMargin = totalCost > 0 ? ((subtotal - totalCost) / totalCost) * 100 : 0;
+
   const { data: quote } = await (supabase as any)
     .from('quotes')
     .select('tax_rate')

@@ -1,51 +1,143 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import {
   ChevronRight,
   ChevronDown,
   Plus,
   Trash2,
   Copy,
-  GripVertical,
+  ArrowUp,
+  ArrowDown,
   Eye,
   EyeOff,
+  Ungroup,
+  ArrowUpRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
+
+// ─── Formatted Number Input ──────────────────────────────────────────
+
+function FormattedNumberInput({
+  value,
+  onChange,
+  className,
+  highlight,
+  step,
+  ...props
+}: {
+  value: number | '';
+  onChange: (val: number) => void;
+  className?: string;
+  highlight?: boolean;
+  step?: string;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [displayValue, setDisplayValue] = useState(value === 0 || value === '' ? '' : String(value));
+
+  useEffect(() => {
+    // Only update display if external value changed (not during editing)
+    if (!document.activeElement || document.activeElement !== inputRef.current) {
+      setDisplayValue(value === 0 || value === '' ? '' : Number(value).toFixed(2));
+    }
+  }, [value]);
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    // Only allow digits and single decimal point
+    if (raw !== '' && !/^\d*\.?\d*$/.test(raw)) return;
+    setDisplayValue(raw);
+    const num = parseFloat(raw) || 0;
+    onChange(num);
+  };
+
+  const handleBlur = () => {
+    const num = parseFloat(displayValue) || 0;
+    setDisplayValue(num === 0 ? '' : num.toFixed(2));
+    onChange(num);
+  };
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.select();
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      inputMode="decimal"
+      value={displayValue}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      onFocus={handleFocus}
+      className={cn(
+        'flex h-8 w-full rounded-md border border-transparent bg-transparent px-2 py-1 text-sm text-right font-mono transition-all',
+        'hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
+        highlight && 'bg-primary/10 ring-1 ring-primary/30',
+        className
+      )}
+      {...props}
+    />
+  );
+}
+
+// ─── Row Component ───────────────────────────────────────────────────
 
 interface QuoteLineItemRowProps {
   item: LineItem;
   isChild?: boolean;
   isExpanded?: boolean;
+  hasChildren: boolean;
   onUpdate: (id: string, updates: Partial<LineItem>) => void;
   onUpdatePricing: (id: string, field: 'cost' | 'sell' | 'margin', value: number) => void;
   onAddSubItem: (parentId: string) => void;
   onRemove: (id: string) => void;
   onDuplicate: (id: string) => void;
   onToggleExpand?: (id: string) => void;
-  childCount?: number;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  onUngroup?: () => void;
+  onPromote?: () => void;
+  onDeleteWithConfirm?: (id: string) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  aggregated?: {
+    cost_price: number;
+    sell_price: number;
+    margin_percentage: number;
+    line_total: number;
+    estimated_hours: number;
+  };
 }
 
 export function QuoteLineItemRow({
   item,
   isChild = false,
   isExpanded = true,
+  hasChildren,
   onUpdate,
   onUpdatePricing,
   onAddSubItem,
   onRemove,
   onDuplicate,
   onToggleExpand,
-  childCount = 0,
+  onMoveUp,
+  onMoveDown,
+  onUngroup,
+  onPromote,
+  onDeleteWithConfirm,
+  canMoveUp,
+  canMoveDown,
+  aggregated,
 }: QuoteLineItemRowProps) {
   const descRef = useRef<HTMLInputElement>(null);
+  const isReadOnly = !isChild && hasChildren;
+  const highlights = item._highlightFields || new Set<string>();
 
   const handleNumberChange = useCallback(
-    (field: string, raw: string) => {
-      const val = parseFloat(raw) || 0;
-
+    (field: string, val: number) => {
       if (field === 'cost_price') {
         onUpdatePricing(item.id, 'cost', val);
       } else if (field === 'sell_price') {
@@ -61,10 +153,19 @@ export function QuoteLineItemRow({
     [item.id, onUpdate, onUpdatePricing]
   );
 
-  const parentTotal =
-    !isChild && childCount > 0
-      ? undefined // will be computed in table
-      : item.line_total;
+  const displayTotal = aggregated ? aggregated.line_total : item.line_total;
+  const displayCost = aggregated ? aggregated.cost_price : item.cost_price;
+  const displaySell = aggregated ? aggregated.sell_price : item.sell_price;
+  const displayMargin = aggregated ? aggregated.margin_percentage : item.margin_percentage;
+  const displayHours = aggregated ? aggregated.estimated_hours : item.estimated_hours;
+
+  const handleDelete = () => {
+    if (!isChild && hasChildren && onDeleteWithConfirm) {
+      onDeleteWithConfirm(item.id);
+    } else {
+      onRemove(item.id);
+    }
+  };
 
   return (
     <tr
@@ -75,12 +176,29 @@ export function QuoteLineItemRow({
         item._isNew && 'animate-slide-up'
       )}
     >
-      {/* Drag handle + expand */}
-      <td className="w-10 px-1 py-1.5 text-center">
+      {/* Reorder + expand */}
+      <td className="w-12 px-1 py-1.5 text-center">
         {!isChild ? (
           <div className="flex items-center gap-0.5">
-            <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 cursor-grab" />
-            {childCount > 0 && onToggleExpand && (
+            <div className="flex flex-col">
+              <button
+                onClick={onMoveUp}
+                disabled={!canMoveUp}
+                className="p-0 h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                title="Move up"
+              >
+                <ArrowUp className="w-3 h-3 text-muted-foreground" />
+              </button>
+              <button
+                onClick={onMoveDown}
+                disabled={!canMoveDown}
+                className="p-0 h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                title="Move down"
+              >
+                <ArrowDown className="w-3 h-3 text-muted-foreground" />
+              </button>
+            </div>
+            {hasChildren && onToggleExpand && (
               <button
                 onClick={() => onToggleExpand(item.id)}
                 className="p-0.5 rounded hover:bg-muted"
@@ -94,7 +212,27 @@ export function QuoteLineItemRow({
             )}
           </div>
         ) : (
-          <span className="block w-3.5 h-px bg-border ml-4" />
+          <div className="flex items-center gap-0.5 ml-3">
+            <div className="flex flex-col">
+              <button
+                onClick={onMoveUp}
+                disabled={!canMoveUp}
+                className="p-0 h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                title="Move up"
+              >
+                <ArrowUp className="w-3 h-3 text-muted-foreground" />
+              </button>
+              <button
+                onClick={onMoveDown}
+                disabled={!canMoveDown}
+                className="p-0 h-3.5 w-3.5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                title="Move down"
+              >
+                <ArrowDown className="w-3 h-3 text-muted-foreground" />
+              </button>
+            </div>
+            <span className="block w-3 h-px bg-border" />
+          </div>
         )}
       </td>
 
@@ -114,55 +252,82 @@ export function QuoteLineItemRow({
 
       {/* Qty */}
       <td className="w-20 py-1.5 px-1">
-        <Input
-          type="number"
-          step="0.01"
-          value={item.quantity || ''}
-          onChange={(e) => handleNumberChange('quantity', e.target.value)}
-          className="h-8 text-sm text-right font-mono border-transparent bg-transparent hover:border-input focus:border-input"
-        />
+        {isReadOnly ? (
+          <span className="block text-right text-sm font-mono text-muted-foreground px-2">—</span>
+        ) : (
+          <FormattedNumberInput
+            value={item.quantity || ''}
+            onChange={(val) => handleNumberChange('quantity', val)}
+          />
+        )}
       </td>
 
       {/* Cost */}
       <td className="w-24 py-1.5 px-1">
-        <Input
-          type="number"
-          step="0.01"
-          value={item.cost_price || ''}
-          onChange={(e) => handleNumberChange('cost_price', e.target.value)}
-          className="h-8 text-sm text-right font-mono border-transparent bg-transparent hover:border-input focus:border-input"
-        />
+        {isReadOnly ? (
+          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+            ${displayCost.toFixed(2)}
+          </span>
+        ) : (
+          <FormattedNumberInput
+            value={item.cost_price || ''}
+            onChange={(val) => handleNumberChange('cost_price', val)}
+            highlight={highlights.has('cost_price')}
+          />
+        )}
       </td>
 
       {/* Margin % */}
       <td className="w-20 py-1.5 px-1">
-        <Input
-          type="number"
-          step="0.5"
-          value={item.margin_percentage || ''}
-          onChange={(e) => handleNumberChange('margin_percentage', e.target.value)}
-          className="h-8 text-sm text-right font-mono border-transparent bg-transparent hover:border-input focus:border-input"
-        />
+        {isReadOnly ? (
+          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+            {displayMargin.toFixed(1)}%
+          </span>
+        ) : (
+          <FormattedNumberInput
+            value={item.margin_percentage || ''}
+            onChange={(val) => handleNumberChange('margin_percentage', val)}
+            highlight={highlights.has('margin_percentage')}
+          />
+        )}
       </td>
 
       {/* Sell */}
       <td className="w-24 py-1.5 px-1">
-        <Input
-          type="number"
-          step="0.01"
-          value={item.sell_price || ''}
-          onChange={(e) => handleNumberChange('sell_price', e.target.value)}
-          className="h-8 text-sm text-right font-mono border-transparent bg-transparent hover:border-input focus:border-input"
-        />
+        {isReadOnly ? (
+          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+            ${displaySell.toFixed(2)}
+          </span>
+        ) : (
+          <FormattedNumberInput
+            value={item.sell_price || ''}
+            onChange={(val) => handleNumberChange('sell_price', val)}
+            highlight={highlights.has('sell_price')}
+          />
+        )}
+      </td>
+
+      {/* Hours */}
+      <td className="w-20 py-1.5 px-1">
+        {isReadOnly ? (
+          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+            {displayHours > 0 ? displayHours.toFixed(1) : '—'}
+          </span>
+        ) : (
+          <FormattedNumberInput
+            value={item.estimated_hours || ''}
+            onChange={(val) => handleNumberChange('estimated_hours', val)}
+          />
+        )}
       </td>
 
       {/* Total */}
       <td className="w-28 py-1.5 px-2 text-right font-mono text-sm font-medium">
-        ${(parentTotal ?? 0).toFixed(2)}
+        ${displayTotal.toFixed(2)}
       </td>
 
       {/* Actions */}
-      <td className="w-28 py-1.5 px-1">
+      <td className="w-32 py-1.5 px-1">
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {!isChild && (
             <Button
@@ -190,6 +355,28 @@ export function QuoteLineItemRow({
               <Eye className="w-3.5 h-3.5" />
             )}
           </Button>
+          {!isChild && hasChildren && onUngroup && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onUngroup}
+              title="Ungroup children"
+            >
+              <Ungroup className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {isChild && onPromote && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onPromote}
+              title="Promote to standalone"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </Button>
+          )}
           {!isChild && (
             <Button
               variant="ghost"
@@ -205,7 +392,7 @@ export function QuoteLineItemRow({
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-destructive hover:text-destructive"
-            onClick={() => onRemove(item.id)}
+            onClick={handleDelete}
             title="Remove"
           >
             <Trash2 className="w-3.5 h-3.5" />

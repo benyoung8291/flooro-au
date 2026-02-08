@@ -29,6 +29,10 @@ export default function QuoteEditor() {
     removeLineItem,
     duplicateLineItem,
     toggleExpanded,
+    reorderParent,
+    reorderSubItem,
+    ungroupParent,
+    promoteSubItem,
     saveLineItems,
   } = useQuoteLineItems(quoteId);
 
@@ -189,6 +193,10 @@ export default function QuoteEditor() {
               onRemove={removeLineItem}
               onDuplicate={duplicateLineItem}
               onToggleExpand={toggleExpanded}
+              onReorderParent={reorderParent}
+              onReorderSubItem={reorderSubItem}
+              onUngroupParent={ungroupParent}
+              onPromoteSubItem={promoteSubItem}
               onOpenPriceBook={() => {
                 setPriceBookParentId(null);
                 setPriceBookOpen(true);
