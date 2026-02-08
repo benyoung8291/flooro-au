@@ -1,21 +1,26 @@
-import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
-  Save,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   FileText,
   Send,
   CheckCircle2,
   XCircle,
-  Loader2,
   Clock,
+  ChevronDown,
+  ChevronRight,
+  Settings2,
 } from 'lucide-react';
-import { QuoteStatusBadge } from './QuoteStatusBadge';
 import type { Quote, QuoteStatus, UpdateQuoteInput } from '@/hooks/useQuotes';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
 
@@ -69,180 +74,161 @@ export function QuoteSummaryPanel({
     () => computeTotals(lineItems),
     [lineItems]
   );
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const taxRate = quote.tax_rate || 10;
   const taxAmount = totalSell * (taxRate / 100);
   const grandTotal = totalSell + taxAmount;
 
+  const statusActions = useMemo(() => {
+    const actions: { label: string; status: QuoteStatus; icon: React.ElementType; className: string }[] = [];
+    if (quote.status === 'draft') {
+      actions.push({ label: 'Mark Sent', status: 'sent', icon: Send, className: '' });
+    }
+    if (quote.status === 'draft' || quote.status === 'sent') {
+      actions.push({ label: 'Accepted', status: 'accepted', icon: CheckCircle2, className: 'text-green-600' });
+    }
+    if (quote.status === 'sent') {
+      actions.push({ label: 'Declined', status: 'declined', icon: XCircle, className: 'text-destructive' });
+    }
+    return actions;
+  }, [quote.status]);
+
   return (
-    <div className="space-y-4">
-      {/* Totals */}
-      <Card>
-        <CardHeader className="pb-3 px-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-sm font-medium">Quote Summary</CardTitle>
-            <QuoteStatusBadge status={quote.status} />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3 px-4 sm:px-6">
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Total Cost</span>
-              <span className="font-mono">${totalCost.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Subtotal (Sell)</span>
+    <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur-sm shadow-[0_-4px_20px_-4px_hsl(var(--foreground)/0.08)] print:hidden">
+      <div className="px-4 lg:px-6">
+        {/* Main summary row */}
+        <div className="flex items-center gap-4 h-14 overflow-x-auto">
+          {/* Totals */}
+          <div className="flex items-center gap-4 sm:gap-6 text-sm shrink-0">
+            <div>
+              <span className="text-muted-foreground text-xs block leading-none mb-0.5">Subtotal</span>
               <span className="font-mono font-medium">${totalSell.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Margin</span>
+            <div className="hidden sm:block">
+              <span className="text-muted-foreground text-xs block leading-none mb-0.5">Margin</span>
               <span className="font-mono">{margin.toFixed(1)}%</span>
             </div>
-            <Separator />
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">GST</span>
+            <div>
+              <span className="text-muted-foreground text-xs block leading-none mb-0.5">
+                GST ({taxRate}%)
+              </span>
+              <span className="font-mono">${taxAmount.toFixed(2)}</span>
+            </div>
+            <Separator orientation="vertical" className="h-8" />
+            <div>
+              <span className="text-muted-foreground text-xs block leading-none mb-0.5">Total</span>
+              <span className="font-mono font-bold text-base">${grandTotal.toFixed(2)}</span>
+            </div>
+            {totalHours > 0 && (
+              <div className="hidden md:flex items-center gap-1 text-xs text-muted-foreground">
+                <Clock className="w-3.5 h-3.5" />
+                {totalHours.toFixed(1)}h
+              </div>
+            )}
+          </div>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Details toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1.5 hidden sm:flex"
+              onClick={() => setDetailsOpen(!detailsOpen)}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              Details
+            </Button>
+
+            {/* Status dropdown */}
+            {statusActions.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    Status
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {statusActions.map(({ label, status, icon: Icon, className }) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() => onStatusChange(status)}
+                      className={className}
+                    >
+                      <Icon className="w-4 h-4 mr-2" />
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={onNavigatePreview}>
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Preview</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Expandable details panel */}
+        <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <CollapsibleContent>
+            <div className="pb-4 pt-2 border-t border-border/50 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Valid Until</Label>
+                <Input
+                  type="date"
+                  value={quote.valid_until || ''}
+                  onChange={(e) => onUpdateQuote({ valid_until: e.target.value || null })}
+                  className="h-9 text-sm"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">
+                  GST Rate (%)
+                </Label>
                 <Input
                   type="number"
                   value={quote.tax_rate}
-                  onChange={(e) =>
-                    onUpdateQuote({ tax_rate: parseFloat(e.target.value) || 0 })
-                  }
-                  className="h-6 w-14 text-xs text-right font-mono border-transparent bg-transparent hover:border-input focus:border-input"
+                  onChange={(e) => onUpdateQuote({ tax_rate: parseFloat(e.target.value) || 0 })}
+                  className="h-9 text-sm font-mono"
                 />
-                <span className="text-xs text-muted-foreground">%</span>
               </div>
-              <span className="font-mono text-sm">${taxAmount.toFixed(2)}</span>
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <Label className="text-xs text-muted-foreground">Client Notes</Label>
+                <Textarea
+                  value={quote.notes || ''}
+                  onChange={(e) => onUpdateQuote({ notes: e.target.value || null })}
+                  placeholder="Visible on quote..."
+                  className="text-sm min-h-[60px] resize-none"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+                <Label className="text-xs text-muted-foreground">Internal Notes</Label>
+                <Textarea
+                  value={quote.internal_notes || ''}
+                  onChange={(e) => onUpdateQuote({ internal_notes: e.target.value || null })}
+                  placeholder="Private notes..."
+                  className="text-sm min-h-[60px] resize-none"
+                />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">Terms & Conditions</Label>
+                <Textarea
+                  value={quote.terms_and_conditions || ''}
+                  onChange={(e) => onUpdateQuote({ terms_and_conditions: e.target.value || null })}
+                  placeholder="Terms and conditions..."
+                  className="text-sm min-h-[60px] resize-none"
+                />
+              </div>
             </div>
-            <Separator />
-            <div className="flex justify-between text-base font-semibold">
-              <span>Total</span>
-              <span className="font-mono">${grandTotal.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {totalHours > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{totalHours.toFixed(1)} estimated hours</span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Valid Until */}
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Valid Until</Label>
-            <Input
-              type="date"
-              value={quote.valid_until || ''}
-              onChange={(e) => onUpdateQuote({ valid_until: e.target.value || null })}
-              className="h-8 text-sm"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Notes */}
-      <Card>
-        <CardContent className="pt-4 space-y-3">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Client Notes</Label>
-            <Textarea
-              value={quote.notes || ''}
-              onChange={(e) => onUpdateQuote({ notes: e.target.value || null })}
-              placeholder="Notes visible on the quote..."
-              className="text-sm min-h-[60px] resize-none"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Internal Notes</Label>
-            <Textarea
-              value={quote.internal_notes || ''}
-              onChange={(e) => onUpdateQuote({ internal_notes: e.target.value || null })}
-              placeholder="Private notes (not on PDF)..."
-              className="text-sm min-h-[60px] resize-none"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Terms */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Terms & Conditions</Label>
-            <Textarea
-              value={quote.terms_and_conditions || ''}
-              onChange={(e) =>
-                onUpdateQuote({ terms_and_conditions: e.target.value || null })
-              }
-              placeholder="Terms and conditions..."
-              className="text-sm min-h-[80px] resize-none"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <div className="space-y-2">
-        <Button
-          onClick={onSave}
-          disabled={isSaving}
-          className="w-full gap-2"
-        >
-          {isSaving ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Save className="w-4 h-4" />
-          )}
-          {hasUnsavedChanges ? 'Save Changes' : 'Saved'}
-        </Button>
-
-        <Button variant="outline" className="w-full gap-2" onClick={onNavigatePreview}>
-          <FileText className="w-4 h-4" />
-          Preview PDF
-        </Button>
-
-        <Separator />
-
-        <div className="grid grid-cols-2 gap-2">
-          {quote.status === 'draft' && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              onClick={() => onStatusChange('sent')}
-            >
-              <Send className="w-3.5 h-3.5" />
-              Mark Sent
-            </Button>
-          )}
-          {(quote.status === 'draft' || quote.status === 'sent') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-success border-success/30 hover:bg-success/10"
-              onClick={() => onStatusChange('accepted')}
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Accepted
-            </Button>
-          )}
-          {(quote.status === 'sent') && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
-              onClick={() => onStatusChange('declined')}
-            >
-              <XCircle className="w-3.5 h-3.5" />
-              Declined
-            </Button>
-          )}
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </div>
   );

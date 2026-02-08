@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,57 +25,11 @@ import {
   Trash2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { QuoteLineItemRow, FormattedNumberInput } from './QuoteLineItemRow';
 import { DeleteParentDialog } from './DeleteParentDialog';
 import { calculateAggregatedValues } from '@/hooks/useQuoteLineItems';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
-
-// ─── Hooks ────────────────────────────────────────────────────────────
-
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < breakpoint : false
-  );
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-    const handler = () => setIsMobile(mq.matches);
-    mq.addEventListener('change', handler);
-    setIsMobile(mq.matches);
-    return () => mq.removeEventListener('change', handler);
-  }, [breakpoint]);
-  return isMobile;
-}
-
-// ─── Column resize config ──────────────────────────────────────────────
-
-const DEFAULT_COL_WIDTHS: Record<string, number> = {
-  qty: 90,
-  cost: 110,
-  margin: 90,
-  sell: 110,
-  hours: 90,
-  total: 120,
-};
-
-const MIN_COL_WIDTHS: Record<string, number> = {
-  qty: 50,
-  cost: 60,
-  margin: 50,
-  sell: 60,
-  hours: 50,
-  total: 70,
-};
-
-const RESIZABLE_COLS = ['qty', 'cost', 'margin', 'sell', 'hours', 'total'] as const;
-
-const COL_LABELS: Record<string, string> = {
-  qty: 'Qty',
-  cost: 'Cost',
-  margin: 'Margin %',
-  sell: 'Sell',
-  hours: 'Hours',
-  total: 'Total',
-};
 
 // ─── Props ──────────────────────────────────────────────────────────
 
@@ -96,6 +50,17 @@ interface QuoteLineItemsTableProps {
   onGroupIntoParent: (itemId: string, parentId: string) => void;
   onCreateGroupFromItem: (itemId: string) => void;
 }
+
+// ─── Column config ─────────────────────────────────────────────────
+
+const COL_LABELS: Record<string, string> = {
+  qty: 'Qty',
+  cost: 'Cost',
+  margin: 'Margin %',
+  sell: 'Sell',
+  hours: 'Hours',
+  total: 'Total',
+};
 
 // ─── Component ──────────────────────────────────────────────────────
 
@@ -118,8 +83,6 @@ export function QuoteLineItemsTable({
 }: QuoteLineItemsTableProps) {
   const isMobile = useIsMobile();
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; description: string; childCount: number } | null>(null);
-  const [colWidths, setColWidths] = useState(DEFAULT_COL_WIDTHS);
-  const tableRef = useRef<HTMLTableElement>(null);
 
   // ── Build flat rows from hierarchy ──
 
@@ -211,35 +174,6 @@ export function QuoteLineItemsTable({
     }
   }, [deleteTarget, onUngroupParent]);
 
-  // ── Column resize handlers ──
-
-  const handleResizeStart = useCallback((colKey: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startWidth = colWidths[colKey];
-
-    document.body.classList.add('col-resizing');
-
-    const onMove = (moveEvent: MouseEvent) => {
-      const diff = moveEvent.clientX - startX;
-      const min = MIN_COL_WIDTHS[colKey] || 50;
-      setColWidths(prev => ({
-        ...prev,
-        [colKey]: Math.max(min, startWidth + diff),
-      }));
-    };
-
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.classList.remove('col-resizing');
-    };
-
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [colWidths]);
-
   // ── Mobile number change handler ──
 
   const handleMobileNumberChange = useCallback(
@@ -272,10 +206,10 @@ export function QuoteLineItemsTable({
 
   return (
     <>
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div>
         {isMobile ? (
           /* ═══════════ MOBILE: Card-based view ═══════════ */
-          <div className="p-2 space-y-3">
+          <div className="space-y-3">
             {lineItems.map((parent, parentIndex) => {
               const hasChildren = parent.subItems.length > 0;
               const aggregated = hasChildren ? calculateAggregatedValues(parent) : undefined;
@@ -293,7 +227,7 @@ export function QuoteLineItemsTable({
                 <div
                   key={parent.id}
                   className={cn(
-                    'rounded-lg border border-border bg-card shadow-sm overflow-hidden',
+                    'rounded-lg border border-border/60 bg-card shadow-sm overflow-hidden',
                     parent.is_optional && 'opacity-60 italic',
                     parent._isNew && 'animate-slide-up'
                   )}
@@ -301,31 +235,30 @@ export function QuoteLineItemsTable({
                   {/* Parent header */}
                   <div className={cn(
                     'p-3',
-                    hasChildren && 'bg-muted/30 border-b border-border/50'
+                    hasChildren && 'bg-muted/20 border-b border-border/40'
                   )}>
-                    {/* Top row: reorder + description + total + actions */}
                     <div className="flex items-center gap-1.5">
                       <div className="flex items-center gap-0.5 shrink-0">
                         <div className="flex flex-col">
                           <button
                             onClick={() => onReorderParent(parent.id, 'up')}
                             disabled={!canMoveUp}
-                            className="p-0 h-4 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                            className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
                           >
-                            <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                            <ArrowUp className="w-3.5 h-3.5 text-muted-foreground" />
                           </button>
                           <button
                             onClick={() => onReorderParent(parent.id, 'down')}
                             disabled={!canMoveDown}
-                            className="p-0 h-4 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                            className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
                           >
-                            <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                            <ArrowDown className="w-3.5 h-3.5 text-muted-foreground" />
                           </button>
                         </div>
                         {hasChildren && (
                           <button
                             onClick={() => onToggleExpand(parent.id)}
-                            className="p-0.5 rounded hover:bg-muted"
+                            className="p-1 rounded hover:bg-muted"
                           >
                             {(parent._isExpanded !== false) ? (
                               <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -339,8 +272,8 @@ export function QuoteLineItemsTable({
                       <input
                         value={parent.description}
                         onChange={(e) => onUpdate(parent.id, { description: e.target.value })}
-                        className="flex-1 min-w-0 h-9 px-2 text-sm rounded-md border border-transparent bg-transparent font-medium hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring"
-                        placeholder="Group name"
+                        className="flex-1 min-w-0 h-11 px-2 text-sm rounded-md border border-transparent bg-transparent font-medium hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring"
+                        placeholder="Item description"
                       />
 
                       <span className="font-mono text-sm font-medium shrink-0 tabular-nums">
@@ -349,7 +282,7 @@ export function QuoteLineItemsTable({
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -407,58 +340,58 @@ export function QuoteLineItemsTable({
                       </DropdownMenu>
                     </div>
 
-                    {/* Number fields for parent without children */}
+                    {/* Number fields — 2-column grid for better tap targets */}
                     {!isReadOnly && (
-                      <div className="grid grid-cols-3 gap-2 mt-2">
+                      <div className="grid grid-cols-2 gap-2 mt-3">
                         <div>
-                          <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Qty</label>
+                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Qty</label>
                           <FormattedNumberInput
                             value={parent.quantity || ''}
                             onChange={(v) => handleMobileNumberChange(parent.id, 'quantity', v)}
-                            className="h-9"
+                            className="h-11"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost</label>
-                          <FormattedNumberInput
-                            value={parent.cost_price || ''}
-                            onChange={(v) => handleMobileNumberChange(parent.id, 'cost_price', v)}
-                            highlight={highlights.has('cost_price')}
-                            className="h-9"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sell</label>
+                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Sell</label>
                           <FormattedNumberInput
                             value={parent.sell_price || ''}
                             onChange={(v) => handleMobileNumberChange(parent.id, 'sell_price', v)}
                             highlight={highlights.has('sell_price')}
-                            className="h-9"
+                            className="h-11"
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Margin %</label>
+                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Cost</label>
+                          <FormattedNumberInput
+                            value={parent.cost_price || ''}
+                            onChange={(v) => handleMobileNumberChange(parent.id, 'cost_price', v)}
+                            highlight={highlights.has('cost_price')}
+                            className="h-11"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Margin %</label>
                           <FormattedNumberInput
                             value={parent.margin_percentage || ''}
                             onChange={(v) => handleMobileNumberChange(parent.id, 'margin_percentage', v)}
                             highlight={highlights.has('margin_percentage')}
-                            className="h-9"
+                            className="h-11"
                           />
                         </div>
-                        <div>
-                          <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Hours</label>
+                        <div className="col-span-2">
+                          <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Hours</label>
                           <FormattedNumberInput
                             value={parent.estimated_hours || ''}
                             onChange={(v) => handleMobileNumberChange(parent.id, 'estimated_hours', v)}
-                            className="h-9"
+                            className="h-11"
                           />
                         </div>
                       </div>
                     )}
 
-                    {/* Read-only aggregated values for parent groups */}
+                    {/* Read-only aggregated for parent groups */}
                     {isReadOnly && (
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-muted-foreground font-mono">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground font-mono">
                         <span>Cost ${displayCost.toFixed(2)}</span>
                         <span>Margin {displayMargin.toFixed(1)}%</span>
                         <span>Sell ${displaySell.toFixed(2)}</span>
@@ -467,7 +400,7 @@ export function QuoteLineItemsTable({
                     )}
                   </div>
 
-                  {/* Children — nested inside the parent card */}
+                  {/* Children */}
                   {hasChildren && parent._isExpanded !== false && (
                     <div className="divide-y divide-border/30">
                       {parent.subItems.map((child, childIndex) => {
@@ -479,36 +412,33 @@ export function QuoteLineItemsTable({
                           <div
                             key={child.id}
                             className={cn(
-                              'p-3 pl-6 bg-background/50',
+                              'p-3 pl-4 bg-background/50 border-l-2 border-primary/10 ml-3',
                               child.is_optional && 'opacity-60 italic',
                               child._isNew && 'animate-slide-up'
                             )}
                           >
                             <div className="flex items-center gap-1.5">
-                              <div className="flex items-center gap-0.5 shrink-0">
-                                <div className="flex flex-col">
-                                  <button
-                                    onClick={() => onReorderSubItem(parent.id, child.id, 'up')}
-                                    disabled={!canChildMoveUp}
-                                    className="p-0 h-4 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
-                                  >
-                                    <ArrowUp className="w-3 h-3 text-muted-foreground" />
-                                  </button>
-                                  <button
-                                    onClick={() => onReorderSubItem(parent.id, child.id, 'down')}
-                                    disabled={!canChildMoveDown}
-                                    className="p-0 h-4 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
-                                  >
-                                    <ArrowDown className="w-3 h-3 text-muted-foreground" />
-                                  </button>
-                                </div>
-                                <span className="block w-2 h-px bg-border" />
+                              <div className="flex flex-col shrink-0">
+                                <button
+                                  onClick={() => onReorderSubItem(parent.id, child.id, 'up')}
+                                  disabled={!canChildMoveUp}
+                                  className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                                >
+                                  <ArrowUp className="w-3 h-3 text-muted-foreground" />
+                                </button>
+                                <button
+                                  onClick={() => onReorderSubItem(parent.id, child.id, 'down')}
+                                  disabled={!canChildMoveDown}
+                                  className="p-0 h-5 w-5 flex items-center justify-center rounded hover:bg-muted disabled:opacity-20"
+                                >
+                                  <ArrowDown className="w-3 h-3 text-muted-foreground" />
+                                </button>
                               </div>
 
                               <input
                                 value={child.description}
                                 onChange={(e) => onUpdate(child.id, { description: e.target.value })}
-                                className="flex-1 min-w-0 h-9 px-2 text-sm rounded-md border border-transparent bg-transparent hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring"
+                                className="flex-1 min-w-0 h-11 px-2 text-sm rounded-md border border-transparent bg-transparent hover:border-input focus:border-input focus:outline-none focus:ring-1 focus:ring-ring"
                                 placeholder="Sub-item"
                               />
 
@@ -518,7 +448,7 @@ export function QuoteLineItemsTable({
 
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                                  <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
                                     <MoreHorizontal className="w-4 h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -543,48 +473,49 @@ export function QuoteLineItemsTable({
                               </DropdownMenu>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 mt-2">
+                            {/* Child number fields — 2-column */}
+                            <div className="grid grid-cols-2 gap-2 mt-2">
                               <div>
-                                <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Qty</label>
+                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Qty</label>
                                 <FormattedNumberInput
                                   value={child.quantity || ''}
                                   onChange={(v) => handleMobileNumberChange(child.id, 'quantity', v)}
-                                  className="h-9"
+                                  className="h-11"
                                 />
                               </div>
                               <div>
-                                <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Cost</label>
-                                <FormattedNumberInput
-                                  value={child.cost_price || ''}
-                                  onChange={(v) => handleMobileNumberChange(child.id, 'cost_price', v)}
-                                  highlight={childHighlights.has('cost_price')}
-                                  className="h-9"
-                                />
-                              </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Sell</label>
+                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Sell</label>
                                 <FormattedNumberInput
                                   value={child.sell_price || ''}
                                   onChange={(v) => handleMobileNumberChange(child.id, 'sell_price', v)}
                                   highlight={childHighlights.has('sell_price')}
-                                  className="h-9"
+                                  className="h-11"
                                 />
                               </div>
                               <div>
-                                <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Margin %</label>
+                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Cost</label>
+                                <FormattedNumberInput
+                                  value={child.cost_price || ''}
+                                  onChange={(v) => handleMobileNumberChange(child.id, 'cost_price', v)}
+                                  highlight={childHighlights.has('cost_price')}
+                                  className="h-11"
+                                />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Margin %</label>
                                 <FormattedNumberInput
                                   value={child.margin_percentage || ''}
                                   onChange={(v) => handleMobileNumberChange(child.id, 'margin_percentage', v)}
                                   highlight={childHighlights.has('margin_percentage')}
-                                  className="h-9"
+                                  className="h-11"
                                 />
                               </div>
-                              <div>
-                                <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium">Hours</label>
+                              <div className="col-span-2">
+                                <label className="text-[10px] text-muted-foreground font-medium mb-1 block">Hours</label>
                                 <FormattedNumberInput
                                   value={child.estimated_hours || ''}
                                   onChange={(v) => handleMobileNumberChange(child.id, 'estimated_hours', v)}
-                                  className="h-9"
+                                  className="h-11"
                                 />
                               </div>
                             </div>
@@ -598,39 +529,39 @@ export function QuoteLineItemsTable({
             })}
 
             {lineItems.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                No line items yet. Add an item or import from Price Book.
+              <div className="text-center py-16 text-muted-foreground">
+                <p className="text-sm">No line items yet.</p>
+                <p className="text-xs mt-1">Add an item or import from Price Book.</p>
               </div>
             )}
           </div>
         ) : (
-          /* ═══════════ DESKTOP: Table with resizable columns ═══════════ */
+          /* ═══════════ DESKTOP: Clean flat table ═══════════ */
           <div className="overflow-x-auto">
-            <table ref={tableRef} className="w-full text-sm" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full text-sm">
               <colgroup>
                 <col style={{ width: 48 }} />
                 <col />
-                {RESIZABLE_COLS.map(col => (
-                  <col key={col} style={{ width: colWidths[col] }} />
-                ))}
+                <col style={{ width: 80 }} />
+                <col style={{ width: 100 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 100 }} />
+                <col style={{ width: 80 }} />
+                <col style={{ width: 110 }} />
                 <col style={{ width: 44 }} />
               </colgroup>
               <thead>
-                <tr className="border-b border-border bg-muted/40">
+                <tr className="border-b border-border">
                   <th className="w-12" />
-                  <th className="text-left py-2.5 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                  <th className="text-left py-2.5 px-1 font-medium text-muted-foreground text-xs">
                     Description
                   </th>
-                  {RESIZABLE_COLS.map(col => (
+                  {(['qty', 'cost', 'margin', 'sell', 'hours', 'total'] as const).map(col => (
                     <th
                       key={col}
-                      className="text-right py-2.5 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wider relative"
+                      className="text-right py-2.5 px-1 font-medium text-muted-foreground text-xs"
                     >
                       {COL_LABELS[col]}
-                      <div
-                        className="col-resize-handle"
-                        onMouseDown={(e) => handleResizeStart(col, e)}
-                      />
                     </th>
                   ))}
                   <th />
@@ -676,7 +607,7 @@ export function QuoteLineItemsTable({
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-muted-foreground">
+                    <td colSpan={9} className="text-center py-16 text-muted-foreground">
                       No line items yet. Add an item or import from Price Book.
                     </td>
                   </tr>
@@ -687,7 +618,7 @@ export function QuoteLineItemsTable({
         )}
 
         {/* Footer actions */}
-        <div className="flex items-center gap-2 p-3 border-t border-border bg-muted/20">
+        <div className="flex items-center gap-2 py-3 mt-2">
           <Button variant="outline" size="sm" onClick={onAddLineItem} className="gap-1.5">
             <Plus className="w-3.5 h-3.5" />
             Add Item
