@@ -26,17 +26,33 @@ export function RichTextEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const isInternalChange = useRef(false);
+  const initialised = useRef(false);
 
-  // Sync external value changes into the editor
+  // Set initial content on mount
   useEffect(() => {
-    if (editorRef.current && !isInternalChange.current) {
+    if (editorRef.current && !initialised.current) {
+      editorRef.current.innerHTML = value || '';
+      initialised.current = true;
+    }
+  }, []);
+
+  // Sync external value changes (e.g. server refetch) only when we're NOT the source
+  useEffect(() => {
+    if (!initialised.current) return;
+    if (isInternalChange.current) {
+      isInternalChange.current = false;
+      return;
+    }
+    if (editorRef.current) {
       const current = editorRef.current.innerHTML;
       const incoming = value || '';
       if (current !== incoming) {
-        editorRef.current.innerHTML = incoming;
+        // Only reset if the editor is NOT focused — prevents cursor jump
+        if (document.activeElement !== editorRef.current) {
+          editorRef.current.innerHTML = incoming;
+        }
       }
     }
-    isInternalChange.current = false;
   }, [value]);
 
   const handleInput = useCallback(() => {
@@ -110,7 +126,6 @@ export function RichTextEditor({
             '[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1',
             '[&_li]:my-0.5'
           )}
-          dangerouslySetInnerHTML={{ __html: value || '' }}
         />
       </div>
     </div>
