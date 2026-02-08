@@ -77,16 +77,17 @@ export function usePriceBook() {
   return useQuery({
     queryKey: ['price_book_items'],
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('price_book_items')
         .select('*')
         .order('is_global', { ascending: false })
         .order('category')
         .order('name');
-      
+
       if (error) throw error;
       return (data || []).map(parsePriceBookItem);
     },
+    retry: 2,
   });
 }
 
@@ -94,20 +95,21 @@ export function usePriceBookByCategory(category?: PriceBookCategory) {
   return useQuery({
     queryKey: ['price_book_items', 'category', category],
     queryFn: async () => {
-      let query = (supabase as any)
+      let query = supabase
         .from('price_book_items')
         .select('*')
         .order('is_global', { ascending: false })
         .order('name');
-      
+
       if (category) {
         query = query.eq('category', category);
       }
-      
+
       const { data, error } = await query;
       if (error) throw error;
       return (data || []).map(parsePriceBookItem);
     },
+    retry: 2,
   });
 }
 
@@ -127,7 +129,7 @@ export function useCreatePriceBookItem() {
       
       if (!profile?.organization_id) throw new Error('No organization found');
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('price_book_items')
         .insert({
           name: input.name,
@@ -163,7 +165,7 @@ export function useUpdatePriceBookItem() {
     mutationFn: async (input: UpdatePriceBookItemInput) => {
       const { id, ...updates } = input;
       
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('price_book_items')
         .update(updates)
         .eq('id', id)
@@ -188,7 +190,7 @@ export function useDeletePriceBookItem() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('price_book_items')
         .delete()
         .eq('id', id);

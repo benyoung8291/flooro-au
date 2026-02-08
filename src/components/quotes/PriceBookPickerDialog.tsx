@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search, Plus, Check } from 'lucide-react';
+import { Search, Plus, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import {
   usePriceBook,
   CATEGORY_LABELS,
@@ -39,7 +39,7 @@ export function PriceBookPickerDialog({
   onOpenChange,
   onSelect,
 }: PriceBookPickerDialogProps) {
-  const { data: items = [], isLoading } = usePriceBook();
+  const { data: items = [], isLoading, error, refetch } = usePriceBook();
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -103,10 +103,20 @@ export function PriceBookPickerDialog({
 
         <ScrollArea className="flex-1 min-h-0 max-h-[55vh]">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">Loading...</div>
+            <div className="text-center py-8 text-muted-foreground text-sm">Loading price book items...</div>
+          ) : error ? (
+            <div className="text-center py-8 space-y-3">
+              <AlertCircle className="w-8 h-8 text-destructive mx-auto" />
+              <p className="text-sm text-destructive">Failed to load price book items</p>
+              <p className="text-xs text-muted-foreground">{(error as Error).message}</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()} className="gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5" />
+                Retry
+              </Button>
+            </div>
           ) : grouped.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">
-              No items found
+              {search.trim() ? 'No items match your search' : 'No price book items yet. Add items from the Price Book page.'}
             </div>
           ) : (
             <div className="space-y-4 pr-4">

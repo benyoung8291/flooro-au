@@ -172,10 +172,10 @@ export default function QuoteEditor() {
       </header>
 
       {/* Body — full-width layout */}
-      <main className="px-4 lg:px-6 py-6">
+      <main className="px-4 lg:px-6 py-6 space-y-4">
+        {/* Top section: client details + summary sidebar */}
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Main content — full width */}
-          <div className="flex-1 min-w-0 space-y-4">
+          <div className="flex-1 min-w-0">
             <QuoteClientCard
               clientName={quote.client_name}
               clientEmail={quote.client_email}
@@ -184,27 +184,6 @@ export default function QuoteEditor() {
               title={quote.title}
               description={quote.description}
               onUpdate={handleUpdateQuote}
-            />
-
-            <QuoteLineItemsTable
-              lineItems={lineItems}
-              onUpdate={updateLineItem}
-              onUpdatePricing={updateLineItemPricing}
-              onAddLineItem={() => addLineItem()}
-              onAddSubItem={addSubItem}
-              onRemove={removeLineItem}
-              onDuplicate={duplicateLineItem}
-              onToggleExpand={toggleExpanded}
-              onReorderParent={reorderParent}
-              onReorderSubItem={reorderSubItem}
-              onUngroupParent={ungroupParent}
-              onPromoteSubItem={promoteSubItem}
-              onGroupIntoParent={groupIntoParent}
-              onCreateGroupFromItem={createGroupFromItem}
-              onOpenPriceBook={() => {
-                setPriceBookParentId(null);
-                setPriceBookOpen(true);
-              }}
             />
           </div>
 
@@ -224,6 +203,28 @@ export default function QuoteEditor() {
             </div>
           </aside>
         </div>
+
+        {/* Line items — full width, not constrained by sidebar */}
+        <QuoteLineItemsTable
+          lineItems={lineItems}
+          onUpdate={updateLineItem}
+          onUpdatePricing={updateLineItemPricing}
+          onAddLineItem={() => addLineItem()}
+          onAddSubItem={addSubItem}
+          onRemove={removeLineItem}
+          onDuplicate={duplicateLineItem}
+          onToggleExpand={toggleExpanded}
+          onReorderParent={reorderParent}
+          onReorderSubItem={reorderSubItem}
+          onUngroupParent={ungroupParent}
+          onPromoteSubItem={promoteSubItem}
+          onGroupIntoParent={groupIntoParent}
+          onCreateGroupFromItem={createGroupFromItem}
+          onOpenPriceBook={() => {
+            setPriceBookParentId(null);
+            setPriceBookOpen(true);
+          }}
+        />
       </main>
 
       {/* Price Book Picker */}
