@@ -20,6 +20,8 @@ interface QuoteLineItemsTableProps {
   onReorderSubItem: (parentId: string, childId: string, direction: 'up' | 'down') => void;
   onUngroupParent: (parentId: string) => void;
   onPromoteSubItem: (childId: string) => void;
+  onGroupIntoParent: (itemId: string, parentId: string) => void;
+  onCreateGroupFromItem: (itemId: string) => void;
 }
 
 export function QuoteLineItemsTable({
@@ -36,6 +38,8 @@ export function QuoteLineItemsTable({
   onReorderSubItem,
   onUngroupParent,
   onPromoteSubItem,
+  onGroupIntoParent,
+  onCreateGroupFromItem,
 }: QuoteLineItemsTableProps) {
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; description: string; childCount: number } | null>(null);
 
@@ -89,6 +93,14 @@ export function QuoteLineItemsTable({
       }
     }
     return result;
+  }, [lineItems]);
+
+  // Available parents for grouping: all top-level items that are not the current item
+  // (includes both groups with children and standalone items that could become groups)
+  const availableParentGroups = useMemo(() => {
+    return lineItems
+      .filter(p => p.subItems.length > 0) // only show existing groups
+      .map(p => ({ id: p.id, description: p.description }));
   }, [lineItems]);
 
   const handleDeleteWithConfirm = useCallback((id: string) => {
@@ -180,6 +192,12 @@ export function QuoteLineItemsTable({
                   onUngroup={!isChild && hasChildren ? () => onUngroupParent(item.id) : undefined}
                   onPromote={isChild ? () => onPromoteSubItem(item.id) : undefined}
                   onDeleteWithConfirm={handleDeleteWithConfirm}
+                  onGroupInto={!isChild && !hasChildren ? onGroupIntoParent : undefined}
+                  onCreateGroup={!isChild && !hasChildren ? onCreateGroupFromItem : undefined}
+                  availableParents={!isChild && !hasChildren
+                    ? availableParentGroups.filter(p => p.id !== item.id)
+                    : undefined
+                  }
                 />
               ))}
               {rows.length === 0 && (
