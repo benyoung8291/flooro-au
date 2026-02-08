@@ -608,11 +608,14 @@ export default function ProjectEditor() {
       
       try {
         const rollSpecs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
+        const covingHeightMm = room.accessories?.coving?.enabled ? (room.accessories.coving.heightMm || 100) : 0;
         const plan = calculateStripPlan(room, rollSpecs, scale, {
           fillDirection: room.fillDirection || 0,
           firstSeamOffset: room.seamOptions?.firstSeamOffset || 0,
           manualSeams: room.seamOptions?.manualSeams || [],
           avoidSeamZones: room.seamOptions?.avoidZones || [],
+          wasteOverride: room.wastePercent,
+          covingHeightMm,
         });
         
         plans.set(room.id, plan);

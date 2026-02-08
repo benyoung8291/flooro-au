@@ -10,14 +10,11 @@ import { StripPlanResult } from '@/lib/rollGoods/types';
 
 /**
  * Calculate total seam length from strip plan
+ * Uses the pre-calculated actual seam length (not extended rendering coordinates)
  */
 export function calculateSeamLengthFromPlan(stripPlan?: StripPlanResult): number {
   if (!stripPlan) return 0;
-  return stripPlan.seamLines.reduce((total, seam) => {
-    const dx = seam.x2 - seam.x1;
-    const dy = seam.y2 - seam.y1;
-    return total + Math.sqrt(dx * dx + dy * dy) / 1000; // Convert to meters
-  }, 0);
+  return stripPlan.totalSeamLengthM;
 }
 
 /**
@@ -153,18 +150,50 @@ export function calculateCoveFilletCorners(
 
 /**
  * Calculate weld rod requirements
+ * Uses actual seam length + net perimeter when coving is enabled
  */
 export function calculateWeldRod(
   room: Room,
+  scale: ScaleCalibration | null,
   stripPlan?: StripPlanResult,
   weldRodMaterial?: Material
-): AccessoryCalculation & { totalSeamLengthM: number } | undefined {
+): AccessoryCalculation & { totalSeamLengthM: number; seamLengthM: number; perimeterLengthM: number } | undefined {
   const accessories = room.accessories;
   if (!accessories?.weldRod?.enabled) return undefined;
   
+  // Actual seam length from strip plan (already correctly calculated, not extended)
   const seamLengthM = calculateSeamLengthFromPlan(stripPlan);
   
-  if (seamLengthM <= 0) return undefined;
+  // Calculate perimeter contribution when coving is enabled
+  let perimeterLengthM = 0;
+  if (accessories.coving?.enabled) {
+    const perimeterPixels = calculatePerimeter(room.points);
+    const pixelsPerMm = scale?.pixelsPerMm || 1;
+    const perimeterM = perimeterPixels / pixelsPerMm / 1000;
+    const doorWidthsM = room.doors.reduce((total, door) => total + door.width / 1000, 0);
+    
+    // Subtract excluded walls
+    let excludedLengthM = 0;
+    if (accessories.coving.excludeWalls && accessories.coving.excludeWalls.length > 0 && scale) {
+      const points = room.points;
+      for (const wallIndex of accessories.coving.excludeWalls) {
+        if (wallIndex >= 0 && wallIndex < points.length) {
+          const start = points[wallIndex];
+          const end = points[(wallIndex + 1) % points.length];
+          const dx = end.x - start.x;
+          const dy = end.y - start.y;
+          const wallLengthPixels = Math.sqrt(dx * dx + dy * dy);
+          excludedLengthM += wallLengthPixels / pixelsPerMm / 1000;
+        }
+      }
+    }
+    
+    perimeterLengthM = Math.max(0, perimeterM - doorWidthsM - excludedLengthM);
+  }
+  
+  const totalWeldRodM = seamLengthM + perimeterLengthM;
+  
+  if (totalWeldRodM <= 0) return undefined;
   
   // Get price from material or default
   const pricePerLinearM = (weldRodMaterial?.specs as Record<string, unknown>)?.pricePerLinearM;
@@ -172,16 +201,23 @@ export function calculateWeldRod(
                     weldRodMaterial?.specs?.price || 
                     2; // Default $2/m
   
+  const detailParts = [`${seamLengthM.toFixed(2)}m seams`];
+  if (perimeterLengthM > 0) {
+    detailParts.push(`${perimeterLengthM.toFixed(2)}m perimeter`);
+  }
+  
   return {
     accessoryType: 'weld_rod',
     materialId: accessories.weldRod.materialId,
     materialName: weldRodMaterial?.name || 'Weld Rod',
-    quantity: seamLengthM,
+    quantity: totalWeldRodM,
     unit: 'm',
     unitPrice,
-    totalCost: seamLengthM * unitPrice,
-    totalSeamLengthM: seamLengthM,
-    details: `${seamLengthM.toFixed(2)}m seams`,
+    totalCost: totalWeldRodM * unitPrice,
+    totalSeamLengthM: totalWeldRodM,
+    seamLengthM,
+    perimeterLengthM,
+    details: detailParts.join(' + '),
   };
 }
 
@@ -382,7 +418,7 @@ export function calculateRoomAccessories(
   const coveFilletCorners = accessories?.coving?.enabled 
     ? calculateCoveFilletCorners(room, findMaterial(accessories?.coving?.materialId))
     : undefined;
-  const weldRod = calculateWeldRod(room, stripPlan, findMaterial(accessories?.weldRod?.materialId));
+  const weldRod = calculateWeldRod(room, scale, stripPlan, findMaterial(accessories?.weldRod?.materialId));
   const smoothEdge = calculateSmoothEdge(room, scale, findMaterial(accessories?.smoothEdge?.materialId));
   const transitions = calculateTransitions(room, materials);
   const underlayment = calculateUnderlayment(room, areaM2, findMaterial(accessories?.underlayment?.materialId));

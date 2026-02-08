@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Room, ScaleCalibration, RoomAccessories, CovingConfig, WeldRodConfig, SmoothEdgeConfig, UnderlaymentConfig, AdhesiveConfig, TransitionConfig } from '@/lib/canvas/types';
+import { StripPlanResult } from '@/lib/rollGoods/types';
 import { Material } from '@/hooks/useMaterials';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -37,7 +38,7 @@ interface AccessoriesPanelProps {
   scale: ScaleCalibration | null;
   materials: Material[];
   onUpdateAccessories: (accessories: RoomAccessories) => void;
-  stripPlan?: { seamLines: Array<{ x1: number; y1: number; x2: number; y2: number }> };
+  stripPlan?: StripPlanResult;
 }
 
 export function AccessoriesPanel({ 
@@ -62,12 +63,12 @@ export function AccessoriesPanel({
   const doorWidthsM = room.doors.reduce((total, door) => total + door.width / 1000, 0);
   const netPerimeterM = Math.max(0, perimeterM - doorWidthsM);
   
-  // Calculate seam length
-  const seamLengthM = stripPlan?.seamLines.reduce((total, seam) => {
-    const dx = seam.x2 - seam.x1;
-    const dy = seam.y2 - seam.y1;
-    return total + Math.sqrt(dx * dx + dy * dy) / 1000;
-  }, 0) || 0;
+  // Calculate actual seam length from strip plan (not extended rendering coordinates)
+  const seamLengthM = (stripPlan as StripPlanResult)?.totalSeamLengthM || 0;
+  
+  // Calculate perimeter contribution for weld rod when coving enabled
+  const covingEnabled = accessories.coving?.enabled || false;
+  const covingHeightMm = accessories.coving?.heightMm || 100;
   
   // Calculate current accessory costs
   const accessoryCalc = calculateRoomAccessories(
@@ -170,8 +171,9 @@ export function AccessoriesPanel({
             <div>Area: <span className="font-mono">{netAreaM2.toFixed(2)} m²</span></div>
             <div>Perimeter: <span className="font-mono">{netPerimeterM.toFixed(2)} m</span></div>
             <div>Doors: <span className="font-mono">{room.doors.length}</span></div>
-            {seamLengthM > 0 && (
-              <div>Seams: <span className="font-mono">{seamLengthM.toFixed(2)} m</span></div>
+            <div>Seams: <span className="font-mono">{seamLengthM.toFixed(2)} m</span></div>
+            {covingEnabled && (
+              <div>Weld Rod: <span className="font-mono">{(seamLengthM + netPerimeterM).toFixed(2)} m</span></div>
             )}
           </div>
         </div>
@@ -226,12 +228,17 @@ export function AccessoriesPanel({
                 </div>
                 
                 {accessories.coving?.enabled && accessoryCalc.coving && (
-                  <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
-                    <span>Estimated Cost:</span>
-                    <span className="font-mono font-medium">
-                      ${accessoryCalc.coving.totalCost.toFixed(2)}
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
+                      <span>Estimated Cost:</span>
+                      <span className="font-mono font-medium">
+                        ${accessoryCalc.coving.totalCost.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded bg-muted text-xs text-muted-foreground">
+                      Drops extended by +{(covingHeightMm * 2)}mm for {covingHeightMm}mm coving
+                    </div>
+                  </>
                 )}
                 
                 {accessories.coving?.enabled && accessoryCalc.coveFilletCorners && (
@@ -318,9 +325,11 @@ export function AccessoriesPanel({
                   <span className="text-sm font-medium">{ACCESSORY_TYPES.weld_rod.label}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {accessories.weldRod?.enabled && seamLengthM > 0 && (
+                  {accessories.weldRod?.enabled && (
                     <Badge variant="secondary" className="text-xs">
-                      {seamLengthM.toFixed(1)}m
+                      {covingEnabled 
+                        ? `${(seamLengthM + netPerimeterM).toFixed(1)}m` 
+                        : `${seamLengthM.toFixed(1)}m`}
                     </Badge>
                   )}
                   <Switch 
@@ -339,7 +348,7 @@ export function AccessoriesPanel({
               <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
                 <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.weld_rod.description}</p>
                 
-                {seamLengthM > 0 ? (
+                {seamLengthM > 0 || covingEnabled ? (
                   <>
                     <div className="flex items-center gap-2">
                       <Switch 
@@ -350,12 +359,25 @@ export function AccessoriesPanel({
                       <Label htmlFor="colorMatch" className="text-xs">Color matched to material</Label>
                     </div>
                     
-                    {accessories.weldRod?.enabled && accessoryCalc.weldRod && (
-                      <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
-                        <span>Estimated Cost:</span>
-                        <span className="font-mono font-medium">
-                          ${accessoryCalc.weldRod.totalCost.toFixed(2)}
-                        </span>
+                    {accessories.weldRod?.enabled && (
+                      <div className="space-y-1.5">
+                        {/* Breakdown */}
+                        <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                          <div>Seams: <span className="font-mono">{seamLengthM.toFixed(2)}m</span></div>
+                          {covingEnabled && (
+                            <div>Perimeter: <span className="font-mono">{netPerimeterM.toFixed(2)}m</span></div>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-primary/10 text-xs">
+                          <span>Total: {covingEnabled 
+                            ? `${seamLengthM.toFixed(1)}m + ${netPerimeterM.toFixed(1)}m = ${(seamLengthM + netPerimeterM).toFixed(1)}m`
+                            : `${seamLengthM.toFixed(1)}m`}</span>
+                          {accessoryCalc.weldRod && (
+                            <span className="font-mono font-medium">
+                              ${accessoryCalc.weldRod.totalCost.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
                   </>

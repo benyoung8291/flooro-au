@@ -191,7 +191,13 @@ export function calculateStripPlan(
 
   // Calculate strip length with pattern matching
   // First strip is the reference - subsequent strips need pattern offset
-  const baseStripLength = roomLength;
+  let baseStripLength = roomLength;
+  
+  // Extend strip length for wall coving (vinyl runs up both walls)
+  const covingExtension = (options.covingHeightMm && options.covingHeightMm > 0)
+    ? 2 * options.covingHeightMm
+    : 0;
+  baseStripLength += covingExtension;
   
   const strips: Strip[] = [];
   const seamLines: SeamLine[] = [];
@@ -199,6 +205,7 @@ export function calculateStripPlan(
   let totalMaterialMm2 = 0;
   let totalRollLengthMm = 0;
   let cumulativePatternOffset = 0;
+  let seamCount = 0;
 
   for (let i = 0; i < totalStrips; i++) {
     const isLastStrip = i === totalStrips - 1 && hasPartialStrip;
@@ -284,6 +291,7 @@ export function calculateStripPlan(
 
     // Generate seam line between this strip and the previous one
     if (i > 0) {
+      seamCount++;
       // Seam position accounts for offset (in working/rotated coordinate space)
       const seamPos = (i * rollWidth) - normalizedOffset;
       
@@ -384,6 +392,11 @@ export function calculateStripPlan(
     materialCost = totalMaterialAreaM2 * pricePerM2;
   }
 
+  // Calculate actual seam lengths (not the extended rendering lines)
+  // Each seam's true length = room dimension in the strip direction
+  const totalSeamLengthMm = seamCount * roomLength;
+  const totalSeamLengthM = totalSeamLengthMm / 1000;
+
   return {
     roomId: room.id,
     roomName: room.name,
@@ -406,6 +419,10 @@ export function calculateStripPlan(
     wastePercent,
     
     utilizationPercent,
+    
+    totalSeamLengthMm,
+    totalSeamLengthM,
+    
     materialCost,
     pricingMethod,
     fullRolls,

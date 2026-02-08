@@ -92,6 +92,10 @@ export interface StripPlanResult {
   // Efficiency
   utilizationPercent: number;
   
+  // Actual seam lengths (not extended for rendering)
+  totalSeamLengthMm: number;
+  totalSeamLengthM: number;
+  
   // Cost breakdown
   materialCost: number;
   pricingMethod: 'per_m2' | 'per_roll' | 'per_linear_m' | 'mixed';
@@ -130,6 +134,9 @@ export interface StripPlanOptions {
 
   // Override waste percentage (from report-level settings)
   wasteOverride?: number;
+  
+  // Wall coving extension: each strip length extended by 2x this value (mm)
+  covingHeightMm?: number;
 }
 
 /**

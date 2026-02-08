@@ -87,6 +87,7 @@ export interface Room {
   tilePattern?: 'grid' | 'brick' | 'thirds' | 'herringbone' | 'basketweave' | 'diagonal'; // For tile materials
   edgeTransitions?: EdgeTransition[]; // Edges that are transitions, not walls
   edgeCurves?: EdgeCurve[]; // Curve data per edge, indexed same as points
+  wastePercent?: number; // Per-room waste override (undefined = use material default)
   
   // Seam management options
   seamOptions?: {
