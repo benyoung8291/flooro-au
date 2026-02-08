@@ -21,17 +21,17 @@ import {
 
 export default function Dashboard() {
   const { user, signOut } = useAuth();
-  const { data: profile, isLoading: profileLoading } = useUserProfile();
+  const { data: profile, isLoading: profileLoading, isRefetching: profileRefetching } = useUserProfile();
   const { data: organization, isLoading: orgLoading } = useUserOrganization();
   const isPlatformAdmin = useIsPlatformAdmin();
   const stats = useProjectStats();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!profileLoading && profile && !profile.organization_id) {
+    if (!profileLoading && !profileRefetching && profile && !profile.organization_id) {
       navigate('/onboarding');
     }
-  }, [profile, profileLoading, navigate]);
+  }, [profile, profileLoading, profileRefetching, navigate]);
 
   const handleSignOut = async () => {
     await signOut();

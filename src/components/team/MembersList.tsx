@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTeamMembers, useDeleteTeamMember, useUpdateTeamMember, OrganizationMember } from '@/hooks/useTeamMembers';
+import { useOrgAccessRequests, useApproveAccessRequest, useDenyAccessRequest } from '@/hooks/useAccessRequests';
 import { useHasRole } from '@/hooks/useUserProfile';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,7 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { MoreHorizontal, UserPlus, Shield, User, Eye, Trash2, Ban, CheckCircle2, Users } from 'lucide-react';
+import { MoreHorizontal, UserPlus, Shield, User, Eye, Trash2, Ban, CheckCircle2, Users, Clock, XCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { AddMemberDialog } from './AddMemberDialog';
 import { format } from 'date-fns';
@@ -46,6 +47,87 @@ const statusConfig = {
   active: { label: 'Active', className: 'bg-success/10 text-success border-success/20' },
   suspended: { label: 'Suspended', className: 'bg-destructive/10 text-destructive border-destructive/20' },
 };
+
+function PendingAccessRequests() {
+  const { data: requests, isLoading } = useOrgAccessRequests();
+  const approveRequest = useApproveAccessRequest();
+  const denyRequest = useDenyAccessRequest();
+  const { toast } = useToast();
+
+  if (isLoading || !requests?.length) return null;
+
+  const handleApprove = async (requestId: string, email: string) => {
+    try {
+      await approveRequest.mutateAsync(requestId);
+      toast({ title: 'Request approved', description: `${email} has been added to your organisation.` });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeny = async (requestId: string, email: string) => {
+    try {
+      await denyRequest.mutateAsync(requestId);
+      toast({ title: 'Request denied', description: `${email}'s request has been denied.` });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card className="border-primary/20 bg-primary/5 mb-4">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Clock className="h-4 w-4 text-primary" />
+          Pending Access Requests
+          <Badge variant="secondary" className="ml-1">
+            {requests.length}
+          </Badge>
+        </CardTitle>
+        <CardDescription>
+          People requesting to join your organisation
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {requests.map((req) => (
+          <div
+            key={req.id}
+            className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-foreground truncate">
+                {req.full_name || 'Unknown'}
+              </p>
+              <p className="text-sm text-muted-foreground truncate">{req.email}</p>
+              <p className="text-xs text-muted-foreground">
+                Requested {format(new Date(req.created_at), 'MMM d, yyyy')}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 ml-4 shrink-0">
+              <Button
+                size="sm"
+                onClick={() => handleApprove(req.id, req.email)}
+                disabled={approveRequest.isPending || denyRequest.isPending}
+              >
+                <CheckCircle2 className="h-4 w-4 mr-1" />
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleDeny(req.id, req.email)}
+                disabled={approveRequest.isPending || denyRequest.isPending}
+              >
+                <XCircle className="h-4 w-4 mr-1" />
+                Deny
+              </Button>
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function MembersList() {
   const { toast } = useToast();
@@ -121,6 +203,9 @@ export function MembersList() {
 
   return (
     <>
+      {/* Pending access requests for admins */}
+      {isAdmin && <PendingAccessRequests />}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -129,7 +214,7 @@ export function MembersList() {
               Team Members
             </CardTitle>
             <CardDescription>
-              Manage who has access to your organization
+              Manage who has access to your organisation
             </CardDescription>
           </div>
           {isAdmin && (
@@ -254,7 +339,7 @@ export function MembersList() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove team member?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove {selectedMember?.email} from your organization. 
+              This will remove {selectedMember?.email} from your organisation. 
               They will lose access to all projects.
             </AlertDialogDescription>
           </AlertDialogHeader>
