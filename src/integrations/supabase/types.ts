@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_requests: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          organization_id: string
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          organization_id: string
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          organization_id?: string
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       materials: {
         Row: {
           created_at: string
@@ -387,6 +431,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_access_request: {
+        Args: { _request_id: string }
+        Returns: undefined
+      }
+      check_domain_organizations: {
+        Args: never
+        Returns: {
+          org_id: string
+          org_name: string
+        }[]
+      }
       create_organization_for_user: {
         Args: { _name: string }
         Returns: {
@@ -409,6 +464,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      deny_access_request: { Args: { _request_id: string }; Returns: undefined }
       get_user_org_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
