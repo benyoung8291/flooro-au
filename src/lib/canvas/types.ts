@@ -89,6 +89,16 @@ export interface Room {
   edgeCurves?: EdgeCurve[]; // Curve data per edge, indexed same as points
   wastePercent?: number; // Per-room waste override (undefined = use material default)
   
+  // Installation cost configuration
+  installCost?: {
+    type: 'per_m2' | 'fixed';        // m2 rate or flat/day rate
+    rate: number;                     // $/m2 or fixed amount
+    sellRate?: number;                // sell price (if different from cost)
+    priceBookItemId?: string;         // link back to price book item
+    oohAllowance?: boolean;           // Out of Hours flag
+    oohMultiplier?: number;           // OOH multiplier (default 1.5)
+  };
+  
   // Seam management options
   seamOptions?: {
     firstSeamOffset?: number;      // Offset from starting edge (mm)

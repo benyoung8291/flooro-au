@@ -144,6 +144,59 @@ export type Database = {
         }
         Relationships: []
       }
+      price_book_items: {
+        Row: {
+          category: string
+          cost_rate: number
+          created_at: string
+          description: string | null
+          id: string
+          is_global: boolean
+          name: string
+          organization_id: string | null
+          pricing_type: string
+          sell_rate: number
+          specs: Json
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          cost_rate?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_global?: boolean
+          name: string
+          organization_id?: string | null
+          pricing_type?: string
+          sell_rate?: number
+          specs?: Json
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          cost_rate?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_global?: boolean
+          name?: string
+          organization_id?: string | null
+          pricing_type?: string
+          sell_rate?: number
+          specs?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "price_book_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
