@@ -129,16 +129,27 @@ export function TakeoffPanel({
     return { area: totalArea, cost: totalCost, roomsWithMaterial };
   }, [rooms, materials, scale]);
 
-  const formatArea = (room: Room): string => {
-    if (!scale) return '—';
+  const getNetAreaM2 = (room: Room): number => {
+    if (!scale) return 0;
     const netPx = calculateRoomNetArea(room);
-    const netM2 = netPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
-    if (room.holes.length > 0) {
-      const grossPx = calculatePolygonArea(room.points);
-      const grossM2 = grossPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
-      return `${netM2.toFixed(2)} m² (−${(grossM2 - netM2).toFixed(2)})`;
+    return netPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
+  };
+
+  const getOrderAreaM2 = (room: Room): number | null => {
+    if (!scale || !room.materialId) return null;
+    const material = allMaterialsMap.get(room.materialId);
+    if (!material) return null;
+    
+    // For roll goods, use strip plan result
+    const stripPlan = stripPlans?.get(room.id);
+    if (material.type === 'roll' && stripPlan) {
+      return stripPlan.totalMaterialAreaM2;
     }
-    return `${netM2.toFixed(2)} m²`;
+    
+    // For tiles/other, apply waste factor to net area
+    const netM2 = getNetAreaM2(room);
+    const wastePercent = room.wastePercent ?? (material.specs as any).wastePercent ?? 10;
+    return netM2 * (1 + wastePercent / 100);
   };
 
   const getRoomCost = (room: Room): number | null => {
@@ -346,9 +357,20 @@ export function TakeoffPanel({
                               </Badge>
                             ) : null;
                           })()}
-                          <span className="text-xs text-muted-foreground font-mono shrink-0">
-                            {formatArea(room)}
-                          </span>
+                          {/* Area display: net m² and order m² */}
+                          <div className="flex flex-col items-end shrink-0">
+                            <span className="text-xs text-muted-foreground font-mono leading-tight">
+                              {scale ? `${getNetAreaM2(room).toFixed(2)} m²` : '—'}
+                            </span>
+                            {(() => {
+                              const orderM2 = getOrderAreaM2(room);
+                              return orderM2 !== null ? (
+                                <span className="text-[10px] text-primary font-mono font-medium leading-tight">
+                                  {orderM2.toFixed(2)} m² order
+                                </span>
+                              ) : null;
+                            })()}
+                          </div>
                         </div>
                         
                         {/* Material row */}
