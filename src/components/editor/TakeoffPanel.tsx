@@ -3,6 +3,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Select,
@@ -33,6 +34,9 @@ import {
   ArrowRight,
   Pencil,
   Library,
+  Percent,
+  DollarSign,
+  Clock,
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
@@ -465,6 +469,11 @@ export function TakeoffPanel({
                         {/* Quick info badges */}
                         {material && (
                           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                            {/* Waste % badge */}
+                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 font-mono">
+                              <Percent className="w-2.5 h-2.5 mr-0.5" />
+                              {room.wastePercent ?? (material.specs as any).wastePercent ?? 10}%
+                            </Badge>
                             {accessoryCount > 0 && (
                               <Badge variant="outline" className="text-[10px] h-5 px-1.5">
                                 <Wrench className="w-2.5 h-2.5 mr-0.5" />
@@ -490,6 +499,18 @@ export function TakeoffPanel({
                               <Badge variant="outline" className="text-[10px] h-5 px-1.5 capitalize">
                                 <LayoutGrid className="w-2.5 h-2.5 mr-0.5" />
                                 {room.tilePattern || 'grid'}
+                              </Badge>
+                            )}
+                            {/* Install cost badge */}
+                            {room.installCost && room.installCost.rate > 0 && (
+                              <Badge variant="secondary" className="text-[10px] h-5 px-1.5 font-mono">
+                                <DollarSign className="w-2.5 h-2.5 mr-0.5" />
+                                {room.installCost.type === 'per_m2' 
+                                  ? `${room.installCost.rate.toFixed(0)}/m²` 
+                                  : `${room.installCost.rate.toFixed(0)} fixed`}
+                                {room.installCost.oohAllowance && (
+                                  <Clock className="w-2.5 h-2.5 ml-0.5 text-amber-500" />
+                                )}
                               </Badge>
                             )}
                           </div>
@@ -612,6 +633,136 @@ export function TakeoffPanel({
                                     </TooltipTrigger>
                                     <TooltipContent side="left">Apply to all rooms with this material</TooltipContent>
                                   </Tooltip>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Installation Cost editor */}
+                            {material && (
+                              <div className="space-y-2 pt-2 border-t border-border/50">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-muted-foreground font-medium">Installation Cost</span>
+                                  <Select
+                                    value={room.installCost?.type || 'per_m2'}
+                                    onValueChange={(value) => {
+                                      onUpdateRoom?.(room.id, { 
+                                        installCost: { 
+                                          ...room.installCost, 
+                                          type: value as 'per_m2' | 'fixed',
+                                          rate: room.installCost?.rate || 0,
+                                        } 
+                                      });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-6 w-20 text-[10px]" onClick={(e) => e.stopPropagation()}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-popover border border-border shadow-lg z-50">
+                                      <SelectItem value="per_m2">$/m²</SelectItem>
+                                      <SelectItem value="fixed">Fixed $</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div className="space-y-1">
+                                    <span className="text-[10px] text-muted-foreground">Cost</span>
+                                    <Input
+                                      type="number"
+                                      value={room.installCost?.rate || ''}
+                                      placeholder="0.00"
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        onUpdateRoom?.(room.id, { 
+                                          installCost: { 
+                                            ...room.installCost,
+                                            type: room.installCost?.type || 'per_m2',
+                                            rate: isNaN(val) ? 0 : val,
+                                          } 
+                                        });
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-6 text-xs font-mono px-1.5"
+                                      step="0.01"
+                                      min={0}
+                                    />
+                                  </div>
+                                  <div className="space-y-1">
+                                    <span className="text-[10px] text-muted-foreground">Sell</span>
+                                    <Input
+                                      type="number"
+                                      value={room.installCost?.sellRate || ''}
+                                      placeholder="0.00"
+                                      onChange={(e) => {
+                                        const val = parseFloat(e.target.value);
+                                        onUpdateRoom?.(room.id, { 
+                                          installCost: { 
+                                            ...room.installCost,
+                                            type: room.installCost?.type || 'per_m2',
+                                            rate: room.installCost?.rate || 0,
+                                            sellRate: isNaN(val) ? undefined : val,
+                                          } 
+                                        });
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-6 text-xs font-mono px-1.5"
+                                      step="0.01"
+                                      min={0}
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* OOH Allowance */}
+                                <div className="flex items-center justify-between text-xs">
+                                  <div className="flex items-center gap-2">
+                                    <Checkbox
+                                      id={`ooh-${room.id}`}
+                                      checked={room.installCost?.oohAllowance || false}
+                                      onCheckedChange={(checked) => {
+                                        onUpdateRoom?.(room.id, { 
+                                          installCost: { 
+                                            ...room.installCost,
+                                            type: room.installCost?.type || 'per_m2',
+                                            rate: room.installCost?.rate || 0,
+                                            oohAllowance: checked === true,
+                                            oohMultiplier: checked ? (room.installCost?.oohMultiplier || 1.5) : undefined,
+                                          } 
+                                        });
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-3.5 w-3.5"
+                                    />
+                                    <label 
+                                      htmlFor={`ooh-${room.id}`} 
+                                      className="text-muted-foreground cursor-pointer flex items-center gap-1"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Clock className="w-3 h-3" />
+                                      Out of Hours
+                                    </label>
+                                  </div>
+                                  {room.installCost?.oohAllowance && (
+                                    <div className="flex items-center gap-1">
+                                      <Input
+                                        type="number"
+                                        value={room.installCost?.oohMultiplier || 1.5}
+                                        onChange={(e) => {
+                                          const val = parseFloat(e.target.value);
+                                          onUpdateRoom?.(room.id, { 
+                                            installCost: { 
+                                              ...room.installCost!,
+                                              oohMultiplier: isNaN(val) ? 1.5 : val,
+                                            } 
+                                          });
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-14 h-6 text-xs font-mono px-1.5"
+                                        step="0.1"
+                                        min={1}
+                                        max={5}
+                                      />
+                                      <span className="text-muted-foreground">×</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             )}
