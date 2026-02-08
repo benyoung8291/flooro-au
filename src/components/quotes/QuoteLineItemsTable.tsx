@@ -505,7 +505,7 @@ export function QuoteLineItemsTable({
                 <col style={{ width: 44 }} />
               </colgroup>
               <thead>
-                <tr className="border-b border-border bg-background">
+                <tr className="border-b border-border bg-white dark:bg-card">
                   <th className="w-12" />
                   <th className="text-left py-3 px-1 font-semibold text-foreground text-xs tracking-wide">
                     Description
