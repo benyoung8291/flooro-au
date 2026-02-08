@@ -1,307 +1,166 @@
 
 
-# Complete Quote System Overhaul (Updated from FieldFlow Reference)
+# FieldFlow Quote Logic Gap Analysis and Implementation Plan
 
-## Overview
-
-Replace the current dialog-based `QuoteSummaryDialog.tsx` with a full standalone quoting system modeled on the FieldFlow reference app. The new system uses persistent database-backed quotes with a parent/child line item hierarchy, inline editing, Price Book integration, margin calculations, and a professional PDF preview -- all as dedicated pages that work both standalone and when linked to takeoff projects.
+After thoroughly reviewing both the FieldFlow reference repo (`useSimpleQuoteLineItems.ts` + `InlineQuoteLineItems.tsx` + `QuoteDetails.tsx`) and Flooro's current implementation, here are the significant gaps that need to be addressed.
 
 ---
 
-## Part 1: Database Schema
+## Gap Analysis: What's Missing from Flooro
 
-### `quotes` table
+### 1. Pricing Calculation Formula Mismatch (Critical)
 
-Closely mirrors the FieldFlow `quotes` table, adapted to Flooro's `organization_id` model (instead of FieldFlow's `tenant_id`).
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK, default gen_random_uuid() |
-| organization_id | uuid | FK to organizations |
-| project_id | uuid | FK to projects, nullable (standalone quotes have no project) |
-| quote_number | text | Auto-generated sequential (Q-0001) |
-| status | text | draft, sent, accepted, declined, expired |
-| title | text | nullable, e.g. "Flooring Quote - Level 2 Office" |
-| description | text | nullable, scope of works / rich description |
-| client_name | text | nullable |
-| client_email | text | nullable |
-| client_phone | text | nullable |
-| client_address | text | nullable, site/delivery address |
-| subtotal | numeric | default 0 |
-| total_cost | numeric | default 0, sum of cost side for margin tracking |
-| total_margin | numeric | default 0, calculated margin % |
-| tax_rate | numeric | default 10 (GST) |
-| tax_amount | numeric | default 0 |
-| total_amount | numeric | default 0, grand total |
-| valid_until | date | nullable |
-| notes | text | nullable, shown on PDF |
-| internal_notes | text | nullable, NOT shown on PDF |
-| terms_and_conditions | text | nullable |
-| estimated_hours | numeric | default 0 |
-| version | integer | default 1 |
-| parent_quote_id | uuid | nullable, FK to quotes (revision tracking) |
-| created_by | uuid | FK to auth.users |
-| sent_at | timestamptz | nullable |
-| approved_at | timestamptz | nullable |
-| rejected_at | timestamptz | nullable |
-| rejection_reason | text | nullable |
-| created_at | timestamptz | |
-| updated_at | timestamptz | |
-
-### `quote_line_items` table
-
-Direct match to FieldFlow's parent/child model using `parent_line_item_id`.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| id | uuid | PK |
-| organization_id | uuid | FK |
-| quote_id | uuid | FK to quotes |
-| parent_line_item_id | uuid | FK to self, nullable (null = parent row) |
-| description | text | Line item name/description |
-| quantity | numeric | default 1 |
-| cost_price | numeric | default 0, buy/cost per unit |
-| sell_price | numeric | default 0, sell per unit |
-| margin_percentage | numeric | default 0, auto-calculated |
-| unit_price | numeric | default 0, legacy/display price |
-| line_total | numeric | default 0, qty x sell_price |
-| estimated_hours | numeric | default 0 |
-| item_order | integer | default 0, sort order |
-| is_optional | boolean | default false |
-| is_active | boolean | default true (soft delete) |
-| price_book_item_id | uuid | nullable, FK to price_book_items |
-| is_from_price_book | boolean | default false |
-| source_room_id | text | nullable, links to takeoff room ID |
-| metadata | jsonb | default '{}', flexible (waste %, OOH flag, etc.) |
-| created_at | timestamptz | |
-| updated_at | timestamptz | |
-
-### RLS Policies
-
-Same pattern as existing tables -- org members can read/write their own org's quotes. Read-only for non-admin roles where appropriate.
-
-### Database Function: `generate_quote_number(org_id uuid)`
-
-Returns the next sequential quote number formatted as `Q-NNNN`, incrementing from the highest existing number for that organization.
-
----
-
-## Part 2: Quote Hooks (Following FieldFlow's `useSimpleQuoteLineItems` Pattern)
-
-### `src/hooks/useQuotes.ts`
-
-A comprehensive hook file containing:
-
-- **`useQuotes(statusFilter?)`** -- List all org quotes, filterable by status
-- **`useQuote(quoteId)`** -- Single quote with full header data
-- **`useCreateQuote()`** -- Create quote (standalone or project-linked), calls `generate_quote_number` RPC
-- **`useUpdateQuote()`** -- Update quote header fields (client info, status, totals, notes)
-- **`useDeleteQuote()`** -- Soft delete / archive
-- **`useDuplicateQuote()`** -- Clone a quote with a new number and version
-
-### `src/hooks/useQuoteLineItems.ts`
-
-Modeled directly on FieldFlow's `useSimpleQuoteLineItems.ts`:
-
-- Fetches line items and organizes into parent/child `LineItem[]` structure using `parent_line_item_id`
-- Maintains local `editedLineItems` state for editing before explicit save
-- `hasUnsavedChanges` detection by comparing JSON snapshots
-- `saveLineItems()` -- flattens hierarchy, diffs against DB (insert/update/delete), saves in batch
-- `addLineItem()` / `removeLineItem()` / `addSubItem()` / `removeSubItem()`
-- `duplicateLineItem()` for quick copying
-- localStorage auto-backup every 30 seconds as safety net
-- Pricing calculation helpers: when cost or margin changes, sell price auto-calculates (and vice versa), matching FieldFlow's `calculatePricing` logic
-
-### `src/hooks/useGenerateQuoteFromProject.ts`
-
-Converts takeoff project data into a hierarchical quote:
-1. Creates a new quote linked to the project
-2. For each room with a material assigned, creates a parent line item (room name)
-3. Under each room parent, creates child items for:
-   - Material (qty = order m2, cost/sell from material)
-   - Installation (if room has installCost set)
-   - Each enabled accessory (coving, weld rod, etc.)
-4. Pre-fills client details and site address from the project
-
----
-
-## Part 3: Quotes List Page (`/quotes`)
-
-A dedicated dashboard for all quotes, matching FieldFlow's `Quotes.tsx`:
-
-- **Status filter tabs**: All | Draft | Sent | Accepted | Declined | Expired
-- **Search bar**: Filter by client name, quote number, or title
-- **Quick stats row**: Total quoted value, number by status, acceptance rate
-- **Quote cards**: Each showing quote number, client name, title, status badge, total amount, date, and actions dropdown (Edit, Duplicate, Delete)
-- **"New Quote" button** in the header
-- **Create Quote dialog**: Simple dialog to set a title and optionally link to a project, then navigates to the editor
-
----
-
-## Part 4: Quote Editor Page (`/quotes/:quoteId`)
-
-The main editing interface -- a dedicated full page modeled on FieldFlow's `QuoteDetails.tsx`. This is the core of the system.
-
-### Layout (Two-Column Desktop)
-
-```text
-+----------------------------------------------------------+
-| Header: Quote Q-0042  |  Status Badge  |  Save | Actions |
-+----------------------------------------------------------+
-| Left Column (70%)          | Right Column (30%)          |
-|                            |                             |
-| Client Details Card        | Quote Summary Card          |
-|   Name, Email, Phone,      |   Total Cost                |
-|   Site Address              |   Total Sell                |
-|   (inline editable)        |   Margin %                  |
-|                            |   Tax (GST 10%)             |
-| Line Items Table           |   GRAND TOTAL               |
-|   [Parent] Living Room     |                             |
-|     - Material 24.5m2      | Estimated Hours             |
-|     - Installation 24.5m2  |                             |
-|     - Wall Coving 19.2m    | Notes                       |
-|     - Weld Rod 14.3m       |   (internal + client)       |
-|   [Parent] Hallway         |                             |
-|     - Material 12.0m2      | Terms & Conditions          |
-|     - Installation 12.0m2  |                             |
-|   [Parent] Additional      | Valid Until                 |
-|     - Floor Leveller x5    |                             |
-|                            | Actions:                    |
-| + Add Line Item            |   Save Draft                |
-| + Add from Price Book      |   Preview PDF               |
-|                            |   Mark as Sent              |
-|                            |   Mark as Accepted          |
-+----------------------------------------------------------+
+**FieldFlow** uses a markup-style formula:
 ```
+sell = cost * (1 + margin / 100)
+```
+- When margin is 30%, cost $100 -> sell = $130
+- When sell changes, margin recalculates: `margin = ((sell - cost) / cost) * 100`
+- Cost changes always keep margin fixed, recalculate sell
+- Sell changes always recalculate margin
 
-### Line Items Table (Matching FieldFlow's `InlineQuoteLineItems.tsx`)
+**Flooro** uses a gross margin formula:
+```
+sell = cost / (1 - margin / 100)
+```
+- When margin is 30%, cost $100 -> sell = $142.86
+- This is a completely different business model
 
-Each line item row has these columns:
-- **Description** (text input, full width for parents)
-- **Qty** (numeric input)
-- **Cost** (numeric input, cost price per unit)
-- **Margin %** (numeric input, auto-calculated when sell changes)
-- **Sell** (numeric input, auto-calculated when margin changes)
-- **Total** (read-only, qty x sell)
-- **Actions** (delete, add sub-item)
+**Action**: Replace Flooro's pricing formulas to match FieldFlow's markup-based calculations.
 
-Key behaviors from FieldFlow:
-- **Parent rows** are bold, with a chevron to expand/collapse children
-- **Child rows** are indented with a left border/padding
-- **Parent totals** aggregate from children (no direct qty/cost on parents with children)
-- **Margin calculation**: Changing cost recalculates sell (keeping margin fixed). Changing sell recalculates margin. Changing margin recalculates sell.
-- **"Add Line Item"** button adds a new parent row
-- **"Add Sub-Item"** button on each parent adds a child
-- **"Add from Price Book"** opens a picker dialog to select from price_book_items, auto-filling description, cost, sell, and margin
-- **Delete** with confirmation for parents (warns about child deletion)
-- **Optional items**: Toggle to mark items as optional (shown in italics, excluded from totals)
+### 2. Parent Data Migration on Add Sub-Item (Critical)
 
-### Unsaved Changes Warning
+**FieldFlow** has a key behavior when adding the first sub-item to a parent: if the parent already has pricing data (cost, sell, quantity), it automatically:
+1. Creates a first sub-item from the parent's data
+2. Clears the parent's cost/sell/margin fields
+3. Then adds the new blank sub-item
 
-- `hasUnsavedChanges` indicator in the header (dot or badge)
-- Browser `beforeunload` warning when navigating away with unsaved changes
-- Explicit "Save" button (not auto-save, matching FieldFlow's approach)
+This prevents data loss when converting a standalone item into a group.
 
-### Status Workflow
+**Flooro** is missing this entirely -- adding a sub-item just appends a blank child without migrating parent data.
 
-Draft -> Sent -> Accepted/Declined/Expired
+### 3. Parent Row Behavior with Sub-Items (Critical)
 
-Status transitions via action buttons in the summary panel and header dropdown.
+**FieldFlow**:
+- Parent rows with sub-items show **aggregated values** (sum of children's costs, sells, and a calculated overall margin)
+- Parent quantity is forced to "1" when it has sub-items
+- Parent cost/sell/margin fields become **read-only** showing aggregated totals
+- Parent `line_total` = sum of all children's `line_total`
+
+**Flooro**:
+- Parent rows still show editable cost/sell/margin fields even with sub-items
+- Parent totals don't aggregate from children
+- No logic to disable editing on parent pricing when children exist
+
+### 4. Reorder Controls (Up/Down Arrows) (Important)
+
+**FieldFlow**: Has up/down arrow buttons on both parent rows and sub-item rows to reorder within their level.
+
+**Flooro**: Has a GripVertical icon (visual only, no drag implemented) and no up/down arrow buttons.
+
+### 5. Delete Confirmation for Parents with Children (Important)
+
+**FieldFlow**: Shows an AlertDialog with three choices:
+- "Cancel" -- abort
+- "Keep Sub-items" -- ungroups children to standalone parents, then deletes the parent
+- "Delete All" -- removes parent + all children
+
+**Flooro**: Deletes immediately without any confirmation or option to keep children.
+
+### 6. Ungroup / Promote Sub-Item (Medium)
+
+**FieldFlow** has two extra actions:
+- **Ungroup**: Converts all sub-items of a parent into standalone line items
+- **Promote Sub-Item**: Moves a single sub-item out of its parent to become its own standalone parent
+
+**Flooro**: Has neither of these operations.
+
+### 7. Estimated Hours Column (Medium)
+
+**FieldFlow**: Has a dedicated "Hours" column in the line items table for estimated hours per item, with sub-item hours also editable.
+
+**Flooro**: Has `estimated_hours` in the data model but no column in the table UI.
+
+### 8. Field Highlight Animation on Recalculation (Nice-to-have)
+
+**FieldFlow**: When margin changes and sell recalculates (or vice versa), the affected cell gets a brief green flash/highlight animation (`bg-primary/10 ring-1 ring-primary/30`) to show the user what changed.
+
+**Flooro**: No visual feedback when dependent fields change.
+
+### 9. Number Input Formatting (Important)
+
+**FieldFlow**: Uses `type="text"` with `inputMode="decimal"` for all numeric fields, with:
+- Regex validation to only allow digits and single decimal point
+- `onBlur` formatting to `.toFixed(2)`
+- Prevents typing non-numeric characters
+
+**Flooro**: Uses `type="number"` which has browser inconsistencies, no format-on-blur, and can produce unexpected values.
+
+### 10. Sell Price Floor Validation (Important)
+
+**FieldFlow**: When sell price changes, it validates `Math.max(sellNum, costNum)` -- sell can never go below cost.
+
+**Flooro**: No sell price floor -- users can set sell below cost, leading to negative margins.
 
 ---
 
-## Part 5: Quote Preview / PDF (`/quotes/:quoteId/preview`)
+## Implementation Plan
 
-A print-optimized page for professional quote output:
+### Phase A: Fix Pricing Calculations (useQuoteLineItems.ts)
 
-- Company branding header (from organization settings via `CompanyBrandingForm`)
-- Quote number, date, valid until
-- Client name, email, phone, site address
-- Line items table with parent/child hierarchy (indented sub-items)
-- Optional items in a separate "Optional Items" section
-- Cost summary: Subtotal, Tax (GST), Total
-- Notes and Terms & Conditions
-- Uses browser `window.print()` for PDF generation (matching current approach)
+1. Replace `calculateSellFromMargin` and `calculateMarginFromSell` to use FieldFlow's markup formula:
+   - `sell = cost * (1 + margin / 100)` 
+   - `margin = ((sell - cost) / cost) * 100`
+2. Add sell price floor validation (sell >= cost)
+3. Add format-on-blur behavior for cost/sell/margin inputs
+
+### Phase B: Parent-Child Interaction Logic (useQuoteLineItems.ts)
+
+1. **Data migration on addSubItem**: When adding the first sub-item to a parent with data, migrate parent's pricing into a new first child, then clear parent pricing
+2. **Aggregated parent values**: Add `calculateAggregatedValues(parent)` function that computes:
+   - Total cost = sum(child.qty * child.cost)
+   - Total sell = sum(child.qty * child.sell) 
+   - Margin = ((totalSell - totalCost) / totalCost) * 100
+3. **Parent line_total auto-calculation**: When any child changes, recalculate parent's `line_total` as sum of children's totals
+4. **Force parent qty = 1** when sub-items exist
+
+### Phase C: Enhanced Row UI (QuoteLineItemRow.tsx + QuoteLineItemsTable.tsx)
+
+1. **Parent row with children shows aggregated read-only values** instead of editable inputs for cost/sell/margin
+2. **Add estimated hours column** to the table
+3. **Add up/down arrow reorder buttons** for both parents and sub-items (replacing the non-functional GripVertical)
+4. **Add ungroup action** on parent rows (converts children to standalone)
+5. **Add promote action** on sub-item rows (moves to standalone parent)
+6. **Add delete confirmation dialog** for parents with children (Keep Sub-items / Delete All / Cancel)
+7. **Add field highlight animation** when dependent fields recalculate
+8. **Switch numeric inputs** from `type="number"` to `type="text"` with `inputMode="decimal"` and regex validation + onBlur formatting
+
+### Phase D: QuoteSummaryPanel Totals Fix
+
+1. Update `computeTotals` to correctly aggregate from children (it already does this but needs to align with the new pricing formulas)
+2. Ensure the total calculation matches FieldFlow's approach where parent items with children have their totals derived purely from children
 
 ---
 
-## Part 6: Project Integration
+## Technical Details
 
-### TakeoffPanel Changes
-
-Replace the "Quote Summary" dialog trigger with a "Generate Quote" button that:
-1. Calls `useGenerateQuoteFromProject` to create a new quote pre-populated from the takeoff
-2. Navigates to `/quotes/:newQuoteId` for full editing
-3. If a quote already exists for this project, shows "View Quote" instead
-
-### Dashboard Changes
-
-Add a "Quotes" navigation button alongside "Materials" and "Price Book" on the Dashboard header.
-
----
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| Migration SQL | `quotes` table, `quote_line_items` table, RLS policies, `generate_quote_number` function |
-| `src/hooks/useQuotes.ts` | Quote CRUD hooks |
-| `src/hooks/useQuoteLineItems.ts` | Line item management following FieldFlow's `useSimpleQuoteLineItems` pattern |
-| `src/hooks/useGenerateQuoteFromProject.ts` | Convert takeoff data to quote |
-| `src/pages/QuotesList.tsx` | Quotes dashboard/list page |
-| `src/pages/QuoteEditor.tsx` | Main quote editing page (following FieldFlow's QuoteDetails pattern) |
-| `src/pages/QuotePreview.tsx` | Print-optimized preview |
-| `src/components/quotes/QuoteLineItemsTable.tsx` | Hierarchical line items table (following FieldFlow's InlineQuoteLineItems) |
-| `src/components/quotes/QuoteLineItemRow.tsx` | Individual row (parent or child) |
-| `src/components/quotes/QuoteSummaryPanel.tsx` | Right sidebar totals/actions panel |
-| `src/components/quotes/QuoteClientCard.tsx` | Client details section |
-| `src/components/quotes/QuoteStatusBadge.tsx` | Reusable status badge |
-| `src/components/quotes/PriceBookPickerDialog.tsx` | Dialog to pick from price book |
-| `src/components/quotes/CreateQuoteDialog.tsx` | New quote creation dialog |
-
-## Files to Modify
+### New/Modified Files
 
 | File | Changes |
 |------|---------|
-| `src/App.tsx` | Add `/quotes`, `/quotes/:quoteId`, `/quotes/:quoteId/preview` routes |
-| `src/pages/Dashboard.tsx` | Add "Quotes" nav button |
-| `src/components/editor/TakeoffPanel.tsx` | Replace "Quote Summary" dialog with "Generate Quote" button |
+| `src/hooks/useQuoteLineItems.ts` | Replace pricing formulas, add data migration on addSubItem, add aggregation logic, add ungroup/promote operations |
+| `src/components/quotes/QuoteLineItemRow.tsx` | Add hours column, switch to text inputs with formatting, show aggregated values for parents with children, add reorder buttons, add promote/ungroup actions |
+| `src/components/quotes/QuoteLineItemsTable.tsx` | Add hours column header, add delete confirmation dialog, pass new props, add field highlight state |
+| `src/components/quotes/QuoteSummaryPanel.tsx` | Align totals with new pricing model |
 
-## Files to Deprecate
+### Key Behavioral Rules (from FieldFlow)
 
-| File | Reason |
-|------|--------|
-| `src/components/reports/QuoteSummaryDialog.tsx` | Replaced by full QuoteEditor page |
-
----
-
-## Implementation Order
-
-Due to the size, this will be broken into phases:
-
-**Phase 1 -- Database and Core Hooks**
-1. Create database migration (quotes + quote_line_items tables, RLS, generate_quote_number function)
-2. Create `useQuotes.ts` hook (CRUD operations)
-3. Create `useQuoteLineItems.ts` hook (parent/child management, save/load, pricing calculations)
-
-**Phase 2 -- Quotes List Page**
-4. Create `QuotesList.tsx` with status filtering, search, and stats
-5. Create `CreateQuoteDialog.tsx`
-6. Create `QuoteStatusBadge.tsx`
-7. Add routes to `App.tsx` and nav button to Dashboard
-
-**Phase 3 -- Quote Editor**
-8. Create `QuoteLineItemsTable.tsx` with parent/child hierarchy, inline editing, margin calculations
-9. Create `QuoteLineItemRow.tsx` for individual rows
-10. Create `QuoteSummaryPanel.tsx` for totals and actions
-11. Create `QuoteClientCard.tsx` for client details
-12. Create `PriceBookPickerDialog.tsx` for adding items from price book
-13. Create `QuoteEditor.tsx` composing all the above
-
-**Phase 4 -- Project Integration**
-14. Create `useGenerateQuoteFromProject.ts`
-15. Update `TakeoffPanel.tsx` to add "Generate Quote" flow
-
-**Phase 5 -- Preview and PDF**
-16. Create `QuotePreview.tsx` with print-optimized layout
+1. **Cost changes**: Keep margin fixed, recalculate sell = `cost * (1 + margin/100)`
+2. **Margin changes**: Keep cost fixed, recalculate sell = `cost * (1 + margin/100)`
+3. **Sell changes**: Keep cost fixed, recalculate margin = `((sell - cost) / cost) * 100`, enforce sell >= cost
+4. **Parent with children**: Cost/Sell/Margin cells become read-only showing aggregated values; parent line_total = sum of child line_totals
+5. **First sub-item added**: Migrate parent data to first child, clear parent, add blank second child
+6. **Delete parent with children**: Show dialog with Cancel / Keep Sub-items (ungroup) / Delete All
+7. **Sub-item promote**: Extract sub-item, create standalone parent after the original parent
+8. **Ungroup parent**: Convert all children to standalone parents, remove the parent shell
 
