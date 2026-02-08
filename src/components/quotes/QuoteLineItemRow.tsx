@@ -80,8 +80,8 @@ export function FormattedNumberInput({
       onBlur={handleBlur}
       onFocus={handleFocus}
       className={cn(
-        'flex h-8 w-full rounded-md border border-border/50 bg-transparent px-2 py-1 text-sm text-right font-mono transition-all',
-        'hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
+        'flex h-7 w-full rounded border border-transparent bg-transparent px-2 py-0.5 text-sm text-right font-mono tabular-nums transition-all',
+        'hover:border-border/50 hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
         highlight && 'bg-primary/10 ring-1 ring-primary/30',
         className
       )}
@@ -187,7 +187,7 @@ export function QuoteLineItemRow({
       )}
     >
       {/* Reorder + expand */}
-      <td className="px-1 py-2.5 text-center">
+      <td className="px-1 py-1 text-center">
         {!isChild ? (
           <div className="flex items-center gap-0.5">
             <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
@@ -247,14 +247,14 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Description */}
-      <td className={cn('py-2.5 pr-2', isChild ? 'pl-8' : 'pl-1')}>
+      <td className={cn('py-1 pr-2', isChild ? 'pl-8' : 'pl-1')}>
         <input
           ref={descRef}
           value={item.description}
           onChange={(e) => onUpdate(item.id, { description: e.target.value })}
           className={cn(
-            'w-full h-8 px-2 text-sm rounded-md border border-border/50 bg-transparent transition-all',
-            'hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
+            'w-full h-7 px-2 text-sm rounded border border-transparent bg-transparent transition-all',
+            'hover:border-border/50 hover:bg-muted/50 focus:bg-background focus:border-input focus:outline-none focus:ring-1 focus:ring-ring',
             !isChild && hasChildren && 'font-semibold',
             isChild && 'text-muted-foreground'
           )}
@@ -263,9 +263,9 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Qty */}
-      <td className="py-2.5 px-1">
+      <td className="py-1 px-1">
         {isReadOnly ? (
-          <span className="block text-right text-sm font-mono text-muted-foreground px-2">—</span>
+          <span className="block text-right text-sm font-mono tabular-nums text-muted-foreground px-2">—</span>
         ) : (
           <FormattedNumberInput
             value={item.quantity || ''}
@@ -275,9 +275,9 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Cost */}
-      <td className="py-2.5 px-1">
+      <td className="py-1 px-1">
         {isReadOnly ? (
-          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+          <span className="block text-right text-sm font-mono tabular-nums text-muted-foreground px-2">
             ${displayCost.toFixed(2)}
           </span>
         ) : (
@@ -290,9 +290,9 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Margin % */}
-      <td className="py-2.5 px-1">
+      <td className="py-1 px-1">
         {isReadOnly ? (
-          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+          <span className="block text-right text-sm font-mono tabular-nums text-muted-foreground px-2">
             {displayMargin.toFixed(1)}%
           </span>
         ) : (
@@ -305,9 +305,9 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Sell */}
-      <td className="py-2.5 px-1">
+      <td className="py-1 px-1">
         {isReadOnly ? (
-          <span className="block text-right text-sm font-mono text-muted-foreground px-2">
+          <span className="block text-right text-sm font-mono tabular-nums text-muted-foreground px-2">
             ${displaySell.toFixed(2)}
           </span>
         ) : (
@@ -320,12 +320,12 @@ export function QuoteLineItemRow({
       </td>
 
       {/* Total — emphasized */}
-      <td className="py-2.5 px-2 text-right font-mono text-sm font-bold tabular-nums text-foreground">
+      <td className="py-1 px-2 text-right font-mono text-sm font-bold tabular-nums text-foreground">
         ${displayTotal.toFixed(2)}
       </td>
 
       {/* Actions */}
-      <td className="py-2.5 px-1 text-center">
+      <td className="py-1 px-1 text-center">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7">

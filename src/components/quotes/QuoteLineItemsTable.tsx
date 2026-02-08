@@ -507,14 +507,14 @@ export function QuoteLineItemsTable({
               <thead>
                 <tr className="border-b border-border bg-white dark:bg-card">
                   <th className="w-12" />
-                  <th className="text-left py-3 px-1 font-semibold text-foreground text-xs tracking-wide">
+                  <th className="text-left py-2 px-1 font-semibold text-foreground text-xs tracking-wide">
                     Description
                   </th>
                   {(['qty', 'cost', 'margin', 'sell', 'total'] as const).map(col => (
                     <th
                       key={col}
                       className={cn(
-                        'text-right py-3 px-1 font-semibold text-foreground text-xs tracking-wide',
+                        'text-right py-2 px-1 font-semibold text-foreground text-xs tracking-wide',
                         col === 'total' && 'pr-2'
                       )}
                     >
@@ -575,17 +575,6 @@ export function QuoteLineItemsTable({
           </div>
         )}
 
-        {/* Footer actions */}
-        <div className="flex items-center gap-2 py-3 mt-2">
-          <Button variant="outline" size="sm" onClick={onAddLineItem} className="gap-1.5">
-            <Plus className="w-3.5 h-3.5" />
-            Add Item
-          </Button>
-          <Button variant="outline" size="sm" onClick={onOpenPriceBook} className="gap-1.5">
-            <BookOpen className="w-3.5 h-3.5" />
-            From Price Book
-          </Button>
-        </div>
       </div>
 
       {/* Delete confirmation dialog */}
