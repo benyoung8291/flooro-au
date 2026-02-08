@@ -52,18 +52,26 @@ export function CanvasContextMenu({
     { label: 'Ramp', value: 'ramp' },
   ];
 
+  // Stop pointer events from bubbling to the canvas container,
+  // which would close the menu before click handlers fire.
+  const stopPropagation = (e: React.PointerEvent | React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <>
       {/* Backdrop */}
       <div
         className="fixed inset-0 z-40"
         onClick={onClose}
+        onPointerDown={stopPropagation}
         onContextMenu={(e) => { e.preventDefault(); onClose(); }}
       />
       {/* Menu */}
       <div
         className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg p-1 min-w-[200px] animate-in fade-in-0 zoom-in-95"
         style={{ left: position.x, top: position.y }}
+        onPointerDown={stopPropagation}
       >
         {/* Room Context Menu */}
         {target.type === 'room' && room && (
