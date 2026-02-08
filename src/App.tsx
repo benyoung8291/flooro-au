@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/admin/AdminRoute";
+import AppLayout from "@/components/layout/AppLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -39,22 +40,29 @@ const App = () => (
               
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/projects/new" element={<NewProject />} />
+                {/* Full-screen pages — outside AppLayout */}
                 <Route path="/projects/:projectId" element={<ProjectEditor />} />
-                <Route path="/materials" element={<Materials />} />
-                <Route path="/price-book" element={<PriceBook />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/quotes" element={<QuotesList />} />
-                <Route path="/quotes/:quoteId" element={<QuoteEditor />} />
                 <Route path="/quotes/:quoteId/preview" element={<QuotePreview />} />
-              </Route>
 
-              {/* Admin Routes */}
-              <Route element={<AdminRoute />}>
-                <Route path="/admin" element={<Admin />}>
-                  <Route path="organizations" element={<Organizations />} />
+                {/* App shell with sidebar */}
+                <Route element={<AppLayout />}>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/onboarding" element={<Onboarding />} />
+                  <Route path="/projects/new" element={<NewProject />} />
+                  <Route path="/materials" element={<Materials />} />
+                  <Route path="/price-book" element={<PriceBook />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/quotes" element={<QuotesList />} />
+                  <Route path="/quotes/:quoteId" element={<QuoteEditor />} />
+                </Route>
+
+                {/* Admin Routes */}
+                <Route element={<AdminRoute />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/admin" element={<Admin />}>
+                      <Route path="organizations" element={<Organizations />} />
+                    </Route>
+                  </Route>
                 </Route>
               </Route>
               
