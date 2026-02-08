@@ -8,9 +8,9 @@ import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
 import { QuoteEditorTotals } from '@/components/quotes/QuoteEditorTotals';
 import { QuoteEditorNotesTab } from '@/components/quotes/QuoteEditorNotesTab';
 import { PriceBookPickerDialog } from '@/components/quotes/PriceBookPickerDialog';
+import { QuoteEditorHeader } from '@/components/quotes/QuoteEditorHeader';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,8 +27,9 @@ import {
   XCircle,
   ChevronDown,
   List,
-  User,
   StickyNote,
+  Plus,
+  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -255,9 +256,11 @@ export default function QuoteEditor() {
         </div>
       </div>
 
-      {/* Tabbed content area */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6">
+        <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6 space-y-4">
+          {/* Always-visible title and client summary */}
+          <QuoteEditorHeader quote={quote} onUpdate={handleUpdateQuote} />
+
           <Tabs defaultValue="line-items" className="space-y-4">
             <TabsList>
               <TabsTrigger value="line-items" className="gap-1.5">
@@ -265,7 +268,7 @@ export default function QuoteEditor() {
                 Line Items
               </TabsTrigger>
               <TabsTrigger value="details" className="gap-1.5">
-                <User className="w-3.5 h-3.5" />
+                <StickyNote className="w-3.5 h-3.5" />
                 Details
               </TabsTrigger>
               <TabsTrigger value="notes" className="gap-1.5">
@@ -274,36 +277,57 @@ export default function QuoteEditor() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="line-items" className="space-y-6">
-              <div className="bg-white dark:bg-card rounded-lg">
-              <QuoteLineItemsTable
-                lineItems={lineItems}
-                onUpdate={updateLineItem}
-                onUpdatePricing={updateLineItemPricing}
-                onAddLineItem={() => addLineItem()}
-                onAddSubItem={addSubItem}
-                onRemove={removeLineItem}
-                onDuplicate={duplicateLineItem}
-                onToggleExpand={toggleExpanded}
-                onReorderParent={reorderParent}
-                onReorderSubItem={reorderSubItem}
-                onUngroupParent={ungroupParent}
-                onPromoteSubItem={promoteSubItem}
-                onGroupIntoParent={groupIntoParent}
-                onCreateGroupFromItem={createGroupFromItem}
-                onOpenPriceBook={() => {
-                  setPriceBookParentId(null);
-                  setPriceBookOpen(true);
-                }}
-              />
+            <TabsContent value="line-items" className="space-y-4">
+              {/* Toolbar above table */}
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => addLineItem()} className="gap-1.5">
+                  <Plus className="w-3.5 h-3.5" />
+                  Add Item
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setPriceBookParentId(null);
+                    setPriceBookOpen(true);
+                  }}
+                  className="gap-1.5"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  From Price Book
+                </Button>
+              </div>
 
-              {/* Inline totals */}
+              {/* White table container */}
+              <div className="bg-white dark:bg-card rounded-lg border border-border/40">
+                <QuoteLineItemsTable
+                  lineItems={lineItems}
+                  onUpdate={updateLineItem}
+                  onUpdatePricing={updateLineItemPricing}
+                  onAddLineItem={() => addLineItem()}
+                  onAddSubItem={addSubItem}
+                  onRemove={removeLineItem}
+                  onDuplicate={duplicateLineItem}
+                  onToggleExpand={toggleExpanded}
+                  onReorderParent={reorderParent}
+                  onReorderSubItem={reorderSubItem}
+                  onUngroupParent={ungroupParent}
+                  onPromoteSubItem={promoteSubItem}
+                  onGroupIntoParent={groupIntoParent}
+                  onCreateGroupFromItem={createGroupFromItem}
+                  onOpenPriceBook={() => {
+                    setPriceBookParentId(null);
+                    setPriceBookOpen(true);
+                  }}
+                />
+              </div>
+
+              {/* Totals outside the white box */}
               <QuoteEditorTotals
                 lineItems={lineItems}
                 taxRate={quote.tax_rate}
                 onUpdateTaxRate={(rate) => handleUpdateQuote({ tax_rate: rate })}
               />
-              </div>
             </TabsContent>
 
             <TabsContent value="details">
