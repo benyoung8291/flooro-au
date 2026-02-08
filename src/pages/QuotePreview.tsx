@@ -1,10 +1,14 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuote } from '@/hooks/useQuotes';
-import { useQuoteLineItems, LineItem } from '@/hooks/useQuoteLineItems';
+import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
 import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
+import { useQuotePdfSettings } from '@/hooks/useQuotePdfSettings';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
+import { PreviewToolbar } from '@/components/quotes/preview/PreviewToolbar';
+import { PreviewItemsTable } from '@/components/quotes/preview/PreviewItemsTable';
+import { OptionalGroupSections } from '@/components/quotes/preview/OptionalGroupSections';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-AU', {
@@ -22,49 +26,19 @@ function formatDate(dateStr: string): string {
   });
 }
 
-// Render a single line item row (parent or child)
-function LineItemRow({
-  item,
-  isChild,
-}: {
-  item: LineItem;
-  isChild?: boolean;
-}) {
-  const hasChildren = item.subItems.length > 0;
-  // Parent total aggregates from children
-  const displayTotal = hasChildren
-    ? item.subItems
-        .filter(c => !c.is_optional)
-        .reduce((s, c) => s + c.line_total, 0)
-    : item.line_total;
-
-  return (
-    <>
-      <tr className={`${isChild ? 'child-row' : 'parent-row'} ${item.is_optional ? 'optional-row' : ''}`}>
-        <td className={isChild ? 'pl-8' : 'font-semibold'}>{item.description}</td>
-        <td className="text-right font-mono-numbers">
-          {!hasChildren ? item.quantity.toFixed(2) : ''}
-        </td>
-        <td className="text-right font-mono-numbers">
-          {!hasChildren && item.sell_price > 0 ? formatCurrency(item.sell_price) : ''}
-        </td>
-        <td className="text-right font-mono-numbers font-semibold">
-          {displayTotal > 0 ? formatCurrency(displayTotal) : '—'}
-        </td>
-      </tr>
-      {item.subItems.map(child => (
-        <LineItemRow key={child.id} item={child} isChild />
-      ))}
-    </>
-  );
-}
-
 export default function QuotePreview() {
   const { quoteId } = useParams<{ quoteId: string }>();
   const navigate = useNavigate();
   const { data: quote, isLoading: quoteLoading } = useQuote(quoteId);
   const { lineItems, isLoading: itemsLoading } = useQuoteLineItems(quoteId);
   const { data: org } = useOrganizationBranding();
+  const {
+    settings,
+    update,
+    showQtyColumn,
+    showUnitPriceColumn,
+    showTotalColumn,
+  } = useQuotePdfSettings();
 
   const isLoading = quoteLoading || itemsLoading;
 
@@ -91,12 +65,11 @@ export default function QuotePreview() {
   // Separate required and optional items
   const requiredItems = lineItems.filter(item => !item.is_optional);
   const optionalItems = lineItems.filter(item => item.is_optional);
-
   const termsText = quote.terms_and_conditions || org?.terms_and_conditions;
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* ── Toolbar (hidden when printing) ───────────────────────── */}
+      {/* ── Header Toolbar (hidden when printing) ────────────── */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50 print:hidden">
         <div className="container mx-auto px-4 h-14 flex items-center gap-3">
           <Button
@@ -106,7 +79,9 @@ export default function QuotePreview() {
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <span className="font-mono font-semibold text-sm">{quote.quote_number}</span>
+          <span className="font-mono font-semibold text-sm">
+            {quote.quote_number}
+          </span>
           <QuoteStatusBadge status={quote.status} />
           <span className="text-muted-foreground text-sm">— Preview</span>
           <div className="ml-auto">
@@ -118,7 +93,10 @@ export default function QuotePreview() {
         </div>
       </header>
 
-      {/* ── Print-optimized document ─────────────────────────────── */}
+      {/* ── Display Toggle Toolbar ───────────────────────────── */}
+      <PreviewToolbar settings={settings} onUpdate={update} />
+
+      {/* ── Print-optimized document ─────────────────────────── */}
       <main className="quote-print-document">
         {/* Company Header */}
         <div className="quote-header">
@@ -167,65 +145,52 @@ export default function QuotePreview() {
           )}
         </div>
 
-        {/* Line Items Table */}
+        {/* Required Line Items Table */}
         {requiredItems.length > 0 && (
           <>
             <h2 className="section-heading">Quoted Items</h2>
-            <table className="items-table">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th className="text-right">Qty</th>
-                  <th className="text-right">Unit Price</th>
-                  <th className="text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {requiredItems.map(item => (
-                  <LineItemRow key={item.id} item={item} />
-                ))}
-              </tbody>
-            </table>
+            <PreviewItemsTable
+              items={requiredItems}
+              settings={settings}
+              showQtyColumn={showQtyColumn}
+              showUnitPriceColumn={showUnitPriceColumn}
+              showTotalColumn={showTotalColumn}
+            />
           </>
         )}
 
-        {/* Optional Items */}
-        {optionalItems.length > 0 && (
-          <>
-            <h2 className="section-heading">Optional Items</h2>
-            <table className="items-table optional-table">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th className="text-right">Qty</th>
-                  <th className="text-right">Unit Price</th>
-                  <th className="text-right">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {optionalItems.map(item => (
-                  <LineItemRow key={item.id} item={item} />
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
+        {/* Optional Items — Grouped Sections */}
+        <OptionalGroupSections
+          optionalItems={optionalItems}
+          baseSubtotal={quote.subtotal}
+          taxRate={quote.tax_rate}
+          settings={settings}
+          showQtyColumn={showQtyColumn}
+          showUnitPriceColumn={showUnitPriceColumn}
+          showTotalColumn={showTotalColumn}
+        />
 
         {/* Totals Summary */}
         <div className="totals-box">
           <div className="totals-row">
             <span>Subtotal</span>
-            <span className="font-mono-numbers">{formatCurrency(quote.subtotal)}</span>
+            <span className="font-mono-numbers">
+              {formatCurrency(quote.subtotal)}
+            </span>
           </div>
           {quote.tax_rate > 0 && (
             <div className="totals-row">
               <span>GST ({quote.tax_rate}%)</span>
-              <span className="font-mono-numbers">{formatCurrency(quote.tax_amount)}</span>
+              <span className="font-mono-numbers">
+                {formatCurrency(quote.tax_amount)}
+              </span>
             </div>
           )}
           <div className="totals-row grand-total">
             <span>Total (inc. GST)</span>
-            <span className="font-mono-numbers">{formatCurrency(quote.total_amount)}</span>
+            <span className="font-mono-numbers">
+              {formatCurrency(quote.total_amount)}
+            </span>
           </div>
         </div>
 
