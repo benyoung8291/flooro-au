@@ -1,91 +1,184 @@
 
 
-# Color Scheme and Visibility Overhaul
+# Professional Quote PDF Redesign -- Letterhead Style
 
-The core problem is that the current design over-optimizes for "minimal" at the expense of readability. Ultra-low-opacity backgrounds, transparent borders, and low-contrast text colors make the interface hard to read. This plan boosts contrast and visibility across all quote components while keeping the clean aesthetic.
-
----
-
-## Root Cause
-
-The CSS variables define a warm cream palette where the muted foreground color (`hsl(30, 10%, 45%)`) is too close to the background (`hsl(40, 33%, 97%)`). Combined with partial opacity borders (`border-border/30`, `/50`, `/60`) and near-invisible zebra striping (`bg-muted/[0.03]`), everything washes out.
+This plan completely redesigns the quote PDF to look like a professional company letterhead document, with the scope/description presented as a letter to the customer, and comprehensive company + quote owner contact information.
 
 ---
 
-## Changes
+## Database Changes
 
-### 1. Improve Base Color Contrast (src/index.css)
+Two new columns are needed to support the additional business information:
 
-Darken the muted-foreground color so labels and secondary text are readable:
-- Light mode `--muted-foreground`: change from `30 10% 45%` to `30 10% 38%` (darker)
-- Light mode `--border`: change from `35 20% 88%` to `35 15% 82%` (more visible borders)
-- Light mode `--input`: match the new border value
+### Organizations table
+- Add `abn` column (text, nullable) -- Australian Business Number
 
-These small shifts make borders and labels noticeably more visible without changing the warm aesthetic.
+### Profiles table
+- Add `phone` column (text, nullable) -- so the quote owner's phone number can appear on the PDF
 
-### 2. Desktop Table -- Stronger Visual Structure (QuoteLineItemRow.tsx)
+---
 
-- **Zebra striping**: increase from `bg-muted/[0.03]` to `bg-muted/[0.08]` so alternating rows are actually visible
-- **Row borders**: change from `border-border/60` (parent) and `border-border/30` (child) to full `border-border` -- no opacity reduction
-- **Parent group left accent**: increase from `border-l-primary/60` to `border-l-primary` -- full opacity
-- **Parent group background**: increase from `bg-muted/10` to `bg-muted/20`
-- **Description inputs**: add a subtle persistent border (`border-border/50`) instead of fully transparent, so users can see where to type. Keep the stronger focus ring on click.
-- **Number inputs**: same treatment -- light persistent border instead of invisible
-- **Total column**: make the text slightly larger and bolder for scanning
-- **Child connector line**: darken from `bg-border/60` to `bg-border`
+## Settings Page Updates
 
-### 3. Desktop Table Header (QuoteLineItemsTable.tsx)
+### Organization Settings (Settings.tsx)
+- Add a new "ABN" field in the Company details section, between Company Name and the Email/Phone row
 
-- Header background: change from `bg-muted/30` to `bg-muted/50` for a stronger visual anchor
-- Header text: change from `text-foreground/80` to `text-foreground` -- full opacity
-- Header border: keep `border-b-2 border-border` (already solid)
+### Profile Settings (Settings.tsx)
+- Add a "Phone" field in the Profile tab so users can set their direct phone number
+- Wire it to the `useUpdateProfile` hook which needs updating to support the new field
 
-### 4. Mobile Cards -- Better Contrast (QuoteLineItemsTable.tsx)
+---
 
-- Card borders: change from `border-border/50` to `border-border` -- full opacity
-- Parent group left accent: `border-l-primary` instead of `border-l-primary/50`
-- Child border-left: change from `border-primary/10` to `border-primary/30`
-- Child bottom border: change from `border-border/20` to `border-border/60`
-- Margin text in data chips: use `text-foreground` instead of `text-muted-foreground` so numbers are readable
+## Hook Updates
 
-### 5. Summary Bottom Bar (QuoteSummaryPanel.tsx)
+### useOrganizationBranding.ts
+- Add `abn` to the select query and interface so it's available on the PDF
 
-- Border top: change from `border-border` to `border-border` (keep) but increase shadow intensity
-- Labels ("Subtotal", "Margin", "GST"): use `text-foreground/60` instead of `text-muted-foreground` for slightly more contrast
-- Total label: make more prominent with `text-foreground` weight
+### useUserProfile.ts
+- Add `phone` to the Profile interface
+- Update `useUpdateProfile` to accept `phone` in its partial updates
 
-### 6. Quotes List Page (QuotesList.tsx)
+### New: useQuoteOwnerProfile.ts
+- A small hook that fetches the `profiles` record for the quote's `created_by` user ID
+- Returns the owner's `full_name`, `email`, and `phone`
+- Used on the PDF preview to display the quote owner's contact details
 
-- Quote row dividers: change from `divide-border/50` to `divide-border` -- full opacity
-- Quote number text: change from `text-muted-foreground` to `text-foreground/60` for better legibility
-- Date text: same treatment
+---
 
-### 7. Client Card (QuoteClientCard.tsx)
+## PDF Layout Redesign (QuotePreview.tsx + quote-print.css)
 
-- Client detail inputs: add persistent `border-border/40` instead of `border-transparent` so fields are visible
-- Preview text: keep current contrast (already legible)
+The current PDF has a functional but generic layout. The new design follows a professional letterhead structure:
 
-### 8. MobileTapToEditValue Component
+### New Document Structure
 
-- Display values: use `text-foreground` consistently (already using it)
-- Label text: keep `text-muted-foreground` but this will benefit from the global darkening in step 1
+```text
++------------------------------------------------------------+
+|  [LOGO]  COMPANY NAME                                      |
+|  ABN: 12 345 678 901                                       |
+|  123 Business St, City STATE 1234                           |
+|  P: (02) 1234 5678  |  E: info@co.com  |  W: co.com       |
++------------------------------------------------------------+
+|                                                             |
+|  QUOTE #Q-0042                    Date: 8 February 2026     |
+|                                   Valid Until: 8 March 2026 |
+|                                                             |
++-------------------------------+-----------------------------+
+|  PREPARED FOR                 |  YOUR CONTACT               |
+|  Client Name                  |  John Smith                 |
+|  123 Client Address           |  john@company.com           |
+|  client@email.com             |  0412 345 678               |
+|  0400 000 000                 |                             |
++-------------------------------+-----------------------------+
+|                                                             |
+|  Dear Client Name,                                          |
+|                                                             |
+|  [Rich text scope/description rendered as a letter body]    |
+|  Thank you for the opportunity to provide this quote...     |
+|                                                             |
++------------------------------------------------------------+
+|                                                             |
+|  QUOTED ITEMS                                               |
+|  [Table with items]                                         |
+|                                                             |
++------------------------------------------------------------+
+|                                     Subtotal    $X,XXX.XX   |
+|                                     GST (10%)   $XXX.XX     |
+|                                     TOTAL       $X,XXX.XX   |
++------------------------------------------------------------+
+|                                                             |
+|  NOTES                                                      |
+|  [Client notes text]                                        |
+|                                                             |
++------------------------------------------------------------+
+|  TERMS & CONDITIONS                                         |
+|  [Terms text in smaller font]                               |
+|                                                             |
++------------------------------------------------------------+
+|                                                             |
+|  ___________________        ___________________             |
+|  Client Signature/Date      Company Rep/Date                |
+|                                                             |
++------------------------------------------------------------+
+|  Company Name  |  ABN: XX XXX XXX XXX  |  phone  |  email   |
++------------------------------------------------------------+
+```
+
+### Key Design Changes
+
+1. **Letterhead header**: Company logo, name, ABN, and full contact details in a clean horizontal bar with a primary-colored bottom border. No more emoji icons -- use clean text separators.
+
+2. **Quote metadata bar**: Quote number displayed prominently as a large label on the left, with date and validity on the right. Clean horizontal layout instead of stacked right-aligned text.
+
+3. **Two-column contact section**: "Prepared For" (client) on the left, "Your Contact" (quote owner) on the right. Both in clean bordered boxes.
+
+4. **Letter-style scope**: The description/scope is rendered as a letter body below the contact section, starting with "Dear [Client Name]," if a client name exists. The rich text HTML is rendered with proper typography. This replaces the cramped "Project" info box.
+
+5. **Clean table styling**: Remove the colored info-box styling. Use clean black/gray lines, uppercase headers, and good spacing. Professional accounting-style table.
+
+6. **Totals**: Right-aligned summary box with clean lines. The grand total row uses a dark background (slate/charcoal) instead of the primary amber color, for a more professional look.
+
+7. **Footer**: Repeats company name, ABN, phone, and email in a single line at the page bottom -- standard letterhead footer.
+
+8. **Print colors**: Switch from amber/orange primary to a neutral charcoal/slate palette for print. This looks more professional and prints well in grayscale. The primary color is only used for the header accent line.
+
+---
+
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| Database migration | Add `abn` to organizations, `phone` to profiles |
+| `src/hooks/useOrganizationBranding.ts` | Add `abn` to select and interface |
+| `src/hooks/useUserProfile.ts` | Add `phone` to Profile interface and update mutation |
+| `src/hooks/useQuoteOwnerProfile.ts` | **New** -- fetch quote creator's profile for PDF |
+| `src/pages/Settings.tsx` | Add ABN field in Company tab, Phone field in Profile tab |
+| `src/pages/QuotePreview.tsx` | Complete restructure to letterhead layout with owner info |
+| `src/styles/quote-print.css` | Complete rewrite for professional letterhead styling |
 
 ---
 
 ## Technical Details
 
-### Files to Modify
+### Database Migration SQL
 
-| File | Changes |
-|------|---------|
-| `src/index.css` | Darken `--muted-foreground` and `--border` CSS variables for better contrast |
-| `src/components/quotes/QuoteLineItemRow.tsx` | Stronger zebra stripes, full-opacity borders, visible input borders, bolder totals |
-| `src/components/quotes/QuoteLineItemsTable.tsx` | Stronger header, full-opacity dividers, mobile card border fixes |
-| `src/components/quotes/QuoteSummaryPanel.tsx` | Improve label contrast in bottom bar |
-| `src/pages/QuotesList.tsx` | Full-opacity row dividers, better text contrast |
-| `src/components/quotes/QuoteClientCard.tsx` | Visible input borders |
+```sql
+ALTER TABLE public.organizations ADD COLUMN abn text;
+ALTER TABLE public.profiles ADD COLUMN phone text;
+```
 
-### Design Principle
+No RLS changes needed -- existing policies already cover these tables appropriately.
 
-The fix is simple: stop using opacity modifiers on things that need to be visible. Borders should be `border-border`, not `border-border/30`. Backgrounds should be at least 8% opacity to register visually. Text that needs to be read should be at least 38% lightness, not 45%.
+### Quote Owner Profile Hook
+
+```typescript
+// Fetches the profile of the user who created the quote
+// Uses the quote's created_by field to look up the profile
+export function useQuoteOwnerProfile(createdBy: string | undefined) {
+  return useQuery({
+    queryKey: ['profile', createdBy],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, email, phone')
+        .eq('id', createdBy)
+        .single();
+      return data;
+    },
+    enabled: !!createdBy,
+  });
+}
+```
+
+### CSS Approach
+
+The print CSS will use hardcoded colors (no CSS variables) for reliable printing:
+- Header accent: `#1a1a1a` (near black) with a thin primary-colored line
+- Text: `#1a1a1a` for headings, `#4a4a4a` for body, `#6b7280` for labels
+- Borders: `#e5e7eb` for table lines, `#d1d5db` for section dividers
+- Grand total row: `#1e293b` (slate-800) background with white text
+- All backgrounds use `print-color-adjust: exact` for reliable output
+
+### Removing Emoji Icons
+
+All emoji icons (phone, mail, globe, pin) are replaced with clean text labels or simple Unicode characters that print reliably. Example: `Ph: (02) 1234 5678` instead of `📞 (02) 1234 5678`.
 
