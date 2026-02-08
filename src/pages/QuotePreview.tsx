@@ -1,12 +1,72 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuote } from '@/hooks/useQuotes';
+import { useQuoteLineItems, LineItem } from '@/hooks/useQuoteLineItems';
+import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Loader2 } from 'lucide-react';
+import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
+
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-AU', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+// Render a single line item row (parent or child)
+function LineItemRow({
+  item,
+  isChild,
+}: {
+  item: LineItem;
+  isChild?: boolean;
+}) {
+  const hasChildren = item.subItems.length > 0;
+  // Parent total aggregates from children
+  const displayTotal = hasChildren
+    ? item.subItems
+        .filter(c => !c.is_optional)
+        .reduce((s, c) => s + c.line_total, 0)
+    : item.line_total;
+
+  return (
+    <>
+      <tr className={`${isChild ? 'child-row' : 'parent-row'} ${item.is_optional ? 'optional-row' : ''}`}>
+        <td className={isChild ? 'pl-8' : 'font-semibold'}>{item.description}</td>
+        <td className="text-right font-mono-numbers">
+          {!hasChildren ? item.quantity.toFixed(2) : ''}
+        </td>
+        <td className="text-right font-mono-numbers">
+          {!hasChildren && item.sell_price > 0 ? formatCurrency(item.sell_price) : ''}
+        </td>
+        <td className="text-right font-mono-numbers font-semibold">
+          {displayTotal > 0 ? formatCurrency(displayTotal) : '—'}
+        </td>
+      </tr>
+      {item.subItems.map(child => (
+        <LineItemRow key={child.id} item={child} isChild />
+      ))}
+    </>
+  );
+}
 
 export default function QuotePreview() {
   const { quoteId } = useParams<{ quoteId: string }>();
   const navigate = useNavigate();
-  const { data: quote, isLoading } = useQuote(quoteId);
+  const { data: quote, isLoading: quoteLoading } = useQuote(quoteId);
+  const { lineItems, isLoading: itemsLoading } = useQuoteLineItems(quoteId);
+  const { data: org } = useOrganizationBranding();
+
+  const isLoading = quoteLoading || itemsLoading;
 
   if (isLoading) {
     return (
@@ -28,19 +88,182 @@ export default function QuotePreview() {
     );
   }
 
+  // Separate required and optional items
+  const requiredItems = lineItems.filter(item => !item.is_optional);
+  const optionalItems = lineItems.filter(item => item.is_optional);
+
+  const termsText = quote.terms_and_conditions || org?.terms_and_conditions;
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-muted/30">
+      {/* ── Toolbar (hidden when printing) ───────────────────────── */}
       <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50 print:hidden">
-        <div className="container mx-auto px-4 h-16 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(`/quotes/${quote.id}`)}>
+        <div className="container mx-auto px-4 h-14 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/quotes/${quote.id}`)}
+          >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <span className="font-mono font-semibold">{quote.quote_number}</span>
-          <span className="text-muted-foreground">— Preview</span>
+          <span className="font-mono font-semibold text-sm">{quote.quote_number}</span>
+          <QuoteStatusBadge status={quote.status} />
+          <span className="text-muted-foreground text-sm">— Preview</span>
+          <div className="ml-auto">
+            <Button size="sm" onClick={() => window.print()}>
+              <Printer className="w-4 h-4 mr-2" />
+              Print / PDF
+            </Button>
+          </div>
         </div>
       </header>
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <p className="text-muted-foreground">Quote preview — full implementation coming in Phase 5.</p>
+
+      {/* ── Print-optimized document ─────────────────────────────── */}
+      <main className="quote-print-document">
+        {/* Company Header */}
+        <div className="quote-header">
+          <div className="company-block">
+            {org?.logo_url && (
+              <img src={org.logo_url} alt="Logo" className="company-logo" />
+            )}
+            <div className="company-name">{org?.name || 'Your Company'}</div>
+            <div className="company-details">
+              {org?.address && <span>{org.address}</span>}
+              {org?.phone && <span>📞 {org.phone}</span>}
+              {org?.email && <span>✉ {org.email}</span>}
+              {org?.website && <span>🌐 {org.website}</span>}
+            </div>
+          </div>
+          <div className="quote-title-block">
+            <div className="quote-title-label">QUOTE</div>
+            <div className="quote-number">{quote.quote_number}</div>
+            <div className="quote-date">{formatDate(quote.created_at)}</div>
+            {quote.valid_until && (
+              <div className="quote-validity">
+                Valid until {formatDate(quote.valid_until)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Info Grid: Project + Client */}
+        <div className="info-grid">
+          <div className="info-box">
+            <h3>Project</h3>
+            {quote.title && <p className="info-name">{quote.title}</p>}
+            {quote.client_address && <p>📍 {quote.client_address}</p>}
+            {quote.description && (
+              <p className="info-description">{quote.description}</p>
+            )}
+          </div>
+          {quote.client_name && (
+            <div className="info-box">
+              <h3>Client</h3>
+              <p className="info-name">{quote.client_name}</p>
+              {quote.client_address && <p>{quote.client_address}</p>}
+              {quote.client_phone && <p>📞 {quote.client_phone}</p>}
+              {quote.client_email && <p>✉ {quote.client_email}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Line Items Table */}
+        {requiredItems.length > 0 && (
+          <>
+            <h2 className="section-heading">Quoted Items</h2>
+            <table className="items-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th className="text-right">Qty</th>
+                  <th className="text-right">Unit Price</th>
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requiredItems.map(item => (
+                  <LineItemRow key={item.id} item={item} />
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {/* Optional Items */}
+        {optionalItems.length > 0 && (
+          <>
+            <h2 className="section-heading">Optional Items</h2>
+            <table className="items-table optional-table">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th className="text-right">Qty</th>
+                  <th className="text-right">Unit Price</th>
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {optionalItems.map(item => (
+                  <LineItemRow key={item.id} item={item} />
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {/* Totals Summary */}
+        <div className="totals-box">
+          <div className="totals-row">
+            <span>Subtotal</span>
+            <span className="font-mono-numbers">{formatCurrency(quote.subtotal)}</span>
+          </div>
+          {quote.tax_rate > 0 && (
+            <div className="totals-row">
+              <span>GST ({quote.tax_rate}%)</span>
+              <span className="font-mono-numbers">{formatCurrency(quote.tax_amount)}</span>
+            </div>
+          )}
+          <div className="totals-row grand-total">
+            <span>Total (inc. GST)</span>
+            <span className="font-mono-numbers">{formatCurrency(quote.total_amount)}</span>
+          </div>
+        </div>
+
+        {/* Notes */}
+        {quote.notes && (
+          <div className="notes-box">
+            <h3>Notes</h3>
+            <p>{quote.notes}</p>
+          </div>
+        )}
+
+        {/* Terms & Conditions */}
+        {termsText && (
+          <div className="terms-box">
+            <h3>Terms & Conditions</h3>
+            <p style={{ whiteSpace: 'pre-wrap' }}>{termsText}</p>
+          </div>
+        )}
+
+        {/* Signature */}
+        <div className="signature-grid">
+          <div className="signature-box">
+            <div className="signature-line" />
+            <span>Client Signature / Date</span>
+          </div>
+          <div className="signature-box">
+            <div className="signature-line" />
+            <span>Company Representative / Date</span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="document-footer">
+          <p>
+            Generated by {org?.name || 'Flooro'} •{' '}
+            {formatDate(new Date().toISOString())}
+          </p>
+        </div>
       </main>
     </div>
   );
