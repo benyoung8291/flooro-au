@@ -93,161 +93,154 @@ export default function QuotesList() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header — clean, minimal */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="/favicon.png" alt="Flooro" className="w-8 h-8" />
-            <h1 className="text-lg font-semibold text-foreground">Quotes</h1>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} size="sm">
+    <div className="container mx-auto px-4 py-6 space-y-5">
+      {/* Page title + New Quote button */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-foreground">Quotes</h1>
+        <Button onClick={() => setCreateOpen(true)} size="sm">
+          <Plus className="w-4 h-4 mr-2" />
+          New Quote
+        </Button>
+      </div>
+
+      {/* Inline stat bar */}
+      <div className="flex items-center gap-3 text-sm text-muted-foreground overflow-x-auto">
+        <span className="font-mono font-medium text-foreground">{stats.total}</span>
+        <span>quotes</span>
+        <Separator orientation="vertical" className="h-4" />
+        <span className="font-mono font-medium text-foreground">{formatCurrency(stats.totalValue)}</span>
+        <span>total</span>
+        <Separator orientation="vertical" className="h-4" />
+        <span className="font-mono font-medium text-green-600 dark:text-green-400">{stats.accepted}</span>
+        <span>accepted</span>
+        <Separator orientation="vertical" className="h-4" />
+        <span className="font-mono font-medium text-foreground">{stats.sent}</span>
+        <span>pending</span>
+      </div>
+
+      {/* Filter bar: search + status chips */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search quotes..."
+            className="pl-10 h-10 rounded-full border-border bg-muted/30 focus:bg-background"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map(f => (
+            <button
+              key={f.value}
+              onClick={() => setStatusFilter(f.value)}
+              className={cn(
+                'px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors',
+                statusFilter === f.value
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted/50'
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Quote rows */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-16 bg-muted/30 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      ) : filteredQuotes.length === 0 ? (
+        <div className="py-20 text-center">
+          <FileText className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
+          <h3 className="text-lg font-medium text-foreground mb-1">No quotes yet</h3>
+          <p className="text-muted-foreground mb-6">
+            Create your first quote to get started.
+          </p>
+          <Button onClick={() => setCreateOpen(true)} size="lg">
             <Plus className="w-4 h-4 mr-2" />
             New Quote
           </Button>
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-6 space-y-5">
-        {/* ── Inline stat bar ────────────────────────────── */}
-        <div className="flex items-center gap-3 text-sm text-muted-foreground overflow-x-auto">
-          <span className="font-mono font-medium text-foreground">{stats.total}</span>
-          <span>quotes</span>
-          <Separator orientation="vertical" className="h-4" />
-          <span className="font-mono font-medium text-foreground">{formatCurrency(stats.totalValue)}</span>
-          <span>total</span>
-          <Separator orientation="vertical" className="h-4" />
-          <span className="font-mono font-medium text-green-600 dark:text-green-400">{stats.accepted}</span>
-          <span>accepted</span>
-          <Separator orientation="vertical" className="h-4" />
-          <span className="font-mono font-medium text-foreground">{stats.sent}</span>
-          <span>pending</span>
-        </div>
-
-        {/* ── Filter bar: search + status chips ──────────── */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search quotes..."
-              className="pl-10 h-10 rounded-full border-border bg-muted/30 focus:bg-background"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {STATUS_FILTERS.map(f => (
-              <button
-                key={f.value}
-                onClick={() => setStatusFilter(f.value)}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-medium rounded-full whitespace-nowrap transition-colors',
-                  statusFilter === f.value
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted/50'
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* ── Quote rows ──────────────────────────────────── */}
-        {isLoading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="h-16 bg-muted/30 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : filteredQuotes.length === 0 ? (
-          <div className="py-20 text-center">
-            <FileText className="w-16 h-16 mx-auto text-muted-foreground/30 mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-1">No quotes yet</h3>
-            <p className="text-muted-foreground mb-6">
-              Create your first quote to get started.
-            </p>
-            <Button onClick={() => setCreateOpen(true)} size="lg">
-              <Plus className="w-4 h-4 mr-2" />
-              New Quote
-            </Button>
-          </div>
-        ) : (
-          <div className="divide-y divide-border">
-            {filteredQuotes.map(quote => (
-              <div
-                key={quote.id}
-                className="flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"
-                onClick={() => navigate(`/quotes/${quote.id}`)}
-              >
-                {/* Left: quote info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-mono text-xs text-foreground/60">
-                      {quote.quote_number}
-                    </span>
-                    {quote.title && (
-                      <>
-                        <span className="text-muted-foreground/40">·</span>
-                        <span className="text-sm font-medium text-foreground truncate">
-                          {quote.title}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <QuoteStatusBadge status={quote.status} />
-                    {quote.client_name && (
-                      <>
-                        <span className="text-muted-foreground/40">·</span>
-                        <span className="truncate">{quote.client_name}</span>
-                      </>
-                    )}
-                    <span className="text-muted-foreground/40">·</span>
-                    <span>{format(new Date(quote.created_at), 'dd MMM yyyy')}</span>
-                  </div>
-                </div>
-
-                {/* Right: amount + menu */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-mono font-semibold text-foreground">
-                    {formatCurrency(quote.total_amount)}
+      ) : (
+        <div className="divide-y divide-border">
+          {filteredQuotes.map(quote => (
+            <div
+              key={quote.id}
+              className="flex items-center gap-4 py-3 px-2 -mx-2 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"
+              onClick={() => navigate(`/quotes/${quote.id}`)}
+            >
+              {/* Left: quote info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-mono text-xs text-foreground/60">
+                    {quote.quote_number}
                   </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${quote.id}`); }}>
-                        <FileEdit className="w-4 h-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${quote.id}/preview`); }}>
-                        <Eye className="w-4 h-4 mr-2" />
-                        Preview
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(quote.id); }}>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={(e) => { e.stopPropagation(); setDeleteId(quote.id); }}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {quote.title && (
+                    <>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span className="text-sm font-medium text-foreground truncate">
+                        {quote.title}
+                      </span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <QuoteStatusBadge status={quote.status} />
+                  {quote.client_name && (
+                    <>
+                      <span className="text-muted-foreground/40">·</span>
+                      <span className="truncate">{quote.client_name}</span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground/40">·</span>
+                  <span>{format(new Date(quote.created_at), 'dd MMM yyyy')}</span>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </main>
+
+              {/* Right: amount + menu */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="font-mono font-semibold text-foreground">
+                  {formatCurrency(quote.total_amount)}
+                </span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${quote.id}`); }}>
+                      <FileEdit className="w-4 h-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/quotes/${quote.id}/preview`); }}>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Preview
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(quote.id); }}>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Duplicate
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={(e) => { e.stopPropagation(); setDeleteId(quote.id); }}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <CreateQuoteDialog open={createOpen} onOpenChange={setCreateOpen} />
 

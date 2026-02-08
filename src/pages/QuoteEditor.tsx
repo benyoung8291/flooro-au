@@ -1,15 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuote, useUpdateQuote, type QuoteStatus, type UpdateQuoteInput } from '@/hooks/useQuotes';
 import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
 import { QuoteLineItemsTable } from '@/components/quotes/QuoteLineItemsTable';
-import { QuoteSummaryPanel } from '@/components/quotes/QuoteSummaryPanel';
 import { QuoteClientCard } from '@/components/quotes/QuoteClientCard';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
+import { QuoteEditorTotals } from '@/components/quotes/QuoteEditorTotals';
+import { QuoteEditorNotesTab } from '@/components/quotes/QuoteEditorNotesTab';
 import { PriceBookPickerDialog } from '@/components/quotes/PriceBookPickerDialog';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, Save, FileText } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Loader2,
+  Save,
+  FileText,
+  ArrowLeft,
+  Send,
+  CheckCircle2,
+  XCircle,
+  ChevronDown,
+  List,
+  User,
+  StickyNote,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 export default function QuoteEditor() {
   const { quoteId } = useParams<{ quoteId: string }>();
@@ -112,9 +134,24 @@ export default function QuoteEditor() {
     [priceBookParentId, addLineItem, addSubItem, updateLineItem]
   );
 
+  const statusActions = useMemo(() => {
+    if (!quote) return [];
+    const actions: { label: string; status: QuoteStatus; icon: React.ElementType; className: string }[] = [];
+    if (quote.status === 'draft') {
+      actions.push({ label: 'Mark Sent', status: 'sent', icon: Send, className: '' });
+    }
+    if (quote.status === 'draft' || quote.status === 'sent') {
+      actions.push({ label: 'Accepted', status: 'accepted', icon: CheckCircle2, className: 'text-green-600' });
+    }
+    if (quote.status === 'sent') {
+      actions.push({ label: 'Declined', status: 'declined', icon: XCircle, className: 'text-destructive' });
+    }
+    return actions;
+  }, [quote?.status]);
+
   if (quoteLoading || itemsLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
@@ -122,7 +159,7 @@ export default function QuoteEditor() {
 
   if (!quote) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
         <p className="text-muted-foreground">Quote not found</p>
         <Button onClick={() => navigate('/quotes')}>
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -133,22 +170,65 @@ export default function QuoteEditor() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* ── Minimal sticky header ─────────────────────────── */}
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-50">
-        <div className="px-4 lg:px-6 h-14 flex items-center justify-between gap-3">
+    <div className="h-full flex flex-col">
+      {/* Quote header bar */}
+      <div className="px-4 lg:px-6 py-4 border-b border-border bg-card/50 shrink-0">
+        <div className="flex items-center justify-between gap-4 max-w-5xl mx-auto">
           <div className="flex items-center gap-3 min-w-0">
-            <Button variant="ghost" size="icon" className="shrink-0" onClick={() => navigate('/quotes')}>
+            <Button variant="ghost" size="icon" className="shrink-0 md:hidden" onClick={() => navigate('/quotes')}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <span className="font-mono font-semibold text-sm">{quote.quote_number}</span>
-            <QuoteStatusBadge status={quote.status} />
-            {hasUnsavedChanges && (
-              <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" title="Unsaved changes" />
-            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="font-mono font-semibold text-sm">{quote.quote_number}</span>
+                <QuoteStatusBadge status={quote.status} />
+                {hasUnsavedChanges && (
+                  <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" title="Unsaved changes" />
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>{format(new Date(quote.created_at), 'dd MMM yyyy')}</span>
+                {quote.valid_until && (
+                  <>
+                    <span>·</span>
+                    <span>Valid until {format(new Date(quote.valid_until), 'dd MMM yyyy')}</span>
+                  </>
+                )}
+                {quote.client_name && (
+                  <>
+                    <span>·</span>
+                    <span className="truncate">{quote.client_name}</span>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Status dropdown */}
+            {statusActions.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    Status
+                    <ChevronDown className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {statusActions.map(({ label, status, icon: Icon, className }) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() => handleStatusChange(status)}
+                      className={className}
+                    >
+                      <Icon className="w-4 h-4 mr-2" />
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <Button
               variant="ghost"
               size="icon"
@@ -173,55 +253,78 @@ export default function QuoteEditor() {
             </Button>
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* ── Content — single column ─────────────────────── */}
-      <main className="px-4 lg:px-6 py-6 space-y-6 max-w-5xl mx-auto">
-        {/* Title + Client (collapsible) */}
-        <QuoteClientCard
-          clientName={quote.client_name}
-          clientEmail={quote.client_email}
-          clientPhone={quote.client_phone}
-          clientAddress={quote.client_address}
-          title={quote.title}
-          description={quote.description}
-          onUpdate={handleUpdateQuote}
-        />
+      {/* Tabbed content area */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-5xl mx-auto px-4 lg:px-6 py-6">
+          <Tabs defaultValue="line-items" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="line-items" className="gap-1.5">
+                <List className="w-3.5 h-3.5" />
+                Line Items
+              </TabsTrigger>
+              <TabsTrigger value="details" className="gap-1.5">
+                <User className="w-3.5 h-3.5" />
+                Details
+              </TabsTrigger>
+              <TabsTrigger value="notes" className="gap-1.5">
+                <StickyNote className="w-3.5 h-3.5" />
+                Notes
+              </TabsTrigger>
+            </TabsList>
 
-        {/* Line items — full width */}
-        <QuoteLineItemsTable
-          lineItems={lineItems}
-          onUpdate={updateLineItem}
-          onUpdatePricing={updateLineItemPricing}
-          onAddLineItem={() => addLineItem()}
-          onAddSubItem={addSubItem}
-          onRemove={removeLineItem}
-          onDuplicate={duplicateLineItem}
-          onToggleExpand={toggleExpanded}
-          onReorderParent={reorderParent}
-          onReorderSubItem={reorderSubItem}
-          onUngroupParent={ungroupParent}
-          onPromoteSubItem={promoteSubItem}
-          onGroupIntoParent={groupIntoParent}
-          onCreateGroupFromItem={createGroupFromItem}
-          onOpenPriceBook={() => {
-            setPriceBookParentId(null);
-            setPriceBookOpen(true);
-          }}
-        />
-      </main>
+            <TabsContent value="line-items" className="space-y-6">
+              <QuoteLineItemsTable
+                lineItems={lineItems}
+                onUpdate={updateLineItem}
+                onUpdatePricing={updateLineItemPricing}
+                onAddLineItem={() => addLineItem()}
+                onAddSubItem={addSubItem}
+                onRemove={removeLineItem}
+                onDuplicate={duplicateLineItem}
+                onToggleExpand={toggleExpanded}
+                onReorderParent={reorderParent}
+                onReorderSubItem={reorderSubItem}
+                onUngroupParent={ungroupParent}
+                onPromoteSubItem={promoteSubItem}
+                onGroupIntoParent={groupIntoParent}
+                onCreateGroupFromItem={createGroupFromItem}
+                onOpenPriceBook={() => {
+                  setPriceBookParentId(null);
+                  setPriceBookOpen(true);
+                }}
+              />
 
-      {/* ── Bottom summary bar ──────────────────────────── */}
-      <QuoteSummaryPanel
-        quote={quote}
-        lineItems={lineItems}
-        isSaving={isSaving}
-        hasUnsavedChanges={hasUnsavedChanges}
-        onSave={handleSave}
-        onUpdateQuote={handleUpdateQuote}
-        onStatusChange={handleStatusChange}
-        onNavigatePreview={() => navigate(`/quotes/${quoteId}/preview`)}
-      />
+              {/* Inline totals */}
+              <QuoteEditorTotals
+                lineItems={lineItems}
+                taxRate={quote.tax_rate}
+                onUpdateTaxRate={(rate) => handleUpdateQuote({ tax_rate: rate })}
+              />
+            </TabsContent>
+
+            <TabsContent value="details">
+              <QuoteClientCard
+                clientName={quote.client_name}
+                clientEmail={quote.client_email}
+                clientPhone={quote.client_phone}
+                clientAddress={quote.client_address}
+                title={quote.title}
+                description={quote.description}
+                onUpdate={handleUpdateQuote}
+              />
+            </TabsContent>
+
+            <TabsContent value="notes">
+              <QuoteEditorNotesTab
+                quote={quote}
+                onUpdateQuote={handleUpdateQuote}
+              />
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
 
       <PriceBookPickerDialog
         open={priceBookOpen}

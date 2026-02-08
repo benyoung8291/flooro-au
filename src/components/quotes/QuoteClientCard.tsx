@@ -1,9 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { User, Mail, Phone, MapPin, ChevronDown, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { RichTextEditor } from './RichTextEditor';
 import { useDebouncedField } from '@/hooks/useDebouncedField';
 import type { UpdateQuoteInput } from '@/hooks/useQuotes';
@@ -27,57 +26,44 @@ export function QuoteClientCard({
   description,
   onUpdate,
 }: QuoteClientCardProps) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Debounced fields — typing is instant, saves fire after 600ms of inactivity
   const titleField = useDebouncedField(title, useCallback((v: string | null) => onUpdate({ title: v }), [onUpdate]));
   const nameField = useDebouncedField(clientName, useCallback((v: string | null) => onUpdate({ client_name: v }), [onUpdate]));
   const emailField = useDebouncedField(clientEmail, useCallback((v: string | null) => onUpdate({ client_email: v }), [onUpdate]));
   const phoneField = useDebouncedField(clientPhone, useCallback((v: string | null) => onUpdate({ client_phone: v }), [onUpdate]));
   const addressField = useDebouncedField(clientAddress, useCallback((v: string | null) => onUpdate({ client_address: v }), [onUpdate]));
 
-  // Build compact preview text
-  const previewParts = [clientName, clientEmail, clientPhone, clientAddress].filter(Boolean);
-  const previewText = previewParts.length > 0 ? previewParts.join(' · ') : 'No client details';
-
   return (
-    <div className="space-y-4">
-      {/* Title — always visible, inline-editable like Google Docs */}
-      <input
-        value={titleField.value}
-        onChange={(e) => titleField.onChange(e.target.value)}
-        onBlur={titleField.flush}
-        placeholder="Untitled Quote"
-        className="w-full text-xl font-semibold bg-transparent border-none outline-none placeholder:text-muted-foreground/40 focus:placeholder:text-muted-foreground/60"
-      />
+    <div className="space-y-6">
+      {/* Title */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Quote Title</Label>
+        <input
+          value={titleField.value}
+          onChange={(e) => titleField.onChange(e.target.value)}
+          onBlur={titleField.flush}
+          placeholder="Untitled Quote"
+          className="w-full text-xl font-semibold bg-transparent border-none outline-none placeholder:text-muted-foreground/40 focus:placeholder:text-muted-foreground/60"
+        />
+      </div>
 
-      {/* Description — Rich text editor with formatting */}
-      <RichTextEditor
-        value={description}
-        onChange={(html) => onUpdate({ description: html })}
-        placeholder="Add a scope or description..."
-      />
+      {/* Scope / Description */}
+      <div className="space-y-2">
+        <Label className="text-xs text-muted-foreground">Scope / Description</Label>
+        <RichTextEditor
+          value={description}
+          onChange={(html) => onUpdate({ description: html })}
+          placeholder="Add a scope or description..."
+        />
+      </div>
 
-      {/* Client details — collapsible */}
-      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CollapsibleTrigger className="flex items-center gap-2 w-full text-left py-2 px-3 rounded-lg hover:bg-muted/50 transition-colors group">
-          {isOpen ? (
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-          )}
-          <User className="w-3.5 h-3.5 text-muted-foreground" />
-          <span className={cn(
-            'text-sm truncate flex-1',
-            previewParts.length === 0 ? 'text-muted-foreground/50 italic' : 'text-foreground'
-          )}>
-            {previewText}
-          </span>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 pl-9">
-            <div className="space-y-1">
+      {/* Client details */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">Client Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <User className="w-3 h-3" /> Client Name
               </Label>
@@ -86,10 +72,10 @@ export function QuoteClientCard({
                 onChange={(e) => nameField.onChange(e.target.value)}
                 onBlur={nameField.flush}
                 placeholder="Client name"
-                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <Mail className="w-3 h-3" /> Email
               </Label>
@@ -99,10 +85,10 @@ export function QuoteClientCard({
                 onChange={(e) => emailField.onChange(e.target.value)}
                 onBlur={emailField.flush}
                 placeholder="client@example.com"
-                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <Phone className="w-3 h-3" /> Phone
               </Label>
@@ -111,10 +97,10 @@ export function QuoteClientCard({
                 onChange={(e) => phoneField.onChange(e.target.value)}
                 onBlur={phoneField.flush}
                 placeholder="Phone number"
-                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm"
               />
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <MapPin className="w-3 h-3" /> Site Address
               </Label>
@@ -123,12 +109,12 @@ export function QuoteClientCard({
                 onChange={(e) => addressField.onChange(e.target.value)}
                 onBlur={addressField.flush}
                 placeholder="Site / delivery address"
-                className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
+                className="h-9 text-sm"
               />
             </div>
           </div>
-        </CollapsibleContent>
-      </Collapsible>
+        </CardContent>
+      </Card>
     </div>
   );
 }
