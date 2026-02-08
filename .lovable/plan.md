@@ -1,53 +1,119 @@
 
+# Quote Editor UI Polish
 
-# Fix Line Items Background to White
-
-The issue is that the line items table background appears as the warm cream color (`hsl(40, 33%, 97%)`) because both the page background and the table rows use the same `bg-background` CSS variable. The user wants the table area to be white, like in the reference screenshot.
+This plan addresses the spacing, typography, and layout issues visible in the screenshot. The changes focus on four areas: moving buttons above the white box, tightening row density, improving number fonts, and lifting quote info above the tabs.
 
 ---
 
-## What needs to change
+## 1. Move "Add Item" and "From Price Book" buttons above the line items table
 
-### 1. Quote Editor content area (`QuoteEditor.tsx`)
-- Wrap the Line Items tab content (table + totals) in a white card/container using `bg-white` (or `bg-card` which maps to near-white `hsl(40, 33%, 99%)`).
-- This creates a visual lift effect: cream page background with a white content card on top -- exactly matching the reference where the table sits on a distinct white surface.
+Currently these buttons sit at the bottom of the table inside the white container, butting up against the edges. They will be moved above the white box so they act as a toolbar row between the tabs and the table.
 
-### 2. Table row backgrounds (`QuoteLineItemRow.tsx`)
-- Change the `<tr>` class from `bg-background` to `bg-white` so each row is explicitly white, not cream.
+**File**: `src/pages/QuoteEditor.tsx`
+- Remove `onAddLineItem` and `onOpenPriceBook` from the `QuoteLineItemsTable` props
+- Add a toolbar row above the white container with the two buttons
 
-### 3. Table header row (`QuoteLineItemsTable.tsx`)
-- Change the `<thead>` row from `bg-background` to `bg-white` to match.
+**File**: `src/components/quotes/QuoteLineItemsTable.tsx`
+- Remove the footer actions div (lines 578-588) that renders the "Add Item" and "From Price Book" buttons
+
+---
+
+## 2. Reduce row padding and improve number typography (Excel-like density)
+
+Currently rows have `py-2.5` padding and inputs are `h-8`. This will be tightened to create a denser, spreadsheet-like feel.
+
+**File**: `src/components/quotes/QuoteLineItemRow.tsx`
+- Reduce row cell padding from `py-2.5` to `py-1` across all `<td>` elements
+- Reduce input height from `h-8` to `h-7`
+- Add `tabular-nums` to all number inputs for monospaced digit alignment
+- Make the Total column use `text-sm` with `tabular-nums` for clean alignment
+
+**File**: `src/components/quotes/QuoteLineItemRow.tsx` (FormattedNumberInput)
+- Reduce height from `h-8` to `h-7`
+- Add `tabular-nums` to the className
+- Remove the border by default (show only on hover/focus) for a cleaner look
+
+**File**: `src/components/quotes/QuoteLineItemsTable.tsx`
+- Reduce header padding from `py-3` to `py-2`
+
+---
+
+## 3. Move totals outside the white box and add spacing
+
+Currently the totals section is inside the white container with no breathing room. It will be moved outside the white box with proper top margin.
+
+**File**: `src/pages/QuoteEditor.tsx`
+- Move `QuoteEditorTotals` outside the white `<div>` container
+- Add `pt-4` spacing above the totals
+
+---
+
+## 4. Move quote title and client info above tabs (always visible)
+
+The quote number, status, and dates are already in the header bar. The quote title and a compact client summary line will be added between the header bar and the tabs so they are always visible regardless of which tab is active.
+
+**File**: `src/pages/QuoteEditor.tsx`
+- Add a section above the `<Tabs>` component showing:
+  - An editable quote title input (borderless, large font)
+  - A compact client summary line showing client name, email, and address as read-only text with pipe separators
+- The "Details" tab will keep the full editable client card for editing all fields
 
 ---
 
 ## Technical Details
 
-### QuoteEditor.tsx (line ~277)
-Wrap the Line Items `TabsContent` children in a white container:
-```tsx
-<TabsContent value="line-items" className="space-y-6">
-  <div className="bg-white dark:bg-card rounded-lg">
-    <QuoteLineItemsTable ... />
-    <QuoteEditorTotals ... />
-  </div>
-</TabsContent>
+### QuoteEditor.tsx layout changes
+
+The content area restructure:
+
+```text
++-------------------------------------+
+| Quote header (number, status, save) |  <-- existing header bar
++-------------------------------------+
+| [Title input] "Untitled Quote"      |  <-- NEW: always-visible title
+| Client Name | email | address       |  <-- NEW: compact client summary
++-------------------------------------+
+| [Line Items] [Details] [Notes] tabs |  <-- existing tabs
++-------------------------------------+
+| [+ Add Item] [From Price Book]      |  <-- MOVED: toolbar above table
++-------------------------------------+
+| +-------------------------------+   |
+| | Description | Qty | Cost | .. |   |  <-- white box (table only)
+| | ...                           |   |
+| +-------------------------------+   |
++-------------------------------------+
+|              Subtotal   $4,947.03   |  <-- MOVED: outside white box
+|              GST        $494.70     |
+|              Total      $5,441.74   |
++-------------------------------------+
 ```
 
-### QuoteLineItemRow.tsx (line ~181)
-Change `bg-background` to `bg-white dark:bg-card`:
+### Row density changes in QuoteLineItemRow.tsx
+
+| Element | Before | After |
+|---------|--------|-------|
+| Cell padding | `py-2.5` | `py-1` |
+| Input height | `h-8` | `h-7` |
+| Input border | Always visible (`border-border/50`) | Transparent by default, visible on hover/focus |
+| Number font | `font-mono` | `font-mono tabular-nums` |
+| Header padding | `py-3` | `py-2` |
+
+### FormattedNumberInput border change
+
 ```tsx
-<tr className={cn(
-  'group border-b border-border/40 transition-colors',
-  'bg-white dark:bg-card',
-  'hover:bg-muted/30',
-  ...
-)}>
+// Before
+'border border-border/50 bg-transparent'
+// After  
+'border border-transparent bg-transparent'
+'hover:border-border/50 focus:border-input'
 ```
 
-### QuoteLineItemsTable.tsx (line ~508)
-Change the header row from `bg-background` to `bg-white dark:bg-card`:
-```tsx
-<tr className="border-b border-border bg-white dark:bg-card">
-```
+This gives each cell a clean, borderless look by default (like a spreadsheet) but shows borders on interaction.
 
-This approach ensures the line items sit on a clean white surface while the surrounding page retains the warm cream tone -- creating the exact visual hierarchy seen in the reference screenshot.
+### Files modified
+
+| File | Changes |
+|------|---------|
+| `src/pages/QuoteEditor.tsx` | Add title/client summary above tabs, move buttons above table, move totals outside white box |
+| `src/components/quotes/QuoteLineItemRow.tsx` | Reduce padding, tighten inputs, improve number typography, borderless inputs |
+| `src/components/quotes/QuoteLineItemsTable.tsx` | Remove footer buttons, reduce header padding |
