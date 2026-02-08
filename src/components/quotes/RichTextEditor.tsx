@@ -77,10 +77,7 @@ export function RichTextEditor({
     <div className={cn('relative group', className)}>
       {/* Toolbar — visible on focus */}
       <div
-        className={cn(
-          'flex items-center gap-0.5 mb-1.5 transition-all',
-          isFocused ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1 pointer-events-none'
-        )}
+        className="flex items-center gap-0.5 mb-1.5"
       >
         {TOOLBAR_BUTTONS.map(({ command, icon: Icon, title }) => (
           <button
