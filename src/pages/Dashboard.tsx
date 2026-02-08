@@ -16,7 +16,8 @@ import {
   LogOut,
   Shield,
   Package,
-  BookOpen
+  BookOpen,
+  FileText
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -76,6 +77,10 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" onClick={() => navigate('/price-book')}>
               <BookOpen className="w-4 h-4 mr-2" />
               Price Book
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/quotes')}>
+              <FileText className="w-4 h-4 mr-2" />
+              Quotes
             </Button>
             <ThemeToggle />
             <Button variant="ghost" size="icon" onClick={() => navigate('/settings')}>

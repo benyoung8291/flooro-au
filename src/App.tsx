@@ -18,6 +18,9 @@ import PriceBook from "./pages/PriceBook";
 import Settings from "./pages/Settings";
 import Admin from "./pages/Admin";
 import Organizations from "./pages/admin/Organizations";
+import QuotesList from "./pages/QuotesList";
+import QuoteEditor from "./pages/QuoteEditor";
+import QuotePreview from "./pages/QuotePreview";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +46,9 @@ const App = () => (
                 <Route path="/materials" element={<Materials />} />
                 <Route path="/price-book" element={<PriceBook />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/quotes" element={<QuotesList />} />
+                <Route path="/quotes/:quoteId" element={<QuoteEditor />} />
+                <Route path="/quotes/:quoteId/preview" element={<QuotePreview />} />
               </Route>
 
               {/* Admin Routes */}
