@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { User, Mail, Phone, MapPin, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RichTextEditor } from './RichTextEditor';
+import { useDebouncedField } from '@/hooks/useDebouncedField';
 import type { UpdateQuoteInput } from '@/hooks/useQuotes';
 
 interface QuoteClientCardProps {
@@ -28,6 +29,13 @@ export function QuoteClientCard({
 }: QuoteClientCardProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  // Debounced fields — typing is instant, saves fire after 600ms of inactivity
+  const titleField = useDebouncedField(title, useCallback((v: string | null) => onUpdate({ title: v }), [onUpdate]));
+  const nameField = useDebouncedField(clientName, useCallback((v: string | null) => onUpdate({ client_name: v }), [onUpdate]));
+  const emailField = useDebouncedField(clientEmail, useCallback((v: string | null) => onUpdate({ client_email: v }), [onUpdate]));
+  const phoneField = useDebouncedField(clientPhone, useCallback((v: string | null) => onUpdate({ client_phone: v }), [onUpdate]));
+  const addressField = useDebouncedField(clientAddress, useCallback((v: string | null) => onUpdate({ client_address: v }), [onUpdate]));
+
   // Build compact preview text
   const previewParts = [clientName, clientEmail, clientPhone, clientAddress].filter(Boolean);
   const previewText = previewParts.length > 0 ? previewParts.join(' · ') : 'No client details';
@@ -36,8 +44,9 @@ export function QuoteClientCard({
     <div className="space-y-4">
       {/* Title — always visible, inline-editable like Google Docs */}
       <input
-        value={title || ''}
-        onChange={(e) => onUpdate({ title: e.target.value || null })}
+        value={titleField.value}
+        onChange={(e) => titleField.onChange(e.target.value)}
+        onBlur={titleField.flush}
         placeholder="Untitled Quote"
         className="w-full text-xl font-semibold bg-transparent border-none outline-none placeholder:text-muted-foreground/40 focus:placeholder:text-muted-foreground/60"
       />
@@ -73,8 +82,9 @@ export function QuoteClientCard({
                 <User className="w-3 h-3" /> Client Name
               </Label>
               <Input
-                value={clientName || ''}
-                onChange={(e) => onUpdate({ client_name: e.target.value || null })}
+                value={nameField.value}
+                onChange={(e) => nameField.onChange(e.target.value)}
+                onBlur={nameField.flush}
                 placeholder="Client name"
                 className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
@@ -85,8 +95,9 @@ export function QuoteClientCard({
               </Label>
               <Input
                 type="email"
-                value={clientEmail || ''}
-                onChange={(e) => onUpdate({ client_email: e.target.value || null })}
+                value={emailField.value}
+                onChange={(e) => emailField.onChange(e.target.value)}
+                onBlur={emailField.flush}
                 placeholder="client@example.com"
                 className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
@@ -96,8 +107,9 @@ export function QuoteClientCard({
                 <Phone className="w-3 h-3" /> Phone
               </Label>
               <Input
-                value={clientPhone || ''}
-                onChange={(e) => onUpdate({ client_phone: e.target.value || null })}
+                value={phoneField.value}
+                onChange={(e) => phoneField.onChange(e.target.value)}
+                onBlur={phoneField.flush}
                 placeholder="Phone number"
                 className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />
@@ -107,8 +119,9 @@ export function QuoteClientCard({
                 <MapPin className="w-3 h-3" /> Site Address
               </Label>
               <Input
-                value={clientAddress || ''}
-                onChange={(e) => onUpdate({ client_address: e.target.value || null })}
+                value={addressField.value}
+                onChange={(e) => addressField.onChange(e.target.value)}
+                onBlur={addressField.flush}
                 placeholder="Site / delivery address"
                 className="h-9 text-sm border-border/40 bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1"
               />

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Settings2,
 } from 'lucide-react';
+import { useDebouncedField } from '@/hooks/useDebouncedField';
 import type { Quote, QuoteStatus, UpdateQuoteInput } from '@/hooks/useQuotes';
 import type { LineItem } from '@/hooks/useQuoteLineItems';
 
@@ -74,6 +75,11 @@ export function QuoteSummaryPanel({
   const taxRate = quote.tax_rate || 10;
   const taxAmount = totalSell * (taxRate / 100);
   const grandTotal = totalSell + taxAmount;
+
+  // Debounced text fields — typing is instant, saves after 600ms of inactivity
+  const notesField = useDebouncedField(quote.notes, useCallback((v: string | null) => onUpdateQuote({ notes: v }), [onUpdateQuote]));
+  const internalNotesField = useDebouncedField(quote.internal_notes, useCallback((v: string | null) => onUpdateQuote({ internal_notes: v }), [onUpdateQuote]));
+  const termsField = useDebouncedField(quote.terms_and_conditions, useCallback((v: string | null) => onUpdateQuote({ terms_and_conditions: v }), [onUpdateQuote]));
 
   const statusActions = useMemo(() => {
     const actions: { label: string; status: QuoteStatus; icon: React.ElementType; className: string }[] = [];
@@ -191,8 +197,9 @@ export function QuoteSummaryPanel({
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                 <Label className="text-xs text-muted-foreground">Client Notes</Label>
                 <Textarea
-                  value={quote.notes || ''}
-                  onChange={(e) => onUpdateQuote({ notes: e.target.value || null })}
+                  value={notesField.value}
+                  onChange={(e) => notesField.onChange(e.target.value)}
+                  onBlur={notesField.flush}
                   placeholder="Visible on quote..."
                   className="text-sm min-h-[60px] resize-none"
                 />
@@ -200,8 +207,9 @@ export function QuoteSummaryPanel({
               <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                 <Label className="text-xs text-muted-foreground">Internal Notes</Label>
                 <Textarea
-                  value={quote.internal_notes || ''}
-                  onChange={(e) => onUpdateQuote({ internal_notes: e.target.value || null })}
+                  value={internalNotesField.value}
+                  onChange={(e) => internalNotesField.onChange(e.target.value)}
+                  onBlur={internalNotesField.flush}
                   placeholder="Private notes..."
                   className="text-sm min-h-[60px] resize-none"
                 />
@@ -209,8 +217,9 @@ export function QuoteSummaryPanel({
               <div className="space-y-1.5 sm:col-span-2">
                 <Label className="text-xs text-muted-foreground">Terms & Conditions</Label>
                 <Textarea
-                  value={quote.terms_and_conditions || ''}
-                  onChange={(e) => onUpdateQuote({ terms_and_conditions: e.target.value || null })}
+                  value={termsField.value}
+                  onChange={(e) => termsField.onChange(e.target.value)}
+                  onBlur={termsField.flush}
                   placeholder="Terms and conditions..."
                   className="text-sm min-h-[60px] resize-none"
                 />
