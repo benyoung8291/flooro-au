@@ -332,11 +332,6 @@ export default function QuoteEditor() {
 
             <TabsContent value="details">
               <QuoteClientCard
-                clientName={quote.client_name}
-                clientEmail={quote.client_email}
-                clientPhone={quote.client_phone}
-                clientAddress={quote.client_address}
-                title={quote.title}
                 description={quote.description}
                 onUpdate={handleUpdateQuote}
               />
