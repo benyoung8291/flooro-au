@@ -181,30 +181,27 @@ export function AccessoriesPanel({
         {/* Coving Section - Only for Sheet Vinyl */}
         {isSheetVinyl && (
           <Collapsible open={expandedSections.has('coving')} onOpenChange={() => toggleSection('coving')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background">
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 flex-1 mr-2">
                   <CornerDownRight className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">{ACCESSORY_TYPES.coving.label}</span>
-                </div>
-                <div className="flex items-center gap-2">
                   {accessories.coving?.enabled && (
                     <Badge variant="secondary" className="text-xs">
                       {accessoryCalc.coving?.quantity.toFixed(1)}m
                     </Badge>
                   )}
-                  <Switch 
-                    checked={accessories.coving?.enabled || false}
-                    onCheckedChange={(checked) => updateCoving({ enabled: checked })}
-                    onClick={(e) => e.stopPropagation()}
-                  />
                   <ChevronDown className={cn(
-                    "w-4 h-4 transition-transform",
+                    "w-4 h-4 transition-transform ml-auto",
                     expandedSections.has('coving') && "rotate-180"
                   )} />
                 </div>
-              </div>
-            </CollapsibleTrigger>
+              </CollapsibleTrigger>
+              <Switch 
+                checked={accessories.coving?.enabled || false}
+                onCheckedChange={(checked) => updateCoving({ enabled: checked })}
+              />
+            </div>
             <CollapsibleContent>
               <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
                 <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.coving.description}</p>
@@ -257,30 +254,27 @@ export function AccessoriesPanel({
         {/* Smooth Edge / Gripper Section - Only for Broadloom Carpet */}
         {isBroadloomCarpet && (
           <Collapsible open={expandedSections.has('smoothEdge')} onOpenChange={() => toggleSection('smoothEdge')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background">
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 flex-1 mr-2">
                   <Grip className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">{ACCESSORY_TYPES.smooth_edge.label}</span>
-                </div>
-                <div className="flex items-center gap-2">
                   {accessories.smoothEdge?.enabled && (
                     <Badge variant="secondary" className="text-xs">
                       {accessoryCalc.smoothEdge?.quantity.toFixed(1)}m
                     </Badge>
                   )}
-                  <Switch 
-                    checked={accessories.smoothEdge?.enabled || false}
-                    onCheckedChange={(checked) => updateSmoothEdge({ enabled: checked })}
-                    onClick={(e) => e.stopPropagation()}
-                  />
                   <ChevronDown className={cn(
-                    "w-4 h-4 transition-transform",
+                    "w-4 h-4 transition-transform ml-auto",
                     expandedSections.has('smoothEdge') && "rotate-180"
                   )} />
                 </div>
-              </div>
-            </CollapsibleTrigger>
+              </CollapsibleTrigger>
+              <Switch 
+                checked={accessories.smoothEdge?.enabled || false}
+                onCheckedChange={(checked) => updateSmoothEdge({ enabled: checked })}
+              />
+            </div>
             <CollapsibleContent>
               <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
                 <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.smooth_edge.description}</p>
@@ -318,13 +312,11 @@ export function AccessoriesPanel({
         {/* Weld Rod Section (only for sheet materials) */}
         {isRollMaterial && (
           <Collapsible open={expandedSections.has('weldRod')} onOpenChange={() => toggleSection('weldRod')}>
-            <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background">
+              <CollapsibleTrigger asChild>
+                <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 flex-1 mr-2">
                   <Scissors className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">{ACCESSORY_TYPES.weld_rod.label}</span>
-                </div>
-                <div className="flex items-center gap-2">
                   {accessories.weldRod?.enabled && (
                     <Badge variant="secondary" className="text-xs">
                       {covingEnabled 
@@ -332,18 +324,17 @@ export function AccessoriesPanel({
                         : `${seamLengthM.toFixed(1)}m`}
                     </Badge>
                   )}
-                  <Switch 
-                    checked={accessories.weldRod?.enabled || false}
-                    onCheckedChange={(checked) => updateWeldRod({ enabled: checked })}
-                    onClick={(e) => e.stopPropagation()}
-                  />
                   <ChevronDown className={cn(
-                    "w-4 h-4 transition-transform",
+                    "w-4 h-4 transition-transform ml-auto",
                     expandedSections.has('weldRod') && "rotate-180"
                   )} />
                 </div>
-              </div>
-            </CollapsibleTrigger>
+              </CollapsibleTrigger>
+              <Switch 
+                checked={accessories.weldRod?.enabled || false}
+                onCheckedChange={(checked) => updateWeldRod({ enabled: checked })}
+              />
+            </div>
             <CollapsibleContent>
               <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
                 <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.weld_rod.description}</p>
@@ -488,30 +479,27 @@ export function AccessoriesPanel({
         
         {/* Underlayment Section */}
         <Collapsible open={expandedSections.has('underlayment')} onOpenChange={() => toggleSection('underlayment')}>
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
-              <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background">
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 flex-1 mr-2">
                 <Layers className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">{ACCESSORY_TYPES.underlayment.label}</span>
-              </div>
-              <div className="flex items-center gap-2">
                 {accessories.underlayment?.enabled && accessories.underlayment?.type !== 'none' && (
                   <Badge variant="secondary" className="text-xs">
                     {accessories.underlayment.type}
                   </Badge>
                 )}
-                <Switch 
-                  checked={accessories.underlayment?.enabled || false}
-                  onCheckedChange={(checked) => updateUnderlayment({ enabled: checked })}
-                  onClick={(e) => e.stopPropagation()}
-                />
                 <ChevronDown className={cn(
-                  "w-4 h-4 transition-transform",
+                  "w-4 h-4 transition-transform ml-auto",
                   expandedSections.has('underlayment') && "rotate-180"
                 )} />
               </div>
-            </div>
-          </CollapsibleTrigger>
+            </CollapsibleTrigger>
+            <Switch 
+              checked={accessories.underlayment?.enabled || false}
+              onCheckedChange={(checked) => updateUnderlayment({ enabled: checked })}
+            />
+          </div>
           <CollapsibleContent>
             <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
               <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.underlayment.description}</p>
@@ -551,30 +539,27 @@ export function AccessoriesPanel({
         
         {/* Adhesive Section */}
         <Collapsible open={expandedSections.has('adhesive')} onOpenChange={() => toggleSection('adhesive')}>
-          <CollapsibleTrigger asChild>
-            <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent/50">
-              <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between p-2 rounded-lg border border-border bg-background">
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center gap-2 cursor-pointer hover:bg-accent/50 rounded px-1 py-0.5 flex-1 mr-2">
                 <Droplets className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">{ACCESSORY_TYPES.adhesive.label}</span>
-              </div>
-              <div className="flex items-center gap-2">
                 {accessories.adhesive?.enabled && accessories.adhesive?.type !== 'none' && (
                   <Badge variant="secondary" className="text-xs">
                     {accessories.adhesive.type}
                   </Badge>
                 )}
-                <Switch 
-                  checked={accessories.adhesive?.enabled || false}
-                  onCheckedChange={(checked) => updateAdhesive({ enabled: checked })}
-                  onClick={(e) => e.stopPropagation()}
-                />
                 <ChevronDown className={cn(
-                  "w-4 h-4 transition-transform",
+                  "w-4 h-4 transition-transform ml-auto",
                   expandedSections.has('adhesive') && "rotate-180"
                 )} />
               </div>
-            </div>
-          </CollapsibleTrigger>
+            </CollapsibleTrigger>
+            <Switch 
+              checked={accessories.adhesive?.enabled || false}
+              onCheckedChange={(checked) => updateAdhesive({ enabled: checked })}
+            />
+          </div>
           <CollapsibleContent>
             <div className="p-3 pt-2 space-y-3 border-x border-b border-border rounded-b-lg bg-background/50">
               <p className="text-xs text-muted-foreground">{ACCESSORY_TYPES.adhesive.description}</p>
