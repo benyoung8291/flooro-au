@@ -288,15 +288,15 @@ export default function NewProject() {
                   onDrop={handleDrop}
                   onDragOver={handleDragOver}
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
+                  className="border-2 border-dashed border-border rounded-lg p-6 sm:p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-3 sm:mb-4">
                     <FileImage className="w-6 h-6 text-muted-foreground" />
                   </div>
                   <p className="text-sm font-medium text-foreground mb-1">
                     Drop your floor plan here
                   </p>
-                  <p className="text-xs text-muted-foreground mb-4">
+                  <p className="text-xs text-muted-foreground mb-3 sm:mb-4">
                     Supports PDF, PNG, JPG up to 20MB
                   </p>
                   <Button type="button" variant="outline" size="sm">
@@ -309,11 +309,11 @@ export default function NewProject() {
           </Card>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3">
-            <Button type="button" variant="outline" onClick={() => navigate('/dashboard')}>
+          <div className="flex items-center justify-end gap-3 sticky bottom-0 bg-background/95 backdrop-blur-sm py-4 -mx-4 px-4 sm:static sm:bg-transparent sm:backdrop-blur-none sm:py-0 sm:mx-0 sm:px-0 border-t sm:border-t-0 border-border safe-area-bottom">
+            <Button type="button" variant="outline" onClick={() => navigate('/dashboard')} className="flex-1 sm:flex-none">
               Cancel
             </Button>
-            <Button type="submit" disabled={createProject.isPending || isUploading || !name.trim()}>
+            <Button type="submit" disabled={createProject.isPending || isUploading || !name.trim()} className="flex-1 sm:flex-none">
               {(createProject.isPending || isUploading) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Create Project
             </Button>

@@ -110,9 +110,9 @@ export default function QuotesList() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button onClick={() => setCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Quote
+            <Button onClick={() => setCreateOpen(true)} size="sm" className="sm:size-default">
+              <Plus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">New Quote</span>
             </Button>
           </div>
         </div>
@@ -120,55 +120,55 @@ export default function QuotesList() {
 
       <main className="container mx-auto px-4 py-8">
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
-                  <FileText className="w-5 h-5" />
+            <CardContent className="pt-4 sm:pt-6 pb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary shrink-0">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold font-mono">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Total Quotes</p>
+                <div className="min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold font-mono">{stats.total}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Quotes</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
-                  <DollarSign className="w-5 h-5" />
+            <CardContent className="pt-4 sm:pt-6 pb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary shrink-0">
+                  <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold font-mono">{formatCurrency(stats.totalValue)}</p>
-                  <p className="text-sm text-muted-foreground">Total Value</p>
+                <div className="min-w-0">
+                  <p className="text-lg sm:text-2xl font-bold font-mono truncate">{formatCurrency(stats.totalValue)}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Total Value</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card className="border-green-500/30 bg-green-500/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-green-500/20 text-green-600">
-                  <CheckCircle className="w-5 h-5" />
+            <CardContent className="pt-4 sm:pt-6 pb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-green-500/20 text-green-600 shrink-0">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold font-mono">{stats.accepted}</p>
-                  <p className="text-sm text-muted-foreground">Accepted</p>
+                <div className="min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold font-mono">{stats.accepted}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Accepted</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary">
-                  <Clock className="w-5 h-5" />
+            <CardContent className="pt-4 sm:pt-6 pb-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center bg-primary/10 text-primary shrink-0">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold font-mono">{stats.sent}</p>
-                  <p className="text-sm text-muted-foreground">Awaiting Response</p>
+                <div className="min-w-0">
+                  <p className="text-xl sm:text-2xl font-bold font-mono">{stats.sent}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Awaiting Response</p>
                 </div>
               </div>
             </CardContent>
@@ -180,21 +180,23 @@ export default function QuotesList() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search by quote number, client, or title..."
+              placeholder="Search quotes..."
               className="pl-10"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Tabs value={statusFilter} onValueChange={setStatusFilter}>
-            <TabsList>
-              {STATUS_TABS.map(tab => (
-                <TabsTrigger key={tab.value} value={tab.value}>
-                  {tab.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+              <TabsList className="w-max sm:w-auto">
+                {STATUS_TABS.map(tab => (
+                  <TabsTrigger key={tab.value} value={tab.value} className="text-xs sm:text-sm">
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         {/* Quote Cards */}

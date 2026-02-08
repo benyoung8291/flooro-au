@@ -71,6 +71,7 @@ export default function ProjectEditor() {
   const [activeTool, setActiveTool] = useState<EditorTool>('select');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [mobileDrawerTab, setMobileDrawerTab] = useState<string | undefined>(undefined);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
@@ -986,7 +987,7 @@ export default function ProjectEditor() {
       </header>
 
       {/* Page Tabs - show when pages exist */}
-      {!isMobile && pages.length >= 1 && (
+      {pages.length >= 1 && (
         <PageTabs
           pages={pages}
           activePageId={activePageId}
@@ -1108,7 +1109,15 @@ export default function ProjectEditor() {
         <MobileNav
           activeTool={activeTool}
           onToolChange={setActiveTool}
-          onOpenMenu={() => setMobileDrawerOpen(true)}
+          onOpenMenu={() => {
+            setMobileDrawerTab(undefined);
+            setMobileDrawerOpen(true);
+          }}
+          onOpenTakeoff={() => {
+            setMobileDrawerTab('takeoff');
+            setMobileDrawerOpen(true);
+          }}
+          roomCount={rooms.length}
         />
       )}
 
@@ -1135,6 +1144,7 @@ export default function ProjectEditor() {
           onMaterialSelect={handleMaterialSelect}
           projectName={project.name}
           projectAddress={project.address || undefined}
+          initialTab={mobileDrawerTab}
         />
       )}
 
