@@ -1,96 +1,74 @@
 
 
-# Quote Editor UX Overhaul - Phase 2
+# Color Scheme and Visibility Overhaul
 
-This plan addresses three core issues: poor visual clarity on desktop/mobile, the broken scope/description input, and the removal of the Hours column.
-
----
-
-## 1. Remove the Hours Column Entirely
-
-The "Hours" column will be removed from the desktop table and mobile card layout. This simplifies the UI by removing an unused column.
-
-**Desktop table**: Remove the "hours" column from `colgroup`, `thead`, and the `QuoteLineItemRow` component.
-
-**Mobile cards**: Remove the full-width "Hours" field from both parent and child card grids.
-
-**Summary bar**: Remove the hours display from `QuoteSummaryPanel`.
-
-**Files affected**: `QuoteLineItemRow.tsx`, `QuoteLineItemsTable.tsx`, `QuoteSummaryPanel.tsx`
+The core problem is that the current design over-optimizes for "minimal" at the expense of readability. Ultra-low-opacity backgrounds, transparent borders, and low-contrast text colors make the interface hard to read. This plan boosts contrast and visibility across all quote components while keeping the clean aesthetic.
 
 ---
 
-## 2. Fix and Upgrade the Scope/Description Input
+## Root Cause
 
-Currently the description field in `QuoteClientCard.tsx` is a single-line `<input>` element. This is why typing doesn't work well -- it cannot handle multi-line text and has no formatting.
-
-**Solution**: Replace the plain `<input>` with a `<textarea>` that supports:
-- Multi-line text entry with auto-growing height
-- Basic formatting via Markdown-style conventions stored as HTML
-- A mini formatting toolbar (Bold, Italic, Bullet list, Numbered list) using `contentEditable` div
-- The formatted content is stored as HTML in the `description` text column
-- On the PDF preview, the HTML is rendered directly using `dangerouslySetInnerHTML` with sanitization
-
-**Implementation approach**: Use a `contentEditable` div with `execCommand` for basic formatting (bold, italic, lists). This avoids adding a heavy rich text editor dependency while giving users the formatting they need. The HTML output is stored in the existing `description` text field in the database.
-
-**Files affected**: `QuoteClientCard.tsx` (new rich text editor component inline), `QuotePreview.tsx` (render HTML description)
+The CSS variables define a warm cream palette where the muted foreground color (`hsl(30, 10%, 45%)`) is too close to the background (`hsl(40, 33%, 97%)`). Combined with partial opacity borders (`border-border/30`, `/50`, `/60`) and near-invisible zebra striping (`bg-muted/[0.03]`), everything washes out.
 
 ---
 
-## 3. Desktop Table Visual Overhaul
+## Changes
 
-The current desktop table lacks clear visual separation between rows and has hard-to-read data.
+### 1. Improve Base Color Contrast (src/index.css)
 
-**Changes**:
-- Add alternating row backgrounds (zebra striping) for better readability
-- Increase row padding from `py-1.5` to `py-2.5` for breathing room
-- Add stronger border lines between rows (from `border-border/40` to `border-border`)
-- Make the table header row visually stronger with a background tint
-- Parent group rows get a distinct left border accent (4px primary colored) so they stand out
-- Child rows get slightly more indentation and a subtle connector line
-- The description column gets more width proportion
-- Number columns get a subtle right-align background strip for scanning
-- Total column is visually emphasized with slightly bolder font weight
-- Column widths adjusted: remove hours column width, redistribute to description
+Darken the muted-foreground color so labels and secondary text are readable:
+- Light mode `--muted-foreground`: change from `30 10% 45%` to `30 10% 38%` (darker)
+- Light mode `--border`: change from `35 20% 88%` to `35 15% 82%` (more visible borders)
+- Light mode `--input`: match the new border value
 
-**Files affected**: `QuoteLineItemRow.tsx`, `QuoteLineItemsTable.tsx`
+These small shifts make borders and labels noticeably more visible without changing the warm aesthetic.
 
----
+### 2. Desktop Table -- Stronger Visual Structure (QuoteLineItemRow.tsx)
 
-## 4. Mobile Card Layout Complete Redesign
+- **Zebra striping**: increase from `bg-muted/[0.03]` to `bg-muted/[0.08]` so alternating rows are actually visible
+- **Row borders**: change from `border-border/60` (parent) and `border-border/30` (child) to full `border-border` -- no opacity reduction
+- **Parent group left accent**: increase from `border-l-primary/60` to `border-l-primary` -- full opacity
+- **Parent group background**: increase from `bg-muted/10` to `bg-muted/20`
+- **Description inputs**: add a subtle persistent border (`border-border/50`) instead of fully transparent, so users can see where to type. Keep the stronger focus ring on click.
+- **Number inputs**: same treatment -- light persistent border instead of invisible
+- **Total column**: make the text slightly larger and bolder for scanning
+- **Child connector line**: darken from `bg-border/60` to `bg-border`
 
-The current mobile layout expands every field into a grid which wastes space and is hard to scan. The new design follows a compact, scannable approach.
+### 3. Desktop Table Header (QuoteLineItemsTable.tsx)
 
-**New mobile card structure**:
+- Header background: change from `bg-muted/30` to `bg-muted/50` for a stronger visual anchor
+- Header text: change from `text-foreground/80` to `text-foreground` -- full opacity
+- Header border: keep `border-b-2 border-border` (already solid)
 
-```text
-+--------------------------------------------------+
-| [arrows] Description input          $1,250.00 [...] |
-|                                                    |
-|  Qty: 10  |  Cost: $85.00  |  Sell: $125.00       |
-|                          Margin: 47.1%             |
-+--------------------------------------------------+
-```
+### 4. Mobile Cards -- Better Contrast (QuoteLineItemsTable.tsx)
 
-Key changes:
-- **Inline number display**: Instead of a 2-column grid of full-size inputs, show numbers as compact inline chips/badges that are tappable to edit
-- **Tap-to-edit pattern**: Numbers display as read-only text by default. Tapping a value opens it for inline editing, then blurs back to display mode. This shows maximum data in minimum space
-- **Description + Total on header row**: Already done, keep this pattern
-- **Remove the full grid of inputs**: Replace with a single compact row of labeled values
-- **Child items**: Show as tighter indented rows with just description + total, expandable to show cost details
-- **Reorder arrows**: Move to a drag handle icon on the left edge, smaller and less prominent
+- Card borders: change from `border-border/50` to `border-border` -- full opacity
+- Parent group left accent: `border-l-primary` instead of `border-l-primary/50`
+- Child border-left: change from `border-primary/10` to `border-primary/30`
+- Child bottom border: change from `border-border/20` to `border-border/60`
+- Margin text in data chips: use `text-foreground` instead of `text-muted-foreground` so numbers are readable
 
-**Files affected**: `QuoteLineItemsTable.tsx` (mobile section rewrite)
+### 5. Summary Bottom Bar (QuoteSummaryPanel.tsx)
 
----
+- Border top: change from `border-border` to `border-border` (keep) but increase shadow intensity
+- Labels ("Subtotal", "Margin", "GST"): use `text-foreground/60` instead of `text-muted-foreground` for slightly more contrast
+- Total label: make more prominent with `text-foreground` weight
 
-## 5. Print CSS Updates
+### 6. Quotes List Page (QuotesList.tsx)
 
-- Remove any hours-related column styles
-- Ensure the rich text description renders properly in print
-- Add `white-space: pre-wrap` and HTML rendering support for the description in the PDF info box
+- Quote row dividers: change from `divide-border/50` to `divide-border` -- full opacity
+- Quote number text: change from `text-muted-foreground` to `text-foreground/60` for better legibility
+- Date text: same treatment
 
-**Files affected**: `quote-print.css`, `QuotePreview.tsx`
+### 7. Client Card (QuoteClientCard.tsx)
+
+- Client detail inputs: add persistent `border-border/40` instead of `border-transparent` so fields are visible
+- Preview text: keep current contrast (already legible)
+
+### 8. MobileTapToEditValue Component
+
+- Display values: use `text-foreground` consistently (already using it)
+- Label text: keep `text-muted-foreground` but this will benefit from the global darkening in step 1
 
 ---
 
@@ -100,28 +78,14 @@ Key changes:
 
 | File | Changes |
 |------|---------|
-| `src/components/quotes/QuoteLineItemRow.tsx` | Remove hours column, increase padding, add zebra/accent styles, stronger borders |
-| `src/components/quotes/QuoteLineItemsTable.tsx` | Remove hours from colgroup/thead, redesign mobile cards to compact tap-to-edit layout, adjust column widths |
-| `src/components/quotes/QuoteClientCard.tsx` | Replace description input with contentEditable rich text editor with formatting toolbar |
-| `src/components/quotes/QuoteSummaryPanel.tsx` | Remove hours display from bottom bar |
-| `src/pages/QuotePreview.tsx` | Render description as HTML instead of plain text |
-| `src/styles/quote-print.css` | Add rich text description styling, remove hours references |
+| `src/index.css` | Darken `--muted-foreground` and `--border` CSS variables for better contrast |
+| `src/components/quotes/QuoteLineItemRow.tsx` | Stronger zebra stripes, full-opacity borders, visible input borders, bolder totals |
+| `src/components/quotes/QuoteLineItemsTable.tsx` | Stronger header, full-opacity dividers, mobile card border fixes |
+| `src/components/quotes/QuoteSummaryPanel.tsx` | Improve label contrast in bottom bar |
+| `src/pages/QuotesList.tsx` | Full-opacity row dividers, better text contrast |
+| `src/components/quotes/QuoteClientCard.tsx` | Visible input borders |
 
-### Rich Text Editor Approach
+### Design Principle
 
-Using `contentEditable` with a mini toolbar rather than a full library like TipTap or Slate:
-- Keeps bundle size small (zero new dependencies)
-- Supports bold, italic, underline, bullet lists, numbered lists
-- Stores output as HTML string in the existing `description` text column
-- Renders directly in PDF preview via `dangerouslySetInnerHTML`
-- The toolbar uses simple `document.execCommand()` calls (bold, italic, insertUnorderedList, insertOrderedList)
-- Styling matches the Google Docs aesthetic with a floating mini toolbar
+The fix is simple: stop using opacity modifiers on things that need to be visible. Borders should be `border-border`, not `border-border/30`. Backgrounds should be at least 8% opacity to register visually. Text that needs to be read should be at least 38% lightness, not 45%.
 
-### Mobile Tap-to-Edit Pattern
-
-Each numeric value renders as a styled span by default. On tap:
-1. The span becomes an input field (auto-focused, auto-selected)
-2. User types new value
-3. On blur, value saves and returns to display mode
-
-This pattern maximises information density on small screens while keeping everything editable.
