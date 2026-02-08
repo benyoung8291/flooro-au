@@ -51,7 +51,7 @@ function computeTotals(items: LineItem[]) {
     }
   }
 
-  const margin = totalSell > 0 ? ((totalSell - totalCost) / totalSell) * 100 : 0;
+  const margin = totalCost > 0 ? ((totalSell - totalCost) / totalCost) * 100 : 0;
   return { totalCost, totalSell, margin, totalHours };
 }
 
