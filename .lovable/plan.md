@@ -1,115 +1,159 @@
 
 
-# Quote Preview/PDF Overhaul -- FieldFlow Feature Parity
+# Quote UI/UX Overhaul -- World-Class Google-Inspired Design
 
-## What FieldFlow Has vs. What Flooro Has
+## Vision
 
-After reviewing the FieldFlow repository's `QuotePDFPreview.tsx`, `QuotePDFDocument.tsx`, and the `src/lib/pdf/` support library, here is a comprehensive gap analysis. FieldFlow gives users extensive control over how their quote PDF looks before downloading it.
-
----
-
-## Gap Analysis
-
-### 1. Display Control Toggles (Critical -- Missing Entirely)
-
-FieldFlow provides a toolbar with toggle switches that let users customize what appears on the PDF **in real-time**:
-
-| Toggle | FieldFlow | Flooro |
-|--------|-----------|--------|
-| **Show Sub-items** | Toggle to show/hide sub-item rows under parents | Always shows all sub-items |
-| **Hide Qty** (parent) | Hides the quantity column for parent rows | No option |
-| **Hide Pricing** (parent) | Hides unit price and total columns for parents | No option |
-| **Hide Sub Qty** | Hides quantity for sub-items (when shown) | No option |
-| **Hide Sub Pricing** | Hides unit price and total for sub-items | No option |
-
-These toggles are **persisted to localStorage** so users' preferences are remembered across sessions.
-
-### 2. Column Visibility Logic (Critical)
-
-When both parent and sub-item pricing/quantity are hidden, the entire column disappears from the table, and the Description column expands to fill the extra space. This is handled by `getVisibleColumns()` and `getColumnWidth()` in the `DynamicLineItemsTable`.
-
-### 3. Zoom Controls (Important)
-
-FieldFlow has zoom in/out buttons with percentage display, and **auto-zoom to fit container width** using a `ResizeObserver`. Flooro has no zoom controls.
-
-### 4. Page Count Display (Nice-to-have)
-
-FieldFlow shows the number of pages in the preview toolbar (e.g., "2 pages").
-
-### 5. Settings Persistence (Important)
-
-All PDF preview settings (toggle states) are saved to `localStorage` under `quote-pdf-settings` and restored on mount.
-
-### 6. Parent Row Aggregation in PDF (Critical)
-
-When sub-items are shown, parent rows display the **aggregated total** (sum of children) as the parent's unit price is derived from `line_total / qty`. When sub-items are hidden, parents show their own unit price and total directly.
-
-### 7. Optional Items as Grouped Sections (Important)
-
-FieldFlow supports **optional groups** with named sections (e.g., "Option A", "Option B") displayed as separate divider sections in the PDF, each with their own sub-total. There are two modes:
-- **Alternatives (OR)**: Each option shows "Quote Total with Option X" breakdown
-- **Add-ons (AND)**: Options show their subtotals, and the main totals section shows a combined total
-
-Flooro currently just separates items into "Required" and "Optional" tables.
+Transform the quotes experience from a functional but cluttered interface into a clean, spacious, Google-quality design. Think Google Sheets meets Google Docs -- minimal chrome, generous whitespace, clear visual hierarchy, and an interface that gets out of the user's way.
 
 ---
 
-## Implementation Plan
+## Current Problems Identified
 
-Since Flooro uses a CSS-based `window.print()` approach rather than `@react-pdf/renderer`, the implementation will adapt FieldFlow's toggle/control concepts to work with Flooro's existing HTML/CSS print system. This keeps things simpler and avoids adding heavy PDF rendering dependencies.
+1. **Quotes List Page**: Stats cards take up too much vertical space, filter tabs are cramped, quote cards are dense with small text
+2. **Quote Editor**: Header is cluttered (quote number, title, status, save all crammed together). Client card and summary panel feel disconnected. The line items table has too many tiny columns fighting for space with confusing arrow buttons
+3. **Mobile**: Line item cards have 6 numeric fields in a 3-column grid that's impossibly small to tap. Reorder arrows are tiny. The mobile experience is barely usable
+4. **Quote Preview/PDF**: Toolbar toggles are a flat row that wraps awkwardly on mobile. No visual grouping of related controls
 
-### Phase 1: Preview Toolbar with Display Toggles
+---
 
-Add a toolbar below the existing header with all the visibility controls:
+## Design Principles (Google-Inspired)
 
-**New state variables (with localStorage persistence):**
-- `showSubItems` (boolean, default: true)
-- `hideParentQty` (boolean, default: false)
-- `hideParentPricing` (boolean, default: false)
-- `hideSubItemQty` (boolean, default: false)
-- `hideSubItemPricing` (boolean, default: true -- FieldFlow's default)
+- **Breathing room**: 16-24px spacing between sections, generous padding inside cards
+- **Visual hierarchy through typography**: Use size and weight, not borders and backgrounds
+- **Minimal borders**: Rely on whitespace to separate sections, not lines everywhere
+- **Clean inputs**: Borderless inputs that only show borders on hover/focus (like Google Sheets cells)
+- **Elevation over borders**: Subtle shadows instead of heavy border styling
+- **Consistent 8px grid**: All spacing in multiples of 4/8
+- **Touch-friendly mobile**: Minimum 44px tap targets, single-column layouts
 
-**Toolbar UI:**
-- Row of Switch + Label pairs matching FieldFlow's layout
-- Conditional visibility: "Hide Sub Qty" and "Hide Sub Pricing" only appear when "Show Sub-items" is ON
-- Settings saved to localStorage on change, restored on mount
+---
 
-### Phase 2: Dynamic Table Column Rendering
+## Phase 1: Quotes List Page Overhaul
 
-Update the `LineItemRow` component and table headers to respect the toggle states:
+### File: `src/pages/QuotesList.tsx`
 
-- When `hideParentQty` is true, parent rows show empty Qty cells
-- When `hideParentPricing` is true, parent rows show empty Unit Price and Total cells
-- When `hideSubItemQty` is true, sub-item rows show empty Qty cells
-- When `hideSubItemPricing` is true, sub-item rows show empty Unit Price and Total cells
-- When both parent AND sub-item versions of a column are hidden, the entire column header is removed and the Description column gets wider
-- Sub-item rows are conditionally rendered based on `showSubItems`
+**Header**: Simplify to just logo, "Quotes" title, and primary "New Quote" button. Remove the back arrow (quotes is a top-level page). Move ThemeToggle out of the header (it belongs in settings).
 
-### Phase 3: Parent Aggregation Display
+**Stats Row**: Convert from 4 chunky cards into a compact inline stat bar -- a single row with dividers showing "24 quotes | $45,200 total | 8 accepted | 3 pending". Lightweight, one line, no cards.
 
-When sub-items ARE shown:
-- Parent rows display aggregated total from children
-- Parent unit_price is derived as `line_total / quantity`
-- Parent quantity shows as "1" (group quantity)
+**Filter Bar**: Combine search and tabs into a single clean bar. Search input on the left with a larger, more prominent pill-style design. Status filter chips (not tabs) on the right, styled as subtle pills with a dot indicator for the active filter.
 
-When sub-items are NOT shown:
-- Parent rows display their own pre-aggregated values (already calculated in the hook)
-- This gives a clean summary view with just parent totals
+**Quote Cards**: Redesign as cleaner list rows:
+- Left side: Quote number (monospace, slightly muted) + title on the same line, client name below in smaller text
+- Right side: Total amount (large, prominent) + date below
+- Status badge as a colored dot + text instead of a full badge
+- More menu stays but becomes a subtle icon that's always visible
+- Remove the margin percentage display from the list (too detailed for a list view)
 
-### Phase 4: Optional Group Sections
+**Empty State**: Larger illustration area, more prominent CTA button
 
-Enhance the optional items handling to support named groups:
+### File: `src/components/quotes/CreateQuoteDialog.tsx`
 
-- Group optional items by a group identifier (we can use the parent item as the group name, since Flooro's parent/child hierarchy naturally creates groups)
-- Each optional group gets its own divider and sub-total
-- Show "Quote Total with [Group Name]" calculation for alternatives mode
+No major changes needed -- dialog is already clean.
 
-### Phase 5: Print CSS Updates
+### File: `src/components/quotes/QuoteStatusBadge.tsx`
 
-Update `quote-print.css` to support:
-- Hidden columns (`.col-hidden` class that applies `display: none`)
-- Dynamic description column width when columns are hidden
-- Proper print rendering for the new toolbar (already `print:hidden`)
+Redesign as a minimal dot + text indicator instead of a full badge. Smaller, cleaner, less visual weight.
+
+---
+
+## Phase 2: Quote Editor Page Overhaul
+
+### File: `src/pages/QuoteEditor.tsx`
+
+**Layout restructure**: Move from a top-down stack (header -> client card + summary -> table) to a cleaner architecture:
+
+- **Sticky header**: Quote number + status dot + save button only. Ultra-minimal. Title goes into the body.
+- **Content area**: Full-width single column. Remove the 280px sidebar -- instead, make the summary a collapsible section or a bottom bar on desktop.
+- **Flow**: Title/description inline-editable at the top (like a Google Doc title), then client details as a collapsible section, then line items, then a fixed bottom summary bar.
+
+**Client Details**: Convert from a card with a grid of inputs to an inline-editable section. Show client name + key details in a compact read-mode display. Click to expand into edit mode. This saves vertical space when the user is focused on line items.
+
+### File: `src/components/quotes/QuoteClientCard.tsx`
+
+Redesign as a collapsible section with a compact "preview" mode showing "John Smith | john@email.com | 0412 345 678" in one line, expandable to the full edit grid.
+
+### File: `src/components/quotes/QuoteSummaryPanel.tsx`
+
+Convert from a sidebar card stack to a sticky bottom bar on desktop:
+- Single row showing: Subtotal | Margin % | GST | **Total** (highlighted)
+- Status change buttons become a dropdown from the status indicator in the header
+- Notes, terms, valid-until move into a "Details" collapsible section under the client card
+- Save button stays in the header
+- Preview PDF button moves to the header as an icon button
+
+### File: `src/components/quotes/QuoteLineItemsTable.tsx`
+
+**Desktop table overhaul**:
+- Remove the column resize handles (adds complexity for little value)
+- Remove the custom `useIsMobile` hook (use the existing one from `use-mobile.tsx`)
+- Cleaner header row: lighter weight, no uppercase tracking
+- Description column gets more space (50%+ of width)
+- Numeric columns use compact widths with no padding bloat
+- Footer "Add Item" and "From Price Book" buttons become a single row with better spacing
+- Remove the border/rounded-lg wrapper -- use a clean flat table style like Google Sheets
+
+**Mobile card overhaul**:
+- Each parent becomes a card with description + total on the main line
+- Numeric fields shown in a 2-column grid (not 3) with larger touch targets (h-11 minimum)
+- Qty and Sell on the first row (most used), Cost and Margin on the second row
+- Hours gets its own row or is hidden behind a "More fields" toggle
+- Sub-items shown as indented rows within the parent card with a subtle left border
+- Action menu (three dots) is more prominent and always visible
+
+### File: `src/components/quotes/QuoteLineItemRow.tsx`
+
+**Desktop row cleanup**:
+- Remove the arrow up/down buttons visual clutter -- replace with a subtle drag handle that only appears in a dedicated "reorder mode" or use a simpler right-click context menu for reorder
+- Actually: keep the reorder arrows but make them appear only in the first column on hover, stacked vertically with smaller icons
+- Description input: full borderless, only shows border on focus (Google Sheets style)
+- Number inputs: same borderless style, right-aligned, monospace
+- Actions column: single three-dot menu (already done)
+- Parent rows with children: subtle background tint, bold description
+- Child rows: left indent with a thin vertical line connector
+
+---
+
+## Phase 3: Quote Preview Overhaul
+
+### File: `src/pages/QuotePreview.tsx`
+
+**Toolbar**: Convert from a flat row of toggles to a clean popover/dropdown panel. Single "Display Options" button in the header that opens a settings panel. This declutters the preview view.
+
+**Header**: Combine with existing header. Quote number + status + "Display Options" button + "Print / PDF" button. Clean and minimal.
+
+### File: `src/components/quotes/preview/PreviewToolbar.tsx`
+
+Redesign as a popover panel that opens from a settings icon, containing:
+- Toggles organized in labeled groups with proper spacing
+- "Parent Items" section with Qty and Pricing toggles
+- "Sub-items" section with Show/Hide master toggle, then Qty and Pricing sub-toggles
+- Visual preview indicator showing which columns are visible
+
+---
+
+## Phase 4: Build Error Fixes
+
+These pre-existing build errors must also be fixed:
+
+### File: `src/components/editor/MobileSidebarDrawer.tsx`
+- Line 117: Change `pixelsPerMeter` to `pixelsPerMm`
+- Lines 118, 310: Fix function call argument count
+
+### File: `src/hooks/usePriceBook.ts`
+- Line 135: Fix the insert call -- the object literal structure needs to match the Supabase type (wrap in array or fix property names)
+- Line 170: Cast `specs` to `Json` type to fix the type incompatibility
+
+---
+
+## Phase 5: Print CSS Polish
+
+### File: `src/styles/quote-print.css`
+
+- Clean up print styles to match the new on-screen design
+- Ensure all print colors use hardcoded values (not CSS variables)
+- Add proper page-break rules for all sections
 
 ---
 
@@ -117,37 +161,31 @@ Update `quote-print.css` to support:
 
 ### Files to Modify
 
-| File | Changes |
-|------|---------|
-| `src/pages/QuotePreview.tsx` | Major rewrite: add toolbar with toggles, dynamic column rendering, optional group handling, localStorage persistence |
-| `src/styles/quote-print.css` | Add column visibility classes, dynamic widths, optional group divider styles |
+| File | Scope |
+|------|-------|
+| `src/pages/QuotesList.tsx` | Full rewrite of layout: inline stats, chip filters, cleaner quote rows |
+| `src/pages/QuoteEditor.tsx` | Layout restructure: remove sidebar, add bottom summary bar, collapsible client section |
+| `src/pages/QuotePreview.tsx` | Toolbar becomes popover, cleaner header |
+| `src/components/quotes/QuoteLineItemRow.tsx` | Cleaner inputs, better spacing, hover-only reorder arrows |
+| `src/components/quotes/QuoteLineItemsTable.tsx` | Remove resize handles, use shared `useIsMobile`, 2-col mobile grid, flat table style |
+| `src/components/quotes/QuoteSummaryPanel.tsx` | Convert to bottom bar with inline totals + collapsible details |
+| `src/components/quotes/QuoteClientCard.tsx` | Add compact preview mode with expand/collapse |
+| `src/components/quotes/QuoteStatusBadge.tsx` | Minimal dot + text style |
+| `src/components/quotes/preview/PreviewToolbar.tsx` | Convert to popover panel |
+| `src/components/editor/MobileSidebarDrawer.tsx` | Fix build errors |
+| `src/hooks/usePriceBook.ts` | Fix TypeScript type errors |
+| `src/styles/quote-print.css` | Polish print styles |
 
-### No New Files Needed
+### Key Design Tokens
 
-Everything fits within the existing QuotePreview page and CSS.
+- Card shadows: `shadow-sm` (subtle elevation instead of borders)
+- Input style: `border-transparent bg-transparent hover:bg-muted/50 focus:bg-background focus:ring-1`
+- Section spacing: `space-y-6` between major sections, `space-y-3` within
+- Mobile tap targets: minimum `h-11` (44px)
+- Typography: Description text `text-sm`, numbers `text-sm font-mono`, labels `text-xs text-muted-foreground`
+- Active filter: `bg-primary/10 text-primary` pill with `rounded-full`
 
-### Key Implementation Notes
+### No New Dependencies
 
-1. **Column visibility logic**: A helper function `getVisibleColumns()` determines which columns to render based on the combination of parent and sub-item hide settings. If both parent qty AND sub-item qty are hidden (or sub-items are off), the Qty column header disappears entirely.
-
-2. **Dynamic width redistribution**: When columns are hidden from the table, the Description column should expand. This can be done with CSS classes that set different `width` percentages based on which columns are visible.
-
-3. **localStorage key**: `quote-pdf-settings` to match FieldFlow's pattern. Settings are loaded on mount and saved on every toggle change.
-
-4. **Optional group totals**: For each optional group, calculate:
-   - Group subtotal (sum of items in group)
-   - GST rate derived from the main quote's tax_rate
-   - "Quote Total with Option" = base subtotal + group subtotal + combined GST
-
-5. **No additional dependencies**: Everything uses existing Flooro components (Switch, Label, Select from Radix UI) and CSS print media queries. No need for `@react-pdf/renderer` or `react-pdf`.
-
-### Toggle Defaults (matching FieldFlow)
-
-```
-showSubItems: true
-hideParentQty: false
-hideParentPricing: false
-hideSubItemQty: false
-hideSubItemPricing: true  (FieldFlow hides sub-item pricing by default)
-```
+Everything uses existing Radix UI components (Popover, Collapsible, Tabs) and Tailwind classes. No new packages needed.
 
