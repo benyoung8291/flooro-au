@@ -1,200 +1,141 @@
 
 
-# Quote PDF Document Redesign
+# Fix Canvas Blue Wash and Performance When Zooming Out
 
-Two issues to fix: (1) the scope/description spacing is broken in the PDF output, and (2) the entire document design needs to match the reference PDF style (Premrest Quote-002089).
+## Root Cause
 
----
+Two rendering functions draw grid lines with a **fixed world-space spacing** regardless of zoom level. When zooming out, the visible area in world coordinates grows dramatically, causing thousands or tens of thousands of grid lines to be drawn per frame.
 
-## Issue 1: Scope/Description Spacing
+- `drawGrid()` uses a fixed 50px spacing -- at zoom 0.1 on a 1920px viewport, it draws ~384 vertical lines and ~216 horizontal lines = ~600 line draw calls per frame (minor + major)
+- `drawSnapGrid()` draws lines **and** individual dots at each intersection -- the dots alone can be 384 x 216 = ~83,000 arc draw calls
 
-The current `.doc-scope-content` CSS uses minimal margin/padding for rich text content. The `dangerouslySetInnerHTML` renders the user's HTML which includes `<ul>`, `<p>`, `<br>` tags but the PDF CSS isn't properly styling the spacing between paragraphs and lists. Comparing the editor screenshot vs the PDF screenshot, bullet lists and paragraphs are running together without proper vertical rhythm.
-
-**Fix**: Update the rich text content CSS rules in `quote-print.css` to add proper paragraph spacing and list margins matching the editor output.
-
----
-
-## Issue 2: Complete Document Redesign
-
-The reference PDF (Premrest Quote-002089) has a distinctly different layout from the current design. Here are the key differences:
-
-### Reference PDF Structure (top to bottom):
-
-1. **Header**: Right-aligned metadata table (Quote Nbr, Date, Valid Until, Customer ID) in a bordered grid. Left side has company logo, name, address, phone, email, ABN stacked vertically.
-
-2. **Two-column contact section**: "Quote To" on the left (client name, address, ABN) and "Prepared By" on the right (person name) plus "Site Location" below.
-
-3. **Title bar**: An accent-colored bar with the quote title/project name.
-
-4. **Letter body**: "Hi team," greeting followed by scope of works description as plain flowing text with headings and bullet lists. No box or border around it -- it reads like a letter.
-
-5. **Items table**: Simple clean table with Description, Qty, Unit Price, Total columns. No heavy row backgrounds -- just clean borders and subtle shading.
-
-6. **Totals**: Right-aligned, simple rows for Subtotal, GST, Total (inc GST).
-
-7. **Footer**: Centered contact email and page number.
-
-### Key design differences from current:
-
-| Current | Reference |
-|---------|-----------|
-| Dark navy meta strip bar across full width | Right-aligned bordered metadata grid |
-| "Bill To" / "Prepared By" in bordered cards | Clean text-only layout with labels |
-| Quote title in accent-bordered box | Accent-colored banner bar |
-| Scope in bordered section | Free-flowing letter text, no borders |
-| Heavy parent row backgrounds | Clean, minimal table styling |
-| Grand total in dark filled row | Simple bordered total row |
-| Acceptance/signature section | Not present in reference (can keep as optional) |
+The grid lines are blue-tinted (`hsl(214 32% 91%)`), and when densely packed they visually blend into a solid blue overlay.
 
 ---
 
-## Changes
+## Solution: Adaptive Grid Density
 
-### File 1: `src/components/quotes/preview/QuotePdfDocument.tsx`
+### 1. Adaptive spacing in `drawGrid()`
 
-Restructure the document layout to match the reference:
+**File**: `src/components/editor/CanvasRenderer.tsx`, function `drawGrid` (line 809-865)
 
-- **Header**: Change to two-column layout. Left column: logo + company name + address/phone/email/ABN stacked. Right column: bordered metadata grid with rows for Quote Nbr, Date, Valid Until.
-- **Remove the dark meta strip** entirely.
-- **Contact section**: Render "Quote To" and "Prepared By" as simple labeled text blocks (no card borders). Add "Site Location" field using `client_address`.
-- **Title bar**: Render as a full-width accent-colored banner with the quote title text.
-- **Scope/Description**: Remove wrapping borders. Render the greeting and description as flowing letter text directly on the page.
-- **Items table section header**: Change from uppercase bordered header to a simple "QUOTED ITEMS" label with bottom border.
-- **Totals**: Simplify to right-aligned rows without the bordered box wrapper. Keep Subtotal, GST, Total rows.
-- **Footer**: Simplify to centered contact email + page indicator.
-- **Keep**: Notes, Terms, and Acceptance sections (they work as-is for when present).
+Instead of a fixed 50px world-space grid, calculate the grid spacing so that lines are always ~50px apart **on screen**:
 
-### File 2: `src/styles/quote-print.css`
+```
+adaptiveGridSize = 50 / zoom
+```
 
-Complete restyle to match the reference design:
+Then round up to a "nice" number (50, 100, 200, 500, 1000...) so the grid looks clean. This ensures a maximum of ~40-50 grid lines per axis regardless of zoom level.
 
-- **Header**: Two-column flex layout. Company info left, metadata grid right with thin borders.
-- **Remove**: `.doc-meta-strip` dark bar styles (replaced by metadata grid in header).
-- **Parties**: Remove card borders and background. Simple text blocks with label styling.
-- **Quote title**: Full-width accent banner (terracotta/orange background, white or dark text).
-- **Scope**: Remove borders and padding. Let content flow naturally as letter text. Fix rich text spacing -- add proper margins between paragraphs (`p` tags get `margin-bottom`), lists get proper vertical spacing, `br` tags create visible line breaks.
-- **Items table**: Cleaner styling -- lighter borders, remove heavy parent row backgrounds, keep subtle distinction between parent/child rows.
-- **Totals**: Remove bordered box wrapper. Right-aligned simple rows with a top border separator.
-- **Footer**: Simple centered line.
-- **Rich text content**: Proper spacing rules -- `div > br`, paragraph gaps, list margins matching what the editor produces.
+Also add a maximum line count safeguard: if the calculated number of lines exceeds ~200, skip drawing the grid entirely (the lines would be too dense to be useful anyway).
 
-### File 3: `src/components/quotes/preview/QuotePdfSidebar.tsx`
+### 2. Cap grid density in `drawSnapGrid()`
 
-Minor updates:
-- Ensure the paper wrapper background remains white.
-- No structural changes needed -- the sidebar shell is working correctly.
+**File**: `src/components/editor/CanvasRenderer.tsx`, function `drawSnapGrid` (line 1631-1686)
+
+- Add a check: if the number of grid cells visible exceeds a threshold (e.g., 100 lines per axis), skip the grid entirely
+- Remove the intersection dots loop entirely when cell count is high -- the dots are invisible at low zoom anyway
+- Add a density check before the dot-drawing nested loop: skip dots if there would be more than ~2500 (50x50)
+
+### 3. Fade grid opacity at extreme zoom levels
+
+For the default grid, reduce the stroke alpha when zoom is very low so even if a few lines render, they don't dominate the view:
+
+```
+const gridAlpha = Math.min(1, zoom * 2);  // fades below zoom 0.5
+ctx.globalAlpha = gridAlpha;
+```
 
 ---
 
 ## Technical Details
 
-### QuotePdfDocument.tsx -- new header structure
+### Changes to `drawGrid` (lines 809-865)
 
-```text
-+------------------------------------------+------------------+
-| [Logo]                                   | Quote Nbr: Q-xxx |
-| Company Name                             | Date: dd/mm/yyyy |
-| Address line 1                           | Valid Until: ...  |
-| Ph: xxxx | email@co.com.au               |                  |
-| ABN: xx xxx xxx xxx                      |                  |
-+------------------------------------------+------------------+
+Replace the fixed `gridSize = 50` with adaptive sizing:
 
-Quote To: Client Name              Prepared By: Owner Name
-Address line                       
-ABN: xxxxx (if available)          Site Location: Address
-
-+==========================================+
-|         Quote Title / Project Name       |  <-- accent banner
-+==========================================+
-
-Hi Client,
-
-[scope/description content flows here as letter text]
-
-QUOTED ITEMS
----------------------------------------------
-Description         | Qty | Unit Price | Total
-Item 1              | 1   | $4,600.00  | $4,600.00
----------------------------------------------
-
-                              Subtotal: $4,600.00
-                              GST:        $460.00
-                        Total (inc GST): $5,060.00
-
-Contact us at email@co.com.au
-Page: 1 of 1
-```
-
-### CSS scope/description spacing fix
-
-The rich text content needs these rules:
-
-```css
-.doc-scope-content p,
-.doc-scope-content div {
-  margin-bottom: 0.5em;
-}
-
-.doc-scope-content ul,
-.doc-scope-content ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
-}
-
-.doc-scope-content li {
-  margin: 0.25em 0;
-}
-
-.doc-scope-content br {
-  display: block;
-  content: "";
-  margin-top: 0.25em;
+```typescript
+function drawGrid(ctx, width, height, zoom, offsetX, offsetY) {
+  // Adaptive grid: keep ~50px screen spacing
+  const minScreenSpacing = 50;
+  const rawSize = minScreenSpacing / zoom;
+  
+  // Snap to a "nice" number: 50, 100, 200, 500, 1000, 2000, 5000...
+  const niceNumbers = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  let gridSize = niceNumbers[niceNumbers.length - 1];
+  for (const n of niceNumbers) {
+    if (n >= rawSize) { gridSize = n; break; }
+  }
+  
+  const majorMultiple = 4;
+  
+  // Calculate visible area
+  const startX = Math.floor(-offsetX / zoom / gridSize) * gridSize - gridSize;
+  const endX = Math.ceil((width - offsetX) / zoom / gridSize) * gridSize + gridSize;
+  const startY = Math.floor(-offsetY / zoom / gridSize) * gridSize - gridSize;
+  const endY = Math.ceil((height - offsetY) / zoom / gridSize) * gridSize + gridSize;
+  
+  // Safety: skip if too many lines
+  const lineCountX = (endX - startX) / gridSize;
+  const lineCountY = (endY - startY) / gridSize;
+  if (lineCountX > 200 || lineCountY > 200) return;
+  
+  // Fade at low zoom
+  const gridAlpha = Math.min(1, zoom * 2.5);
+  ctx.globalAlpha = gridAlpha;
+  
+  // ... draw minor and major lines as before, using adaptive gridSize ...
+  
+  ctx.globalAlpha = 1;
 }
 ```
 
-This ensures the spacing between paragraphs, lists, and line breaks in the PDF matches what the user sees in the rich text editor.
+### Changes to `drawSnapGrid` (lines 1631-1686)
 
-### Metadata grid (replaces dark strip)
+Add density guards:
 
-The right-aligned metadata in the header will be a simple bordered table:
-
-```css
-.doc-meta-grid {
-  border: 1px solid var(--doc-border);
-  border-collapse: collapse;
-  font-size: 11px;
-}
-
-.doc-meta-grid td {
-  padding: 0.35rem 0.75rem;
-  border: 1px solid var(--doc-border);
-}
-
-.doc-meta-grid .doc-meta-label-cell {
-  font-weight: 600;
-  color: var(--doc-text-secondary);
-  white-space: nowrap;
-}
-```
-
-### Accent banner for quote title
-
-```css
-.doc-quote-title {
-  background: var(--doc-accent-bar);  /* terracotta/warm color */
-  color: white;
-  padding: 0.6rem 1rem;
-  font-weight: 600;
-  font-size: 13px;
-  margin: 1rem 0;
+```typescript
+function drawSnapGrid(ctx, width, height, zoom, offsetX, offsetY, gridSizePx) {
+  if (gridSizePx <= 0) return;
+  
+  // Calculate visible bounds
+  const visibleMinX = -offsetX / zoom;
+  const visibleMaxX = (width - offsetX) / zoom;
+  const visibleMinY = -offsetY / zoom;
+  const visibleMaxY = (height - offsetY) / zoom;
+  
+  const startX = Math.floor(visibleMinX / gridSizePx) * gridSizePx;
+  const endX = Math.ceil(visibleMaxX / gridSizePx) * gridSizePx;
+  const startY = Math.floor(visibleMinY / gridSizePx) * gridSizePx;
+  const endY = Math.ceil(visibleMaxY / gridSizePx) * gridSizePx;
+  
+  // Skip if too dense (lines or dots would be invisible)
+  const linesX = (endX - startX) / gridSizePx;
+  const linesY = (endY - startY) / gridSizePx;
+  if (linesX > 100 || linesY > 100) return;
+  
+  // ... draw lines ...
+  
+  // Only draw dots if reasonable count
+  if (linesX * linesY < 2500) {
+    // ... draw intersection dots ...
+  }
 }
 ```
 
-### Files summary
+---
 
-| File | Action |
-|------|--------|
-| `src/components/quotes/preview/QuotePdfDocument.tsx` | Restructure layout to match reference PDF |
-| `src/styles/quote-print.css` | Complete restyle + fix rich text spacing |
-| `src/components/quotes/preview/QuotePdfSidebar.tsx` | Minor cleanup if needed |
+## Files to Modify
 
+| File | Changes |
+|------|---------|
+| `src/components/editor/CanvasRenderer.tsx` | Modify `drawGrid` (~20 lines) and `drawSnapGrid` (~10 lines) to add adaptive spacing and density guards |
+
+No new files needed. No database changes. This is a pure rendering optimization.
+
+## Expected Result
+
+- At normal zoom (0.5 -- 2.0): grid looks identical to current behavior
+- At low zoom (0.1 -- 0.3): grid adapts to larger spacing, remains useful without blue wash
+- At very low zoom (< 0.1): grid fades out gracefully
+- Performance stays at 60fps regardless of zoom level (bounded draw call count)
