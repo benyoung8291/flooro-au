@@ -814,18 +814,35 @@ function drawGrid(
   offsetX: number,
   offsetY: number
 ) {
-  const gridSize = 50;
+  // Adaptive grid: keep ~50px screen spacing regardless of zoom
+  const minScreenSpacing = 50;
+  const rawSize = minScreenSpacing / zoom;
+  
+  // Snap to a "nice" number so grid looks clean
+  const niceNumbers = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+  let gridSize = niceNumbers[niceNumbers.length - 1];
+  for (const n of niceNumbers) {
+    if (n >= rawSize) { gridSize = n; break; }
+  }
+
   const gridColor = 'hsl(214 32% 91%)';
   const majorGridColor = 'hsl(214 32% 85%)';
-
-  ctx.strokeStyle = gridColor;
-  ctx.lineWidth = 0.5 / zoom;
 
   // Calculate visible area in world coordinates
   const startX = Math.floor(-offsetX / zoom / gridSize) * gridSize - gridSize;
   const endX = Math.ceil((width - offsetX) / zoom / gridSize) * gridSize + gridSize;
   const startY = Math.floor(-offsetY / zoom / gridSize) * gridSize - gridSize;
   const endY = Math.ceil((height - offsetY) / zoom / gridSize) * gridSize + gridSize;
+
+  // Safety: skip if too many lines (shouldn't happen with adaptive sizing, but just in case)
+  const lineCountX = (endX - startX) / gridSize;
+  const lineCountY = (endY - startY) / gridSize;
+  if (lineCountX > 200 || lineCountY > 200) return;
+
+  // Fade grid at low zoom levels to prevent visual clutter
+  const gridAlpha = Math.min(1, zoom * 2.5);
+  ctx.save();
+  ctx.globalAlpha = gridAlpha;
 
   // Batch minor grid lines into single path
   ctx.strokeStyle = gridColor;
@@ -862,6 +879,8 @@ function drawGrid(
     }
   }
   ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawRoom(
@@ -1651,34 +1670,46 @@ function drawSnapGrid(
   const startY = Math.floor(visibleMinY / gridSizePx) * gridSizePx;
   const endY = Math.ceil(visibleMaxY / gridSizePx) * gridSizePx;
   
+  // Skip if too dense -- lines and dots would be invisible at this zoom
+  const linesX = (endX - startX) / gridSizePx;
+  const linesY = (endY - startY) / gridSizePx;
+  if (linesX > 100 || linesY > 100) return;
+  
   ctx.save();
+  
+  // Fade snap grid at low zoom
+  const snapAlpha = Math.min(1, zoom * 2);
+  ctx.globalAlpha = snapAlpha;
+  
   ctx.strokeStyle = 'hsla(217, 70%, 50%, 0.15)';
   ctx.lineWidth = 1 / zoom;
   
-  // Draw vertical lines
+  // Batch vertical lines into single path
+  ctx.beginPath();
   for (let x = startX; x <= endX; x += gridSizePx) {
-    ctx.beginPath();
     ctx.moveTo(x, startY);
     ctx.lineTo(x, endY);
-    ctx.stroke();
   }
+  ctx.stroke();
   
-  // Draw horizontal lines
+  // Batch horizontal lines into single path
+  ctx.beginPath();
   for (let y = startY; y <= endY; y += gridSizePx) {
-    ctx.beginPath();
     ctx.moveTo(startX, y);
     ctx.lineTo(endX, y);
-    ctx.stroke();
   }
+  ctx.stroke();
   
-  // Draw grid intersection points for visibility
-  ctx.fillStyle = 'hsla(217, 70%, 50%, 0.25)';
-  const dotSize = 2 / zoom;
-  for (let x = startX; x <= endX; x += gridSizePx) {
-    for (let y = startY; y <= endY; y += gridSizePx) {
-      ctx.beginPath();
-      ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-      ctx.fill();
+  // Only draw intersection dots if reasonable count
+  if (linesX * linesY < 2500) {
+    ctx.fillStyle = 'hsla(217, 70%, 50%, 0.25)';
+    const dotSize = 2 / zoom;
+    for (let x = startX; x <= endX; x += gridSizePx) {
+      for (let y = startY; y <= endY; y += gridSizePx) {
+        ctx.beginPath();
+        ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
   
