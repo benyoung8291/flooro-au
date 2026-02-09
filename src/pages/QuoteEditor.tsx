@@ -40,9 +40,13 @@ import {
   BookOpen,
   RefreshCw,
   Ruler,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
+import { useQuoteOwnerProfile } from '@/hooks/useQuoteOwnerProfile';
+import { exportQuoteToExcel } from '@/lib/quotes/exportQuoteToExcel';
 
 export default function QuoteEditor() {
   const { quoteId } = useParams<{ quoteId: string }>();
@@ -77,6 +81,28 @@ export default function QuoteEditor() {
   const [orphanedRooms, setOrphanedRooms] = useState<OrphanedRoom[]>([]);
   const [orphanDialogOpen, setOrphanDialogOpen] = useState(false);
   const { syncQuote, isSyncing, removeOrphanedRooms, isRemoving } = useSyncQuoteFromProject();
+  const { data: orgBranding } = useOrganizationBranding();
+  const { data: ownerProfile } = useQuoteOwnerProfile(quote?.created_by);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportExcel = useCallback(async () => {
+    if (!quote) return;
+    setIsExporting(true);
+    try {
+      await exportQuoteToExcel({
+        quote,
+        lineItems,
+        org: orgBranding ?? null,
+        owner: ownerProfile ?? null,
+      });
+      toast.success('Excel exported successfully');
+    } catch (err) {
+      console.error('Excel export failed:', err);
+      toast.error('Failed to export Excel');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [quote, lineItems, orgBranding, ownerProfile]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -257,15 +283,37 @@ export default function QuoteEditor() {
               </DropdownMenu>
             )}
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0"
-              onClick={() => setPdfOpen(true)}
-              title="Preview PDF"
-            >
-              <Eye className="w-4 h-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={() => setPdfOpen(true)}
+                >
+                  <Eye className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Preview PDF</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={handleExportExcel}
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="w-4 h-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Excel</TooltipContent>
+            </Tooltip>
             <Button
               size="sm"
               onClick={handleSave}
