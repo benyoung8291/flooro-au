@@ -41,12 +41,14 @@ import {
   RefreshCw,
   Ruler,
   FileSpreadsheet,
+  FileDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
 import { useQuoteOwnerProfile } from '@/hooks/useQuoteOwnerProfile';
 import { exportQuoteToExcel } from '@/lib/quotes/exportQuoteToExcel';
+import { exportQuoteToCsv } from '@/lib/quotes/exportQuoteToCsv';
 
 export default function QuoteEditor() {
   const { quoteId } = useParams<{ quoteId: string }>();
@@ -103,6 +105,20 @@ export default function QuoteEditor() {
       setIsExporting(false);
     }
   }, [quote, lineItems, orgBranding, ownerProfile]);
+
+  const handleExportCsv = useCallback(() => {
+    if (!quote) return;
+    try {
+      exportQuoteToCsv({
+        quoteNumber: quote.quote_number,
+        lineItems,
+      });
+      toast.success('CSV exported successfully');
+    } catch (err) {
+      console.error('CSV export failed:', err);
+      toast.error('Failed to export CSV');
+    }
+  }, [quote, lineItems]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -313,6 +329,19 @@ export default function QuoteEditor() {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>Export Excel</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  onClick={handleExportCsv}
+                >
+                  <FileDown className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export CSV</TooltipContent>
             </Tooltip>
             <Button
               size="sm"
