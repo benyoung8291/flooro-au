@@ -28,7 +28,6 @@ export function PreviewLineItemRow({
 }: Props) {
   const hasChildren = item.subItems.length > 0;
 
-  // Aggregated total for parents with children
   const aggregatedTotal = hasChildren
     ? item.subItems
         .filter(c => !c.is_optional)
@@ -40,16 +39,15 @@ export function PreviewLineItemRow({
       ? aggregatedTotal / item.quantity
       : item.sell_price;
 
-  // Decide whether to show values or blank cells based on toggles
   const isParent = !isChild;
   const hideQty = isParent ? settings.hideParentQty : settings.hideSubItemQty;
   const hidePricing = isParent
     ? settings.hideParentPricing
     : settings.hideSubItemPricing;
 
-  // For parents with children when sub-items are shown: show aggregated values
-  // For parents with children when sub-items are hidden: show own pre-aggregated values
-  const displayQty = hasChildren ? (settings.showSubItems ? '' : item.quantity.toFixed(2)) : item.quantity.toFixed(2);
+  const displayQty = hasChildren
+    ? settings.showSubItems ? '' : item.quantity.toFixed(2)
+    : item.quantity.toFixed(2);
   const displayUnitPrice = hasChildren
     ? settings.showSubItems
       ? ''
@@ -59,28 +57,31 @@ export function PreviewLineItemRow({
     : item.sell_price > 0
       ? formatCurrency(item.sell_price)
       : '';
-  const displayTotal = aggregatedTotal > 0 ? formatCurrency(aggregatedTotal) : '—';
+  const displayTotal = aggregatedTotal > 0 ? formatCurrency(aggregatedTotal) : '';
+
+  const rowClass = [
+    isChild ? 'doc-row-child' : 'doc-row-parent',
+    item.is_optional ? 'doc-row-optional' : '',
+  ].filter(Boolean).join(' ');
 
   return (
     <>
-      <tr
-        className={`${isChild ? 'child-row' : 'parent-row'} ${item.is_optional ? 'optional-row' : ''}`}
-      >
-        <td className={isChild ? 'pl-8' : 'font-semibold'}>
+      <tr className={rowClass}>
+        <td className={isChild ? 'doc-cell-indent' : 'doc-cell-parent'}>
           {item.description}
         </td>
         {showQtyColumn && (
-          <td className="text-right font-mono-numbers">
+          <td className="text-right doc-cell-number">
             {hideQty ? '' : displayQty}
           </td>
         )}
         {showUnitPriceColumn && (
-          <td className="text-right font-mono-numbers">
+          <td className="text-right doc-cell-number">
             {hidePricing ? '' : displayUnitPrice}
           </td>
         )}
         {showTotalColumn && (
-          <td className="text-right font-mono-numbers font-semibold">
+          <td className="text-right doc-cell-number doc-cell-amount">
             {hidePricing ? '' : displayTotal}
           </td>
         )}

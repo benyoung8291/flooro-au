@@ -22,13 +22,13 @@ export function PreviewItemsTable({
   if (items.length === 0) return null;
 
   return (
-    <table className={`items-table ${className}`}>
+    <table className={`doc-items-table ${className}`}>
       <thead>
         <tr>
-          <th>Description</th>
+          <th className="text-left">Description</th>
           {showQtyColumn && <th className="text-right">Qty</th>}
           {showUnitPriceColumn && <th className="text-right">Unit Price</th>}
-          {showTotalColumn && <th className="text-right">Total</th>}
+          {showTotalColumn && <th className="text-right">Amount</th>}
         </tr>
       </thead>
       <tbody>

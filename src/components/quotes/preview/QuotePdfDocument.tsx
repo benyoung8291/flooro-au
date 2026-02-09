@@ -49,89 +49,94 @@ export function QuotePdfDocument({
 
   return (
     <div className="quote-print-document">
-      {/* ── Letterhead Header ──────────────────────────── */}
-      <div className="letterhead-header">
-        <div className="letterhead-brand">
+      {/* ── Header ──────────────────────────────────── */}
+      <header className="doc-header">
+        <div className="doc-header-left">
           {org?.logo_url && (
-            <img src={org.logo_url} alt="Logo" className="letterhead-logo" />
+            <img src={org.logo_url} alt="Logo" className="doc-logo" />
           )}
-          <div className="letterhead-info">
-            <div className="letterhead-company-name">{org?.name || 'Your Company'}</div>
-            {org?.address && <div className="letterhead-detail">{org.address}</div>}
-            {org?.phone && <div className="letterhead-detail">Ph: {org.phone}</div>}
-            {org?.email && <div className="letterhead-detail">{org.email}</div>}
-            {org?.abn && <div className="letterhead-abn">ABN: {org.abn}</div>}
+          <div className="doc-company-info">
+            <div className="doc-company-name">{org?.name || 'Your Company'}</div>
+            {org?.abn && <div className="doc-company-detail">ABN {org.abn}</div>}
+            {org?.address && <div className="doc-company-detail">{org.address}</div>}
+            {org?.phone && <div className="doc-company-detail">{org.phone}</div>}
+            {org?.email && <div className="doc-company-detail">{org.email}</div>}
+            {org?.website && <div className="doc-company-detail">{org.website}</div>}
           </div>
         </div>
-        <div className="letterhead-meta">
-          <table className="meta-table">
-            <tbody>
-              <tr>
-                <td className="meta-label">Qu. Nbr</td>
-                <td className="meta-value">{quote.quote_number}</td>
-              </tr>
-              <tr>
-                <td className="meta-label">Date</td>
-                <td className="meta-value">{formatDate(quote.created_at)}</td>
-              </tr>
-              {quote.valid_until && (
-                <tr>
-                  <td className="meta-label">Valid Until</td>
-                  <td className="meta-value">{formatDate(quote.valid_until)}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="doc-header-right">
+          <div className="doc-type-label">Quote</div>
+          <div className="doc-meta-number">{quote.quote_number}</div>
+        </div>
+      </header>
+
+      {/* ── Meta Strip ──────────────────────────────── */}
+      <div className="doc-meta-strip">
+        <div className="doc-meta-item">
+          <span className="doc-meta-label">Date</span>
+          <span className="doc-meta-value">{formatDate(quote.created_at)}</span>
+        </div>
+        {quote.valid_until && (
+          <div className="doc-meta-item">
+            <span className="doc-meta-label">Valid Until</span>
+            <span className="doc-meta-value">{formatDate(quote.valid_until)}</span>
+          </div>
+        )}
+        <div className="doc-meta-item">
+          <span className="doc-meta-label">Status</span>
+          <span className="doc-meta-value doc-status-badge">{quote.status}</span>
         </div>
       </div>
 
-      {/* ── Contact Grid ───────────────────────────────── */}
-      <div className="contact-grid">
+      {/* ── Client & Prepared By ────────────────────── */}
+      <div className="doc-parties">
         {quote.client_name && (
-          <div className="contact-box">
-            <h3>Quote To</h3>
-            <p className="contact-name">{quote.client_name}</p>
-            {quote.client_address && <p>{quote.client_address}</p>}
-            {quote.client_email && <p>{quote.client_email}</p>}
-            {quote.client_phone && <p>Ph: {quote.client_phone}</p>}
+          <div className="doc-party-card">
+            <div className="doc-party-label">Bill To</div>
+            <div className="doc-party-name">{quote.client_name}</div>
+            {quote.client_address && <div className="doc-party-detail">{quote.client_address}</div>}
+            {quote.client_email && <div className="doc-party-detail">{quote.client_email}</div>}
+            {quote.client_phone && <div className="doc-party-detail">{quote.client_phone}</div>}
           </div>
         )}
         {owner && (
-          <div className="contact-box">
-            <h3>Prepared By</h3>
-            <p className="contact-name">{owner.full_name || 'Team Member'}</p>
-            {owner.email && <p>{owner.email}</p>}
-            {owner.phone && <p>Ph: {owner.phone}</p>}
+          <div className="doc-party-card">
+            <div className="doc-party-label">Prepared By</div>
+            <div className="doc-party-name">{owner.full_name || 'Team Member'}</div>
+            {owner.email && <div className="doc-party-detail">{owner.email}</div>}
+            {owner.phone && <div className="doc-party-detail">{owner.phone}</div>}
           </div>
         )}
       </div>
 
-      {/* ── Title accent bar ─────────────────────────── */}
+      {/* ── Quote Title ─────────────────────────────── */}
       {quote.title && (
-        <div className="quote-title-bar">
-          {quote.title}
+        <div className="doc-quote-title">
+          <span className="doc-quote-title-label">Re:</span> {quote.title}
         </div>
       )}
 
-      {/* ── Letter Body (Scope/Description) ────────────── */}
+      {/* ── Scope / Description ─────────────────────── */}
       {(quote.description || quote.client_name) && (
-        <div className="letter-body">
+        <div className="doc-scope">
           {quote.client_name && (
-            <p className="letter-greeting">Dear {quote.client_name},</p>
+            <p className="doc-greeting">Dear {quote.client_name},</p>
           )}
           {quote.description && (
             <div
-              className="letter-content rich-text-content"
+              className="doc-scope-content rich-text-content"
               dangerouslySetInnerHTML={{ __html: quote.description }}
             />
           )}
         </div>
       )}
 
-      {/* ── Required Items ─────────────────────────────── */}
+      {/* ── Required Items ──────────────────────────── */}
       {requiredItems.length > 0 && (
-        <>
-          <h2 className="section-heading">Quoted Items</h2>
+        <div className="doc-section">
+          <div className="doc-section-header">
+            <h2>Quoted Items</h2>
+          </div>
           <PreviewItemsTable
             items={requiredItems}
             settings={settings}
@@ -139,10 +144,10 @@ export function QuotePdfDocument({
             showUnitPriceColumn={showUnitPriceColumn}
             showTotalColumn={showTotalColumn}
           />
-        </>
+        </div>
       )}
 
-      {/* ── Optional Items ─────────────────────────────── */}
+      {/* ── Optional Items ──────────────────────────── */}
       <OptionalGroupSections
         optionalItems={optionalItems}
         baseSubtotal={quote.subtotal}
@@ -153,59 +158,75 @@ export function QuotePdfDocument({
         showTotalColumn={showTotalColumn}
       />
 
-      {/* ── Totals ─────────────────────────────────────── */}
-      <div className="totals-box">
-        <div className="totals-row">
-          <span>Subtotal</span>
-          <span className="font-mono">{formatCurrency(quote.subtotal)}</span>
-        </div>
-        {quote.tax_rate > 0 && (
-          <div className="totals-row">
-            <span>GST ({quote.tax_rate}%)</span>
-            <span className="font-mono">{formatCurrency(quote.tax_amount)}</span>
+      {/* ── Totals ──────────────────────────────────── */}
+      <div className="doc-totals">
+        <div className="doc-totals-table">
+          <div className="doc-totals-row">
+            <span className="doc-totals-label">Subtotal</span>
+            <span className="doc-totals-value">{formatCurrency(quote.subtotal)}</span>
           </div>
-        )}
-        <div className="totals-row grand-total">
-          <span>Total (inc. GST)</span>
-          <span className="font-mono">{formatCurrency(quote.total_amount)}</span>
+          {quote.tax_rate > 0 && (
+            <div className="doc-totals-row">
+              <span className="doc-totals-label">GST ({quote.tax_rate}%)</span>
+              <span className="doc-totals-value">{formatCurrency(quote.tax_amount)}</span>
+            </div>
+          )}
+          <div className="doc-totals-row doc-totals-grand">
+            <span className="doc-totals-label">Total (inc. GST)</span>
+            <span className="doc-totals-value">{formatCurrency(quote.total_amount)}</span>
+          </div>
         </div>
       </div>
 
-      {/* ── Notes ──────────────────────────────────────── */}
+      {/* ── Notes ───────────────────────────────────── */}
       {quote.notes && (
-        <div className="notes-box">
+        <div className="doc-notes">
           <h3>Notes</h3>
           <p>{quote.notes}</p>
         </div>
       )}
 
-      {/* ── Terms ──────────────────────────────────────── */}
+      {/* ── Terms & Conditions ──────────────────────── */}
       {termsText && (
-        <div className="terms-box">
+        <div className="doc-terms">
           <h3>Terms & Conditions</h3>
           <p style={{ whiteSpace: 'pre-wrap' }}>{termsText}</p>
         </div>
       )}
 
-      {/* ── Signature ──────────────────────────────────── */}
-      <div className="signature-grid">
-        <div className="signature-box">
-          <div className="signature-line" />
-          <span>Client Signature / Date</span>
-        </div>
-        <div className="signature-box">
-          <div className="signature-line" />
-          <span>Company Representative / Date</span>
+      {/* ── Acceptance / Signature ──────────────────── */}
+      <div className="doc-acceptance">
+        <h3>Acceptance</h3>
+        <p className="doc-acceptance-text">
+          I accept this quote and authorise the commencement of the described works.
+        </p>
+        <div className="doc-signature-grid">
+          <div className="doc-signature-block">
+            <div className="doc-signature-line" />
+            <span className="doc-signature-label">Client Name</span>
+          </div>
+          <div className="doc-signature-block">
+            <div className="doc-signature-line" />
+            <span className="doc-signature-label">Signature</span>
+          </div>
+          <div className="doc-signature-block">
+            <div className="doc-signature-line" />
+            <span className="doc-signature-label">Date</span>
+          </div>
         </div>
       </div>
 
-      {/* ── Footer ─────────────────────────────────────── */}
-      <div className="document-footer">
-        <span>{org?.name || 'Flooro'}</span>
-        {org?.abn && <span>ABN: {org.abn}</span>}
-        {org?.phone && <span>Ph: {org.phone}</span>}
-        {org?.email && <span>{org.email}</span>}
-      </div>
+      {/* ── Footer ──────────────────────────────────── */}
+      <footer className="doc-footer">
+        <div className="doc-footer-bar" />
+        <div className="doc-footer-content">
+          <span>{org?.name || 'Flooro'}</span>
+          {org?.abn && <span>ABN {org.abn}</span>}
+          {org?.phone && <span>{org.phone}</span>}
+          {org?.email && <span>{org.email}</span>}
+          {org?.website && <span>{org.website}</span>}
+        </div>
+      </footer>
     </div>
   );
 }

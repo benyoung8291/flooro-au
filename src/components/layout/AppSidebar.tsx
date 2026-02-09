@@ -1,4 +1,3 @@
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useIsPlatformAdmin } from '@/hooks/useUserProfile';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,6 @@ import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
-  LayoutDashboard,
   FolderOpen,
   Package,
   BookOpen,
@@ -33,13 +31,12 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     items: [
-      { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', end: true },
+      { label: 'Projects', icon: FolderOpen, path: '/dashboard', end: true },
     ],
   },
   {
     label: 'Estimating',
     items: [
-      { label: 'Projects', icon: FolderOpen, path: '/dashboard', end: true },
       { label: 'Materials', icon: Package, path: '/materials' },
       { label: 'Price Book', icon: BookOpen, path: '/price-book' },
     ],
