@@ -1,5 +1,6 @@
 import { Loader2, Download, X, ZoomIn, ZoomOut } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuote } from '@/hooks/useQuotes';
 import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
 import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
@@ -36,14 +37,28 @@ export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
 
   const isLoading = quoteLoading || itemsLoading;
 
+  const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, handleClose]);
+
   if (!open) return null;
 
-  return (
+  // Render via portal to document.body so print CSS can properly hide
+  // everything else and show only the quote document
+  return createPortal(
     <>
       {/* Overlay backdrop */}
       <div
         className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm pdf-sidebar-backdrop"
-        onClick={() => onOpenChange(false)}
+        onClick={handleClose}
       />
 
       {/* Sidebar panel */}
@@ -95,7 +110,7 @@ export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
               size="icon"
               variant="ghost"
               className="h-8 w-8"
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
             >
               <X className="w-4 h-4" />
             </Button>
@@ -138,6 +153,7 @@ export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

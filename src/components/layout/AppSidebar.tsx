@@ -1,4 +1,3 @@
-import { useLocation, useNavigate } from 'react-router-dom';
 import { useIsPlatformAdmin } from '@/hooks/useUserProfile';
 import { NavLink } from '@/components/NavLink';
 import { Button } from '@/components/ui/button';
