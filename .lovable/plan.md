@@ -1,137 +1,137 @@
 
 
-# Excel Export for Quotes
+# Excel Export Overhaul: Full Working Document with Live Formulas
 
 ## Overview
 
-Add a professional Excel (.xlsx) export to the Quote Editor that mirrors the quote's structure -- company header, client details, grouped line items with parent/child hierarchy, totals, notes, and terms. The export will use the `exceljs` library which runs entirely in the browser and supports cell styling, merged cells, and borders.
+Transform the Excel export from a static client-facing snapshot into a **fully functional internal working document**. The spreadsheet will include all pricing columns (Cost, Margin%, Sell) and use **Excel formulas** instead of static values, so anyone can open it, change a quantity or cost price, and see totals recalculate automatically -- just like in the app.
 
-## What the Export Will Include
+## What Changes
 
-The Excel file will be a polished, branded document with these sections:
+### Current Export (static, client-facing)
+- 4 columns: Description, Qty, Unit Price, Amount
+- All values are hardcoded numbers
+- No cost/margin data
+- Changing a cell does nothing to other cells
 
-1. **Header** -- Company name, address, phone, email, ABN, plus quote metadata (quote number, date, valid until)
-2. **Client Details** -- "Quote To" block with client name, address, email, phone; plus "Prepared By" block
-3. **Quote Title** -- Merged row with the quote title if present
-4. **Scope / Description** -- Plain-text version of the rich-text description
-5. **Line Items Table** -- Full table with columns: Description, Qty, Unit Price, Amount
-   - Parent items shown as bold grouped rows
-   - Child items indented underneath their parent
-   - Optional items in a separate "Optional Items" section
-6. **Totals** -- Subtotal, GST, Grand Total
-7. **Notes** -- If present
-8. **Terms and Conditions** -- If present
+### New Export (live working document)
+- 7 columns: Description, Qty, Cost, Margin%, Sell, Line Cost, Line Sell
+- All calculation cells use **Excel formulas**
+- Editing Qty, Cost, or Margin% automatically recalculates Sell, Line Cost, Line Sell
+- Parent rows with children use **SUM formulas** to aggregate child totals
+- Totals section uses **SUM/formula references** for Subtotal, GST, and Grand Total
+- Cell protection on formula cells (optional -- editable but clearly marked)
 
-## Visual Design in Excel
+---
 
-- Company name in large bold font at the top
-- Quote number and dates in a right-aligned metadata block
-- Line items table with:
-  - Dark header row (navy background, white text)
-  - Parent rows with light grey background and bold text
-  - Child rows with normal weight and indented description (prefixed with spaces)
-  - Alternating subtle shading for readability
-  - Currency formatting on price columns
-  - Borders around the table
-- Totals section right-aligned with bold grand total row
-- Column widths auto-sized for readability
+## Column Structure
+
+| Column | Header | For child/standalone rows | For parent rows (with children) |
+|--------|--------|--------------------------|--------------------------------|
+| A | Description | Item name (indented for children) | Group name (bold) |
+| B | Qty | Editable number | -- (blank) |
+| C | Cost | Editable cost price | Formula: SUM of children's Line Cost |
+| D | Margin % | Editable margin percentage | Formula: weighted margin from children |
+| E | Sell | **Formula**: `=C{n}*(1+D{n}/100)` | Formula: SUM of children's Line Sell |
+| F | Line Cost | **Formula**: `=B{n}*C{n}` | **Formula**: `=SUM(F{first_child}:F{last_child})` |
+| G | Line Sell | **Formula**: `=B{n}*E{n}` | **Formula**: `=SUM(G{first_child}:G{last_child})` |
+
+### Key formulas (matching the app's pricing model)
+
+- **Sell price**: `= Cost * (1 + Margin / 100)` -- matches `calculateSellFromMargin`
+- **Line Cost**: `= Qty * Cost`
+- **Line Sell**: `= Qty * Sell` (this is what gets summed for totals)
+- **Parent aggregation**: SUM formulas over child row ranges
+- **Subtotal**: `=SUM(G{all parent Line Sell cells})`
+- **GST**: `= Subtotal * tax_rate / 100`
+- **Grand Total**: `= Subtotal + GST`
+
+---
+
+## Totals Section
+
+| Label | Value |
+|-------|-------|
+| Subtotal | `=SUM(...)` over all non-optional parent Line Sell values |
+| Total Cost | `=SUM(...)` over all non-optional parent Line Cost values |
+| Margin | Formula: `=(Subtotal-TotalCost)/TotalCost*100` |
+| GST (10%) | `=Subtotal * tax_rate / 100` |
+| **TOTAL** | `=Subtotal + GST` |
+
+---
+
+## Visual Design (kept from current, enhanced)
+
+- Same branded header with company name, quote metadata, client details, prepared by
+- Same navy table headers, grey parent rows, alternating stripes
+- Same notes/terms sections at the bottom
+- **New**: Wider columns to accommodate the extra data columns
+- **New**: Line Cost and Line Sell columns with light background to indicate they are calculated
+- **New**: Formula cells use a subtle blue font or italic to hint they auto-calculate
+- **New**: Excel row grouping (outline) so child rows can be collapsed/expanded in Excel
 
 ---
 
 ## Technical Details
 
-### New dependency
-
-`exceljs` -- a full-featured Excel library that works in the browser. Supports:
-- Cell styling (fonts, fills, borders, alignment)
-- Merged cells
-- Column widths
-- Number formatting
-- Workbook/worksheet creation
-- Browser-side file generation via Blob
-
-### Files to create
-
-| File | Purpose |
-|------|---------|
-| `src/lib/quotes/exportQuoteToExcel.ts` | Core export function: takes quote, lineItems, org, owner data and generates a styled .xlsx file, triggering a browser download |
-
-### Files to modify
+### File to modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/QuoteEditor.tsx` | Add "Export Excel" button in the header action bar (next to the PDF preview eye icon) |
+| `src/lib/quotes/exportQuoteToExcel.ts` | Complete rewrite of the column structure, replace static values with Excel formulas, add Line Cost/Line Sell columns, formula-driven totals, and Excel row grouping |
 
-### Export function interface
+### No new files or dependencies needed
 
-```typescript
-interface ExportQuoteParams {
-  quote: Quote;
-  lineItems: LineItem[];
-  org: OrganizationBranding | null;
-  owner: QuoteOwnerProfile | null;
-}
+The existing `exceljs` library already supports formulas, row outlining (grouping), and all required features.
 
-async function exportQuoteToExcel(params: ExportQuoteParams): Promise<void>
-// Downloads the file as "{quote_number} - {client_name || 'Quote'}.xlsx"
+### Formula implementation approach
+
+ExcelJS supports formulas via `cell.value = { formula: '...', result: 123 }`. The `result` field provides a cached value for apps that don't recalculate on open (but Excel/Google Sheets will recalculate automatically).
+
+For each child row at Excel row `n`:
+```
+Sell (E{n})      = C{n}*(1+D{n}/100)
+Line Cost (F{n}) = B{n}*C{n}
+Line Sell (G{n}) = B{n}*E{n}
 ```
 
-### Excel worksheet structure (row layout)
-
-```text
-Row 1:  [Company Name - large bold]                    [Quote No.] [Q-0042]
-Row 2:  [Company Address]                              [Date]      [12 Jan 2025]
-Row 3:  [Company Phone]                                [Valid Until] [12 Feb 2025]
-Row 4:  [Company Email / ABN]
-Row 5:  (blank)
-Row 6:  QUOTE TO              |  PREPARED BY
-Row 7:  Client Name           |  Owner Name
-Row 8:  Client Address        |  Owner Email
-Row 9:  Client Email          |  Owner Phone
-Row 10: (blank)
-Row 11: [Quote Title - merged, bold]
-Row 12: [Description text - merged, wrapped]
-Row 13: (blank)
-Row 14: [Description] [Qty] [Unit Price] [Amount]   <-- header row, styled
-Row 15: Room 1 (parent - bold, grey bg)
-Row 16:   Vinyl Supply (child - indented)
-Row 17:   Installation (child - indented)
-Row 18:   Coving (child - indented)
-Row 19: Room 2 (parent - bold, grey bg)
-Row 20:   ...
-...
-Row N:  (blank)
-Row N+1: [Optional Items header if any]
-Row N+2: ...optional items...
-Row N+3: (blank)
-Row N+4:                              Subtotal   $X,XXX.XX
-Row N+5:                              GST (10%)  $XXX.XX
-Row N+6:                              TOTAL      $X,XXX.XX  (bold)
-Row N+7: (blank)
-Row N+8: Notes: ...
-Row N+9: (blank)
-Row N+10: Terms & Conditions: ...
+For parent rows spanning children from row `first` to `last`:
+```
+Line Cost (F{n}) = SUM(F{first}:F{last})
+Line Sell (G{n}) = SUM(G{first}:G{last})
+Cost (C{n})      = F{n}   (total cost)
+Margin (D{n})    = IF(F{n}>0, (G{n}-F{n})/F{n}*100, 0)
+Sell (E{n})      = G{n}   (total sell)
 ```
 
-### UI placement
-
-The export button will be added to the Quote Editor header bar, next to the existing PDF preview (eye) icon:
-
-```text
-[Takeoff] [Status v] [Eye] [Download] [Save]
-                             ^^^
-                      New Excel export button
+For totals:
+```
+Subtotal         = SUM of all parent Line Sell cells (e.g., =G15+G19+G23)
+Total Cost       = SUM of all parent Line Cost cells
+Margin           = IF(TotalCost>0, (Subtotal-TotalCost)/TotalCost*100, 0)
+GST              = Subtotal * tax_rate / 100
+TOTAL            = Subtotal + GST cell
 ```
 
-It will use a `FileSpreadsheet` icon from lucide-react with a dropdown that offers "Export Excel" (and the existing PDF preview can stay as-is). Or simpler: just a direct icon button that triggers the download.
+### Excel row grouping
 
-### Data flow
+Child rows will be grouped under their parent using ExcelJS's `ws.getRow(n).outlineLevel = 1`. This lets users collapse/expand room groups directly in Excel using the +/- buttons, mirroring the expand/collapse in the app.
 
-1. User clicks the Excel export button in the Quote Editor header
-2. The handler calls `exportQuoteToExcel()` with the current quote, lineItems (from the existing hook), org branding, and owner profile
-3. ExcelJS builds the workbook in memory
-4. The workbook is written to a Blob and downloaded via a temporary anchor element
-5. A toast confirms "Excel exported successfully"
+### Standalone parent items (no children)
 
-No server-side processing needed -- everything happens in the browser.
+These behave like child rows -- all columns are editable/formula-driven:
+- Qty, Cost, Margin% are editable values
+- Sell = formula
+- Line Cost = formula
+- Line Sell = formula
+
+### Optional items section
+
+Same as current: separated into its own section with a repeated header row. Optional item formulas work identically but are excluded from the main Subtotal formula.
+
+### Page setup
+
+- Landscape orientation (to fit 7 columns comfortably)
+- A4 paper size
+- Fit to width
 
