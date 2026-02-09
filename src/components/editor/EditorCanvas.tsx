@@ -1058,7 +1058,7 @@ export function EditorCanvas({
         break;
       }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, scaleInputOpen, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, scaleInputOpen, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom, rectangleStart, holeRectStart]);
 
   // Handle pointer move (RAF-throttled to avoid per-pixel expensive operations)
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
