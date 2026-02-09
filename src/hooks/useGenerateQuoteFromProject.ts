@@ -44,13 +44,13 @@ interface QuoteLineItemInsert {
   metadata: Record<string, unknown>;
 }
 
-function getAreaM2(room: Room, scale: ScaleCalibration | null): number {
+export function getAreaM2(room: Room, scale: ScaleCalibration | null): number {
   if (!scale) return 0;
   const netPx = calculateRoomNetArea(room);
   return netPx / (scale.pixelsPerMm * scale.pixelsPerMm) / 1_000_000;
 }
 
-function getOrderAreaM2(
+export function getOrderAreaM2(
   room: Room,
   scale: ScaleCalibration | null,
   material: Material | undefined,
@@ -67,7 +67,7 @@ function getOrderAreaM2(
   return netM2 * (1 + wastePercent / 100);
 }
 
-function resolveMaterial(
+export function resolveMaterial(
   materialId: string | null,
   materials: Material[],
   projectMaterials: ProjectMaterial[]

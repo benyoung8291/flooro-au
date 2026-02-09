@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuote, useUpdateQuote, type QuoteStatus, type UpdateQuoteInput } from '@/hooks/useQuotes';
 import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
+import { useSyncQuoteFromProject } from '@/hooks/useSyncQuoteFromProject';
 import { QuoteLineItemsTable } from '@/components/quotes/QuoteLineItemsTable';
 import { QuoteClientCard } from '@/components/quotes/QuoteClientCard';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
@@ -19,6 +20,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Loader2,
   Save,
   Eye,
@@ -31,6 +37,8 @@ import {
   StickyNote,
   Plus,
   BookOpen,
+  RefreshCw,
+  Ruler,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -65,6 +73,7 @@ export default function QuoteEditor() {
   const [priceBookOpen, setPriceBookOpen] = useState(false);
   const [priceBookParentId, setPriceBookParentId] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const { syncQuote, isSyncing } = useSyncQuoteFromProject();
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -208,6 +217,19 @@ export default function QuoteEditor() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* View Takeoff navigation */}
+            {quote.project_id && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 hidden sm:flex"
+                onClick={() => navigate(`/projects/${quote.project_id}`)}
+              >
+                <Ruler className="w-3.5 h-3.5" />
+                Takeoff
+              </Button>
+            )}
+
             {/* Status dropdown */}
             {statusActions.length > 0 && (
               <DropdownMenu>
@@ -281,7 +303,7 @@ export default function QuoteEditor() {
 
             <TabsContent value="line-items" className="space-y-4">
               {/* Toolbar above table */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={() => addLineItem()} className="gap-1.5">
                   <Plus className="w-3.5 h-3.5" />
                   Add Item
@@ -298,6 +320,33 @@ export default function QuoteEditor() {
                   <BookOpen className="w-3.5 h-3.5" />
                   From Price Book
                 </Button>
+
+                {/* Sync from Takeoff - only for project-linked quotes */}
+                {quote.project_id && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5"
+                          disabled={isSyncing || quote.status !== 'draft'}
+                          onClick={() => quoteId && syncQuote(quoteId)}
+                        >
+                          {isSyncing ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3.5 h-3.5" />
+                          )}
+                          Sync from Takeoff
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {quote.status !== 'draft' && (
+                      <TooltipContent>Only draft quotes can be synced</TooltipContent>
+                    )}
+                  </Tooltip>
+                )}
               </div>
 
               {/* White table container */}
