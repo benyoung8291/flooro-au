@@ -1,188 +1,200 @@
 
 
-# Quote PDF Preview Sidebar Overhaul
+# Quote PDF Document Redesign
 
-This plan converts the full-page quote preview into an inline sidebar panel that slides out from the right within the Quote Editor page, and completely redesigns the PDF document styling to use a clean white background matching the reference screenshots.
-
----
-
-## Architecture Change
-
-Currently the PDF preview is a separate route (`/quotes/:quoteId/preview`) rendering a full-page `QuotePreview` component. This will be replaced with a sidebar panel (using Radix Sheet) that opens from within the Quote Editor page itself, keeping full context visible on the left.
+Two issues to fix: (1) the scope/description spacing is broken in the PDF output, and (2) the entire document design needs to match the reference PDF style (Premrest Quote-002089).
 
 ---
 
-## 1. Create `QuotePdfSidebar` component
+## Issue 1: Scope/Description Spacing
 
-**New file**: `src/components/quotes/preview/QuotePdfSidebar.tsx`
+The current `.doc-scope-content` CSS uses minimal margin/padding for rich text content. The `dangerouslySetInnerHTML` renders the user's HTML which includes `<ul>`, `<p>`, `<br>` tags but the PDF CSS isn't properly styling the spacing between paragraphs and lists. Comparing the editor screenshot vs the PDF screenshot, bullet lists and paragraphs are running together without proper vertical rhythm.
 
-This component wraps the document preview in a Sheet (slide-from-right panel):
-
-- **Header**: "PDF Preview" title + close button (X)
-- **Toolbar row**: "Download" button + toggle switches inline: Show Sub-Items, Hide Qty, Hide Pricing, Hide Sub Qty, Hide Sub Pricing (matching the reference screenshot layout with inline switches rather than a popover)
-- **Scrollable document area**: A grey background container with a centered white "page" div that renders the quote document at a scaled-down size to simulate a page preview
-- **Props**: `open`, `onOpenChange`, `quoteId` -- it internally fetches the quote, line items, org branding, and owner data (same hooks as current `QuotePreview`)
-
-The Sheet will use a custom width (~520px on desktop) rather than the default `sm:max-w-sm`.
+**Fix**: Update the rich text content CSS rules in `quote-print.css` to add proper paragraph spacing and list margins matching the editor output.
 
 ---
 
-## 2. Redesign the PDF document content
+## Issue 2: Complete Document Redesign
 
-**Refactored component**: `src/components/quotes/preview/QuotePdfDocument.tsx` (new)
+The reference PDF (Premrest Quote-002089) has a distinctly different layout from the current design. Here are the key differences:
 
-Extracted from the current `QuotePreview` main content, this is a pure presentational component that renders the actual quote document. It receives all data as props (no routing, no hooks). This same component is used both inside the sidebar preview and for printing.
+### Reference PDF Structure (top to bottom):
 
-### Document design (matching reference screenshots):
+1. **Header**: Right-aligned metadata table (Quote Nbr, Date, Valid Until, Customer ID) in a bordered grid. Left side has company logo, name, address, phone, email, ABN stacked vertically.
 
-**Page 1 - Header area:**
-- Top-right: Quote metadata table (Qu. Nbr, Date, Valid Until) in a compact right-aligned grid
-- Top-left: Company name (large, bold) + address lines + phone + email + ABN
-- Below: Two-column "Quote To" / "Prepared By" section with contact details
-- Orange/terracotta accent bar with the quote title (e.g., "Services Australia - Darebin")
-- Letter body with "Dear [Client]," greeting and scope/description content
+2. **Two-column contact section**: "Quote To" on the left (client name, address, ABN) and "Prepared By" on the right (person name) plus "Site Location" below.
 
-**Line items table:**
-- Clean table with Description, Qty, Unit Price, Total columns
-- Parent rows have left border accent (terracotta/orange) and slightly shaded background
-- Child/sub-item rows are indented with no accent, lighter text
-- Numbers use tabular-nums, right-aligned
+3. **Title bar**: An accent-colored bar with the quote title/project name.
 
-**Totals:**
-- Right-aligned totals section: Subtotal, GST, Total (inc GST) -- with bold total row
+4. **Letter body**: "Hi team," greeting followed by scope of works description as plain flowing text with headings and bullet lists. No box or border around it -- it reads like a letter.
 
-**Footer:**
-- Contact email + page number at bottom of each page
+5. **Items table**: Simple clean table with Description, Qty, Unit Price, Total columns. No heavy row backgrounds -- just clean borders and subtle shading.
 
-### White background throughout:
-- The document itself is always white (`#fff`)
-- When shown in the sidebar, it sits on a light grey background to create the "paper on desk" effect
-- All current cream/muted background references removed from the document CSS
+6. **Totals**: Right-aligned, simple rows for Subtotal, GST, Total (inc GST).
 
----
+7. **Footer**: Centered contact email and page number.
 
-## 3. Inline toggle toolbar (replaces PreviewToolbar popover)
+### Key design differences from current:
 
-**Modified file**: `src/components/quotes/preview/PreviewToolbar.tsx`
-
-Replace the popover-based settings UI with an inline row of labeled toggle switches matching the reference:
-
-```text
-[Download]  Show Sub-Items [*]  Hide Qty [ ]  Hide Pricing [ ]  Hide Sub Qty [*]  Hide Sub Pricing [*]
-```
-
-Each toggle is a small Switch component with a compact label. On mobile, the toolbar wraps to two rows.
+| Current | Reference |
+|---------|-----------|
+| Dark navy meta strip bar across full width | Right-aligned bordered metadata grid |
+| "Bill To" / "Prepared By" in bordered cards | Clean text-only layout with labels |
+| Quote title in accent-bordered box | Accent-colored banner bar |
+| Scope in bordered section | Free-flowing letter text, no borders |
+| Heavy parent row backgrounds | Clean, minimal table styling |
+| Grand total in dark filled row | Simple bordered total row |
+| Acceptance/signature section | Not present in reference (can keep as optional) |
 
 ---
 
-## 4. Update QuoteEditor to open sidebar instead of navigating
+## Changes
 
-**Modified file**: `src/pages/QuoteEditor.tsx`
+### File 1: `src/components/quotes/preview/QuotePdfDocument.tsx`
 
-- Replace the FileText icon button (line 233-241) that navigates to `/quotes/${quoteId}/preview` with one that opens the sidebar via local state: `const [pdfOpen, setPdfOpen] = useState(false)`
-- Add `<QuotePdfSidebar open={pdfOpen} onOpenChange={setPdfOpen} quoteId={quoteId} />` at the bottom of the component
-- Remove the import of `useNavigate` usage for preview (keep it for other navigation)
+Restructure the document layout to match the reference:
 
----
+- **Header**: Change to two-column layout. Left column: logo + company name + address/phone/email/ABN stacked. Right column: bordered metadata grid with rows for Quote Nbr, Date, Valid Until.
+- **Remove the dark meta strip** entirely.
+- **Contact section**: Render "Quote To" and "Prepared By" as simple labeled text blocks (no card borders). Add "Site Location" field using `client_address`.
+- **Title bar**: Render as a full-width accent-colored banner with the quote title text.
+- **Scope/Description**: Remove wrapping borders. Render the greeting and description as flowing letter text directly on the page.
+- **Items table section header**: Change from uppercase bordered header to a simple "QUOTED ITEMS" label with bottom border.
+- **Totals**: Simplify to right-aligned rows without the bordered box wrapper. Keep Subtotal, GST, Total rows.
+- **Footer**: Simplify to centered contact email + page indicator.
+- **Keep**: Notes, Terms, and Acceptance sections (they work as-is for when present).
 
-## 5. Update routing
+### File 2: `src/styles/quote-print.css`
 
-**Modified file**: `src/App.tsx`
+Complete restyle to match the reference design:
 
-- Remove the `/quotes/:quoteId/preview` route (line 45) since preview is now inline
-- The `QuotePreview` page component can be kept for backwards compatibility or removed
+- **Header**: Two-column flex layout. Company info left, metadata grid right with thin borders.
+- **Remove**: `.doc-meta-strip` dark bar styles (replaced by metadata grid in header).
+- **Parties**: Remove card borders and background. Simple text blocks with label styling.
+- **Quote title**: Full-width accent banner (terracotta/orange background, white or dark text).
+- **Scope**: Remove borders and padding. Let content flow naturally as letter text. Fix rich text spacing -- add proper margins between paragraphs (`p` tags get `margin-bottom`), lists get proper vertical spacing, `br` tags create visible line breaks.
+- **Items table**: Cleaner styling -- lighter borders, remove heavy parent row backgrounds, keep subtle distinction between parent/child rows.
+- **Totals**: Remove bordered box wrapper. Right-aligned simple rows with a top border separator.
+- **Footer**: Simple centered line.
+- **Rich text content**: Proper spacing rules -- `div > br`, paragraph gaps, list margins matching what the editor produces.
 
----
+### File 3: `src/components/quotes/preview/QuotePdfSidebar.tsx`
 
-## 6. Rewrite quote-print.css for white document design
-
-**Modified file**: `src/styles/quote-print.css`
-
-Complete redesign of the document styles:
-
-- **White background** on `.quote-print-document` (no cream/muted)
-- **Company header**: Left-aligned company name (large bold) with contact info stacked below; right-aligned quote meta table (Qu. Nbr, Date, Valid Until)
-- **Accent color**: Use the app's terracotta/burnt orange for accent bars and parent row left borders
-- **Items table**: Clean borders, parent rows with left terracotta border + light background tint, child rows indented with lighter text
-- **Totals**: Right-aligned with clean separator lines
-- **Footer**: Centered contact + page counter
-
-### Print overrides:
-- The `@media print` block will hide the sidebar chrome and print only the document content
-- All colors forced to print-safe values with `print-color-adjust: exact`
-
----
-
-## 7. Sidebar "paper preview" styling
-
-Inside the sidebar, the document is rendered inside a scaled container:
-
-```tsx
-<div className="bg-muted/50 flex-1 overflow-y-auto p-4">
-  <div className="bg-white shadow-lg mx-auto" style={{ width: '210mm', transform: 'scale(0.55)', transformOrigin: 'top center' }}>
-    <QuotePdfDocument ... />
-  </div>
-</div>
-```
-
-This creates the "paper on grey background" effect visible in the reference screenshots, with the document scaled down to fit the sidebar width while maintaining A4 proportions.
+Minor updates:
+- Ensure the paper wrapper background remains white.
+- No structural changes needed -- the sidebar shell is working correctly.
 
 ---
 
 ## Technical Details
 
-### Files to create
+### QuotePdfDocument.tsx -- new header structure
 
-| File | Purpose |
-|------|---------|
-| `src/components/quotes/preview/QuotePdfSidebar.tsx` | Sheet wrapper with toolbar + scrollable document preview |
-| `src/components/quotes/preview/QuotePdfDocument.tsx` | Pure presentational document component (extracted from QuotePreview) |
+```text
++------------------------------------------+------------------+
+| [Logo]                                   | Quote Nbr: Q-xxx |
+| Company Name                             | Date: dd/mm/yyyy |
+| Address line 1                           | Valid Until: ...  |
+| Ph: xxxx | email@co.com.au               |                  |
+| ABN: xx xxx xxx xxx                      |                  |
++------------------------------------------+------------------+
 
-### Files to modify
+Quote To: Client Name              Prepared By: Owner Name
+Address line                       
+ABN: xxxxx (if available)          Site Location: Address
 
-| File | Changes |
-|------|---------|
-| `src/pages/QuoteEditor.tsx` | Add sidebar state, replace navigate-to-preview with open-sidebar, render `QuotePdfSidebar` |
-| `src/components/quotes/preview/PreviewToolbar.tsx` | Convert from popover to inline toggle row |
-| `src/styles/quote-print.css` | Complete redesign: white background, terracotta accents, clean table styling, paper-preview-in-sidebar styles |
-| `src/App.tsx` | Remove `/quotes/:quoteId/preview` route |
++==========================================+
+|         Quote Title / Project Name       |  <-- accent banner
++==========================================+
 
-### Files to keep (unchanged)
+Hi Client,
 
-| File | Reason |
-|------|--------|
-| `src/components/quotes/preview/PreviewItemsTable.tsx` | Reused as-is inside `QuotePdfDocument` |
-| `src/components/quotes/preview/PreviewLineItemRow.tsx` | Reused as-is |
-| `src/components/quotes/preview/OptionalGroupSections.tsx` | Reused as-is |
-| `src/hooks/useQuotePdfSettings.ts` | Reused as-is for toggle state |
+[scope/description content flows here as letter text]
 
-### QuotePdfDocument.tsx props interface
+QUOTED ITEMS
+---------------------------------------------
+Description         | Qty | Unit Price | Total
+Item 1              | 1   | $4,600.00  | $4,600.00
+---------------------------------------------
 
-```tsx
-interface QuotePdfDocumentProps {
-  quote: Quote;
-  lineItems: LineItem[];
-  org: OrganizationBranding | null;
-  owner: QuoteOwnerProfile | null;
-  settings: QuotePdfSettings;
-  showQtyColumn: boolean;
-  showUnitPriceColumn: boolean;
-  showTotalColumn: boolean;
+                              Subtotal: $4,600.00
+                              GST:        $460.00
+                        Total (inc GST): $5,060.00
+
+Contact us at email@co.com.au
+Page: 1 of 1
+```
+
+### CSS scope/description spacing fix
+
+The rich text content needs these rules:
+
+```css
+.doc-scope-content p,
+.doc-scope-content div {
+  margin-bottom: 0.5em;
+}
+
+.doc-scope-content ul,
+.doc-scope-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.doc-scope-content li {
+  margin: 0.25em 0;
+}
+
+.doc-scope-content br {
+  display: block;
+  content: "";
+  margin-top: 0.25em;
 }
 ```
 
-### Sheet width customization
+This ensures the spacing between paragraphs, lists, and line breaks in the PDF matches what the user sees in the rich text editor.
 
-The Sheet component's right variant defaults to `sm:max-w-sm`. The sidebar will override this with a custom className to be wider (~520px):
+### Metadata grid (replaces dark strip)
 
-```tsx
-<SheetContent side="right" className="sm:max-w-[520px] w-full p-0 flex flex-col">
+The right-aligned metadata in the header will be a simple bordered table:
+
+```css
+.doc-meta-grid {
+  border: 1px solid var(--doc-border);
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.doc-meta-grid td {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--doc-border);
+}
+
+.doc-meta-grid .doc-meta-label-cell {
+  font-weight: 600;
+  color: var(--doc-text-secondary);
+  white-space: nowrap;
+}
 ```
 
-### Print behavior
+### Accent banner for quote title
 
-A "Download" / "Print" button in the sidebar toolbar will call `window.print()`. The print CSS will:
-1. Hide the sidebar chrome (toolbar, close button)
-2. Show only the document content full-width
-3. Apply white background with forced print colors
+```css
+.doc-quote-title {
+  background: var(--doc-accent-bar);  /* terracotta/warm color */
+  color: white;
+  padding: 0.6rem 1rem;
+  font-weight: 600;
+  font-size: 13px;
+  margin: 1rem 0;
+}
+```
+
+### Files summary
+
+| File | Action |
+|------|--------|
+| `src/components/quotes/preview/QuotePdfDocument.tsx` | Restructure layout to match reference PDF |
+| `src/styles/quote-print.css` | Complete restyle + fix rich text spacing |
+| `src/components/quotes/preview/QuotePdfSidebar.tsx` | Minor cleanup if needed |
 
