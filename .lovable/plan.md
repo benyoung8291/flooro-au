@@ -1,137 +1,87 @@
 
 
-# Excel Export Overhaul: Full Working Document with Live Formulas
+# CSV Export for Quote Line Items (Import-Ready)
 
 ## Overview
 
-Transform the Excel export from a static client-facing snapshot into a **fully functional internal working document**. The spreadsheet will include all pricing columns (Cost, Margin%, Sell) and use **Excel formulas** instead of static values, so anyone can open it, change a quantity or cost price, and see totals recalculate automatically -- just like in the app.
+Add a CSV export option that outputs quote line items in a clean, flat, import-friendly format. Unlike the Excel working document (which is styled and formula-driven), this CSV is designed to be ingested by other software -- accounting tools, estimating platforms, CRMs, or custom import scripts.
 
-## What Changes
+## CSV Structure
 
-### Current Export (static, client-facing)
-- 4 columns: Description, Qty, Unit Price, Amount
-- All values are hardcoded numbers
-- No cost/margin data
-- Changing a cell does nothing to other cells
+Each row represents a single line item (children are flattened alongside parents). The columns are structured for maximum compatibility with other systems:
 
-### New Export (live working document)
-- 7 columns: Description, Qty, Cost, Margin%, Sell, Line Cost, Line Sell
-- All calculation cells use **Excel formulas**
-- Editing Qty, Cost, or Margin% automatically recalculates Sell, Line Cost, Line Sell
-- Parent rows with children use **SUM formulas** to aggregate child totals
-- Totals section uses **SUM/formula references** for Subtotal, GST, and Grand Total
-- Cell protection on formula cells (optional -- editable but clearly marked)
+| Column | Description |
+|--------|-------------|
+| `group` | Parent/room name (for child items) or blank (for standalone items) |
+| `description` | The line item description |
+| `quantity` | Numeric quantity |
+| `unit` | Unit of measure (from metadata if available, otherwise blank) |
+| `cost_price` | Cost per unit |
+| `sell_price` | Sell per unit |
+| `margin_percent` | Margin percentage |
+| `line_cost` | qty x cost |
+| `line_sell` | qty x sell (line total) |
+| `is_optional` | TRUE/FALSE -- whether this is an optional item |
+| `source_room_id` | Room ID from takeoff (for traceability, blank if not linked) |
+| `price_book_item_id` | Price book reference ID (blank if not linked) |
 
----
+### Key design decisions for import compatibility
 
-## Column Structure
+- **Flat structure**: No nested rows. Every child item is its own row with the parent name in the `group` column, making it trivial to filter/group in any system.
+- **No formulas, no styling**: Pure data values only.
+- **Standard CSV**: Comma-delimited, UTF-8 with BOM (for Excel compatibility), quoted strings.
+- **Header row**: Always present as the first row.
+- **Parent-only rows excluded**: Parents with children are not output as their own row (they're just grouping containers). Standalone parents (no children) are output normally with `group` left blank.
+- **Boolean as TRUE/FALSE**: Standard format most import tools understand.
 
-| Column | Header | For child/standalone rows | For parent rows (with children) |
-|--------|--------|--------------------------|--------------------------------|
-| A | Description | Item name (indented for children) | Group name (bold) |
-| B | Qty | Editable number | -- (blank) |
-| C | Cost | Editable cost price | Formula: SUM of children's Line Cost |
-| D | Margin % | Editable margin percentage | Formula: weighted margin from children |
-| E | Sell | **Formula**: `=C{n}*(1+D{n}/100)` | Formula: SUM of children's Line Sell |
-| F | Line Cost | **Formula**: `=B{n}*C{n}` | **Formula**: `=SUM(F{first_child}:F{last_child})` |
-| G | Line Sell | **Formula**: `=B{n}*E{n}` | **Formula**: `=SUM(G{first_child}:G{last_child})` |
+### Example output
 
-### Key formulas (matching the app's pricing model)
-
-- **Sell price**: `= Cost * (1 + Margin / 100)` -- matches `calculateSellFromMargin`
-- **Line Cost**: `= Qty * Cost`
-- **Line Sell**: `= Qty * Sell` (this is what gets summed for totals)
-- **Parent aggregation**: SUM formulas over child row ranges
-- **Subtotal**: `=SUM(G{all parent Line Sell cells})`
-- **GST**: `= Subtotal * tax_rate / 100`
-- **Grand Total**: `= Subtotal + GST`
-
----
-
-## Totals Section
-
-| Label | Value |
-|-------|-------|
-| Subtotal | `=SUM(...)` over all non-optional parent Line Sell values |
-| Total Cost | `=SUM(...)` over all non-optional parent Line Cost values |
-| Margin | Formula: `=(Subtotal-TotalCost)/TotalCost*100` |
-| GST (10%) | `=Subtotal * tax_rate / 100` |
-| **TOTAL** | `=Subtotal + GST` |
+```
+group,description,quantity,unit,cost_price,sell_price,margin_percent,line_cost,line_sell,is_optional,source_room_id,price_book_item_id
+Room 1,Vinyl Supply,25.00,,18.50,25.90,40.00,462.50,647.50,FALSE,,pb-001
+Room 1,Installation,25.00,,12.00,16.80,40.00,300.00,420.00,FALSE,,pb-002
+Room 1,Coving,15.00,,4.50,6.30,40.00,67.50,94.50,FALSE,,
+Room 2,Carpet Supply,30.00,,22.00,30.80,40.00,660.00,924.00,FALSE,,pb-003
+Transitions,T-Bar Aluminium,3.00,,8.00,11.20,40.00,24.00,33.60,FALSE,,
+```
 
 ---
 
-## Visual Design (kept from current, enhanced)
+## UI Integration
 
-- Same branded header with company name, quote metadata, client details, prepared by
-- Same navy table headers, grey parent rows, alternating stripes
-- Same notes/terms sections at the bottom
-- **New**: Wider columns to accommodate the extra data columns
-- **New**: Line Cost and Line Sell columns with light background to indicate they are calculated
-- **New**: Formula cells use a subtle blue font or italic to hint they auto-calculate
-- **New**: Excel row grouping (outline) so child rows can be collapsed/expanded in Excel
+Add a CSV download button next to the existing Excel export button. Both will use icon buttons with tooltips:
+
+- Existing: FileSpreadsheet icon = Excel export (working document)
+- New: FileDown icon = CSV export (import-ready data)
+
+The CSV button will appear right next to the Excel button in the header toolbar.
 
 ---
 
 ## Technical Details
 
-### File to modify
+### New file
+
+| File | Purpose |
+|------|---------|
+| `src/lib/quotes/exportQuoteToCsv.ts` | Pure function that takes `lineItems` and returns a CSV string, then triggers a browser download |
+
+### Modified file
 
 | File | Changes |
 |------|---------|
-| `src/lib/quotes/exportQuoteToExcel.ts` | Complete rewrite of the column structure, replace static values with Excel formulas, add Line Cost/Line Sell columns, formula-driven totals, and Excel row grouping |
+| `src/pages/QuoteEditor.tsx` | Add CSV export button and handler next to the Excel export button |
 
-### No new files or dependencies needed
+### Implementation approach
 
-The existing `exceljs` library already supports formulas, row outlining (grouping), and all required features.
+The CSV export function will:
+1. Accept the `lineItems` array (same data the Excel export uses)
+2. Iterate through parents -- for parents with children, output each child as a row with `group` set to the parent description; for standalone parents, output the parent itself with `group` blank
+3. Build a CSV string with proper escaping (double-quote any field containing commas, quotes, or newlines)
+4. Prepend UTF-8 BOM (`\uFEFF`) for Excel compatibility
+5. Create a Blob and trigger download as `{quote_number} - Line Items.csv`
 
-### Formula implementation approach
+### No new dependencies needed
 
-ExcelJS supports formulas via `cell.value = { formula: '...', result: 123 }`. The `result` field provides a cached value for apps that don't recalculate on open (but Excel/Google Sheets will recalculate automatically).
-
-For each child row at Excel row `n`:
-```
-Sell (E{n})      = C{n}*(1+D{n}/100)
-Line Cost (F{n}) = B{n}*C{n}
-Line Sell (G{n}) = B{n}*E{n}
-```
-
-For parent rows spanning children from row `first` to `last`:
-```
-Line Cost (F{n}) = SUM(F{first}:F{last})
-Line Sell (G{n}) = SUM(G{first}:G{last})
-Cost (C{n})      = F{n}   (total cost)
-Margin (D{n})    = IF(F{n}>0, (G{n}-F{n})/F{n}*100, 0)
-Sell (E{n})      = G{n}   (total sell)
-```
-
-For totals:
-```
-Subtotal         = SUM of all parent Line Sell cells (e.g., =G15+G19+G23)
-Total Cost       = SUM of all parent Line Cost cells
-Margin           = IF(TotalCost>0, (Subtotal-TotalCost)/TotalCost*100, 0)
-GST              = Subtotal * tax_rate / 100
-TOTAL            = Subtotal + GST cell
-```
-
-### Excel row grouping
-
-Child rows will be grouped under their parent using ExcelJS's `ws.getRow(n).outlineLevel = 1`. This lets users collapse/expand room groups directly in Excel using the +/- buttons, mirroring the expand/collapse in the app.
-
-### Standalone parent items (no children)
-
-These behave like child rows -- all columns are editable/formula-driven:
-- Qty, Cost, Margin% are editable values
-- Sell = formula
-- Line Cost = formula
-- Line Sell = formula
-
-### Optional items section
-
-Same as current: separated into its own section with a repeated header row. Optional item formulas work identically but are excluded from the main Subtotal formula.
-
-### Page setup
-
-- Landscape orientation (to fit 7 columns comfortably)
-- A4 paper size
-- Fit to width
+CSV generation is simple string concatenation -- no library required.
 
