@@ -1,19 +1,16 @@
 /* =============================================
-   QUOTE PDF DOCUMENT – CLEAN PROFESSIONAL DESIGN
+   QUOTE PDF DOCUMENT – REFERENCE DESIGN
    ============================================= */
 
 :root {
   --doc-primary: #1a1a2e;
-  --doc-accent: #16213e;
-  --doc-accent-soft: #e8edf5;
+  --doc-accent-bar: #c2703e;
   --doc-text: #2d3748;
   --doc-text-secondary: #4a5568;
   --doc-text-muted: #718096;
-  --doc-border: #e2e8f0;
-  --doc-border-strong: #cbd5e1;
-  --doc-bg-subtle: #f7fafc;
-  --doc-bg-row-alt: #fafbfd;
-  --doc-highlight: #edf2f7;
+  --doc-border: #d1d5db;
+  --doc-border-strong: #9ca3af;
+  --doc-bg-subtle: #f9fafb;
   --doc-white: #ffffff;
 }
 
@@ -24,16 +21,16 @@
 .quote-print-document {
   max-width: 800px;
   margin: 0 auto;
-  padding: 2.5rem 2.5rem 2rem;
+  padding: 2rem 2.25rem 1.5rem;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.55;
   color: var(--doc-text);
   background: var(--doc-white);
 }
 
 /* ═══════════════════════════════════════════════
-   HEADER
+   HEADER – two-column: company left, meta grid right
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-header {
@@ -41,22 +38,22 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 2rem;
-  padding-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
   border-bottom: 2px solid var(--doc-primary);
-  margin-bottom: 0;
+  margin-bottom: 1.25rem;
 }
 
 .quote-print-document .doc-header-left {
   display: flex;
   align-items: flex-start;
-  gap: 1rem;
+  gap: 0.875rem;
 }
 
 .quote-print-document .doc-logo {
-  max-width: 72px;
-  max-height: 72px;
+  max-width: 64px;
+  max-height: 64px;
   object-fit: contain;
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 .quote-print-document .doc-company-info {
@@ -66,174 +63,165 @@
 }
 
 .quote-print-document .doc-company-name {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: var(--doc-primary);
   line-height: 1.2;
   letter-spacing: -0.3px;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .quote-print-document .doc-company-detail {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--doc-text-muted);
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
+/* ── Metadata grid (right side of header) ───── */
+
 .quote-print-document .doc-header-right {
-  text-align: right;
   flex-shrink: 0;
 }
 
-.quote-print-document .doc-type-label {
-  font-size: 28px;
-  font-weight: 800;
-  text-transform: uppercase;
-  color: var(--doc-primary);
-  letter-spacing: 2px;
-  line-height: 1;
-  margin-bottom: 4px;
+.quote-print-document .doc-meta-grid {
+  border: 1px solid var(--doc-border);
+  border-collapse: collapse;
+  font-size: 11px;
 }
 
-.quote-print-document .doc-meta-number {
-  font-size: 13px;
+.quote-print-document .doc-meta-grid td {
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--doc-border);
+}
+
+.quote-print-document .doc-meta-label-cell {
   font-weight: 600;
   color: var(--doc-text-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-/* ═══════════════════════════════════════════════
-   META STRIP
-   ═══════════════════════════════════════════════ */
-
-.quote-print-document .doc-meta-strip {
-  display: flex;
-  gap: 0;
-  background: var(--doc-primary);
-  border-radius: 0;
-  margin-bottom: 1.5rem;
-  overflow: hidden;
+  white-space: nowrap;
+  background: var(--doc-bg-subtle);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-.quote-print-document .doc-meta-item {
-  flex: 1;
-  padding: 0.625rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-right: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-.quote-print-document .doc-meta-item:last-child {
-  border-right: none;
-}
-
-.quote-print-document .doc-meta-label {
-  font-size: 8.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-.quote-print-document .doc-meta-value {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--doc-white);
-}
-
-.quote-print-document .doc-status-badge {
-  text-transform: capitalize;
+.quote-print-document .doc-meta-value-cell {
+  color: var(--doc-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ═══════════════════════════════════════════════
-   PARTIES (Bill To / Prepared By)
+   PARTIES – clean text blocks, no card borders
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-parties {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.25rem;
-  margin-bottom: 1.5rem;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
 }
 
-.quote-print-document .doc-party-card {
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--doc-border);
-  border-radius: 6px;
-  background: var(--doc-bg-subtle);
+.quote-print-document .doc-party-block {
+  /* No border, no background */
 }
 
 .quote-print-document .doc-party-label {
-  font-size: 8.5px;
+  font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--doc-text-muted);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
 }
 
 .quote-print-document .doc-party-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--doc-primary);
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .quote-print-document .doc-party-detail {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--doc-text-secondary);
-  line-height: 1.5;
+  line-height: 1.55;
+}
+
+.quote-print-document .doc-site-location {
+  margin-top: 0.75rem;
 }
 
 /* ═══════════════════════════════════════════════
-   QUOTE TITLE
+   QUOTE TITLE – accent banner
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-quote-title {
-  font-size: 14px;
+  background: var(--doc-accent-bar);
+  color: var(--doc-white);
+  padding: 0.55rem 1rem;
   font-weight: 600;
-  color: var(--doc-primary);
-  padding: 0.75rem 1rem;
-  background: var(--doc-accent-soft);
-  border-left: 3px solid var(--doc-primary);
-  border-radius: 0 4px 4px 0;
+  font-size: 12.5px;
   margin-bottom: 1.25rem;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-.quote-print-document .doc-quote-title-label {
-  font-weight: 700;
-  color: var(--doc-text-muted);
-  margin-right: 4px;
-}
-
 /* ═══════════════════════════════════════════════
-   SCOPE / DESCRIPTION
+   SCOPE / DESCRIPTION – flowing letter text
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-scope {
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--doc-border);
+  margin-bottom: 1.25rem;
 }
 
 .quote-print-document .doc-greeting {
-  font-size: 12.5px;
+  font-size: 12px;
   color: var(--doc-text);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.625rem;
 }
 
 .quote-print-document .doc-scope-content {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--doc-text-secondary);
   line-height: 1.7;
 }
 
-/* Rich text styling */
+/* ── Rich text spacing fix ──────────────────── */
+
+.quote-print-document .doc-scope-content p,
+.quote-print-document .doc-scope-content div {
+  margin-bottom: 0.5em;
+}
+
+.quote-print-document .doc-scope-content p:last-child,
+.quote-print-document .doc-scope-content div:last-child {
+  margin-bottom: 0;
+}
+
+.quote-print-document .doc-scope-content ul,
+.quote-print-document .doc-scope-content ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.quote-print-document .doc-scope-content ul {
+  list-style: disc;
+}
+
+.quote-print-document .doc-scope-content ol {
+  list-style: decimal;
+}
+
+.quote-print-document .doc-scope-content li {
+  margin: 0.25em 0;
+}
+
+.quote-print-document .doc-scope-content br {
+  display: block;
+  content: "";
+  margin-top: 0.25em;
+}
+
+/* Rich text inline formatting */
 .quote-print-document .rich-text-content b,
 .quote-print-document .rich-text-content strong {
   font-weight: 600;
@@ -247,22 +235,6 @@
 
 .quote-print-document .rich-text-content u {
   text-decoration: underline;
-}
-
-.quote-print-document .rich-text-content ul {
-  list-style: disc;
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-
-.quote-print-document .rich-text-content ol {
-  list-style: decimal;
-  padding-left: 1.5rem;
-  margin: 0.5rem 0;
-}
-
-.quote-print-document .rich-text-content li {
-  margin: 3px 0;
 }
 
 /* ═══════════════════════════════════════════════
@@ -284,7 +256,7 @@
   letter-spacing: 1.2px;
   color: var(--doc-primary);
   padding: 0.5rem 0;
-  margin: 1rem 0 0;
+  margin: 0.5rem 0 0;
   border-bottom: 2px solid var(--doc-primary);
 }
 
@@ -295,15 +267,15 @@
 .quote-print-document .doc-items-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 0.75rem;
-  font-size: 11.5px;
+  margin-bottom: 0.5rem;
+  font-size: 11px;
 }
 
 .quote-print-document .doc-items-table thead th {
-  padding: 0.5rem 0.75rem;
+  padding: 0.45rem 0.65rem;
   font-weight: 700;
   color: var(--doc-text-muted);
-  font-size: 8.5px;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.75px;
   border-bottom: 1px solid var(--doc-border-strong);
@@ -311,18 +283,22 @@
 }
 
 .quote-print-document .doc-items-table td {
-  padding: 0.5rem 0.75rem;
+  padding: 0.4rem 0.65rem;
   border-bottom: 1px solid var(--doc-border);
   color: var(--doc-text);
   vertical-align: top;
 }
 
-/* Parent rows */
+/* Parent rows – subtle left accent */
 .quote-print-document .doc-row-parent td {
   font-weight: 500;
   background: var(--doc-bg-subtle);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+
+.quote-print-document .doc-row-parent td:first-child {
+  border-left: 3px solid var(--doc-accent-bar);
 }
 
 .quote-print-document .doc-cell-parent {
@@ -332,23 +308,23 @@
 
 /* Child rows */
 .quote-print-document .doc-row-child td {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--doc-text-secondary);
   background: var(--doc-white);
   border-bottom-color: var(--doc-border);
 }
 
 .quote-print-document .doc-cell-indent {
-  padding-left: 1.75rem !important;
+  padding-left: 1.5rem !important;
   position: relative;
 }
 
 .quote-print-document .doc-cell-indent::before {
   content: '';
   position: absolute;
-  left: 0.75rem;
+  left: 0.65rem;
   top: 50%;
-  width: 6px;
+  width: 5px;
   height: 1px;
   background: var(--doc-border-strong);
 }
@@ -371,19 +347,19 @@
 
 /* Optional group sections */
 .quote-print-document .doc-optional-group {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .quote-print-document .doc-optional-group-name {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--doc-text-secondary);
-  padding: 0.4rem 0.75rem;
+  padding: 0.35rem 0.65rem;
   margin-bottom: 0;
-  background: var(--doc-highlight);
-  border-left: 3px solid var(--doc-primary);
+  background: var(--doc-bg-subtle);
+  border-left: 3px solid var(--doc-accent-bar);
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
@@ -399,45 +375,42 @@
 
 .quote-print-document .doc-optional-totals td {
   border-bottom: none;
-  padding: 0.3rem 0.75rem;
-  font-size: 10.5px;
+  padding: 0.25rem 0.65rem;
+  font-size: 10px;
   color: var(--doc-text-muted);
 }
 
 .quote-print-document .doc-optional-subtotal-row td {
-  font-size: 10.5px;
+  font-size: 10px;
 }
 
 /* ═══════════════════════════════════════════════
-   TOTALS BOX
+   TOTALS – right-aligned, clean rows
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-totals {
   display: flex;
   justify-content: flex-end;
-  margin-top: 1rem;
+  margin-top: 0.75rem;
   margin-bottom: 1.5rem;
 }
 
 .quote-print-document .doc-totals-table {
-  width: 280px;
-  border: 1px solid var(--doc-border);
-  border-radius: 6px;
-  overflow: hidden;
+  width: 260px;
 }
 
 .quote-print-document .doc-totals-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  font-size: 12px;
+  padding: 0.35rem 0;
+  font-size: 11.5px;
   color: var(--doc-text);
   border-bottom: 1px solid var(--doc-border);
 }
 
-.quote-print-document .doc-totals-row:last-child {
-  border-bottom: none;
+.quote-print-document .doc-totals-row:first-child {
+  border-top: 1px solid var(--doc-border-strong);
 }
 
 .quote-print-document .doc-totals-label {
@@ -451,22 +424,19 @@
 }
 
 .quote-print-document .doc-totals-grand {
-  background: var(--doc-primary);
-  color: var(--doc-white) !important;
-  padding: 0.75rem 1rem;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+  border-bottom: 2px solid var(--doc-primary);
+  padding: 0.5rem 0;
 }
 
 .quote-print-document .doc-totals-grand .doc-totals-label {
-  color: rgba(255, 255, 255, 0.8);
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--doc-primary);
 }
 
 .quote-print-document .doc-totals-grand .doc-totals-value {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
-  color: var(--doc-white);
+  color: var(--doc-primary);
 }
 
 /* ═══════════════════════════════════════════════
@@ -475,40 +445,35 @@
 
 .quote-print-document .doc-notes {
   margin-bottom: 1rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--doc-border);
-  border-radius: 6px;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--doc-border);
 }
 
 .quote-print-document .doc-notes h3,
 .quote-print-document .doc-terms h3 {
-  font-size: 8.5px;
+  font-size: 8px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.35rem;
   color: var(--doc-text-muted);
 }
 
 .quote-print-document .doc-notes p {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--doc-text);
   white-space: pre-wrap;
   line-height: 1.6;
 }
 
 .quote-print-document .doc-terms {
-  margin-bottom: 1.5rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--doc-border);
-  border-radius: 6px;
-  background: var(--doc-bg-subtle);
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--doc-border);
 }
 
 .quote-print-document .doc-terms p {
-  font-size: 9.5px;
+  font-size: 9px;
   color: var(--doc-text-muted);
   line-height: 1.7;
 }
@@ -518,8 +483,8 @@
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-acceptance {
-  margin-top: 2rem;
-  padding-top: 1.25rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
   border-top: 1px solid var(--doc-border);
 }
 
@@ -529,35 +494,35 @@
   text-transform: uppercase;
   letter-spacing: 1.2px;
   color: var(--doc-primary);
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
 }
 
 .quote-print-document .doc-acceptance-text {
-  font-size: 11px;
+  font-size: 10.5px;
   color: var(--doc-text-secondary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.25rem;
   line-height: 1.6;
 }
 
 .quote-print-document .doc-signature-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 2rem;
+  gap: 1.5rem;
 }
 
 .quote-print-document .doc-signature-block {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 .quote-print-document .doc-signature-line {
-  height: 40px;
+  height: 36px;
   border-bottom: 1px solid var(--doc-text);
 }
 
 .quote-print-document .doc-signature-label {
-  font-size: 8.5px;
+  font-size: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--doc-text-muted);
@@ -565,26 +530,20 @@
 }
 
 /* ═══════════════════════════════════════════════
-   FOOTER
+   FOOTER – centered contact line
    ═══════════════════════════════════════════════ */
 
 .quote-print-document .doc-footer {
-  margin-top: 2rem;
-}
-
-.quote-print-document .doc-footer-bar {
-  height: 3px;
-  background: var(--doc-primary);
-  margin-bottom: 0.75rem;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+  margin-top: 1.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--doc-border);
 }
 
 .quote-print-document .doc-footer-content {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.25rem 1.5rem;
+  gap: 0.25rem 1.25rem;
   font-size: 9px;
   color: var(--doc-text-muted);
   letter-spacing: 0.25px;
@@ -718,18 +677,11 @@
   }
 
   /* Preserve background colors in print */
-  .quote-print-document .doc-meta-strip {
-    background: var(--doc-primary) !important;
+  .quote-print-document .doc-quote-title {
+    background: var(--doc-accent-bar) !important;
+    color: var(--doc-white) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-  }
-
-  .quote-print-document .doc-meta-label {
-    color: rgba(255, 255, 255, 0.6) !important;
-  }
-
-  .quote-print-document .doc-meta-value {
-    color: var(--doc-white) !important;
   }
 
   .quote-print-document .doc-row-parent td {
@@ -738,56 +690,25 @@
     print-color-adjust: exact;
   }
 
-  .quote-print-document .doc-totals-grand {
-    background: var(--doc-primary) !important;
-    color: var(--doc-white) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  .quote-print-document .doc-row-parent td:first-child {
+    border-left-color: var(--doc-accent-bar) !important;
   }
 
-  .quote-print-document .doc-totals-grand .doc-totals-label,
-  .quote-print-document .doc-totals-grand .doc-totals-value {
-    color: var(--doc-white) !important;
-  }
-
-  .quote-print-document .doc-quote-title {
-    background: var(--doc-accent-soft) !important;
-    border-left-color: var(--doc-primary) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .quote-print-document .doc-party-card {
+  .quote-print-document .doc-meta-label-cell {
     background: var(--doc-bg-subtle) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .quote-print-document .doc-optional-group-name {
-    background: var(--doc-highlight) !important;
-    border-left-color: var(--doc-primary) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .quote-print-document .doc-terms {
     background: var(--doc-bg-subtle) !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .quote-print-document .doc-footer-bar {
-    background: var(--doc-primary) !important;
+    border-left-color: var(--doc-accent-bar) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   .quote-print-document .doc-header {
     border-bottom-color: var(--doc-primary);
-  }
-
-  /* Page break rules */
-  .quote-print-document .doc-header {
     page-break-after: avoid;
   }
 
