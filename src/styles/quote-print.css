@@ -1,189 +1,243 @@
 /* =============================================
-   QUOTE PDF DOCUMENT – WHITE LETTERHEAD DESIGN
-   Scoped under .quote-print-document
+   QUOTE PDF DOCUMENT – CLEAN PROFESSIONAL DESIGN
    ============================================= */
 
 :root {
-  --quote-accent: #c2683c;
-  --quote-accent-light: #fdf2ec;
-  --quote-charcoal: #1e293b;
-  --quote-slate: #334155;
-  --quote-muted: #64748b;
-  --quote-light: #94a3b8;
-  --quote-border: #e2e8f0;
-  --quote-bg-subtle: #f8fafc;
+  --doc-primary: #1a1a2e;
+  --doc-accent: #16213e;
+  --doc-accent-soft: #e8edf5;
+  --doc-text: #2d3748;
+  --doc-text-secondary: #4a5568;
+  --doc-text-muted: #718096;
+  --doc-border: #e2e8f0;
+  --doc-border-strong: #cbd5e1;
+  --doc-bg-subtle: #f7fafc;
+  --doc-bg-row-alt: #fafbfd;
+  --doc-highlight: #edf2f7;
+  --doc-white: #ffffff;
 }
+
+/* ═══════════════════════════════════════════════
+   DOCUMENT BASE
+   ═══════════════════════════════════════════════ */
 
 .quote-print-document {
   max-width: 800px;
   margin: 0 auto;
-  padding: 2.5rem 2rem 3rem;
+  padding: 2.5rem 2.5rem 2rem;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.55;
-  color: var(--quote-slate);
-  background: #fff;
+  color: var(--doc-text);
+  background: var(--doc-white);
 }
 
-/* ── Letterhead Header ──────────────────────── */
+/* ═══════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════ */
 
-.quote-print-document .letterhead-header {
+.quote-print-document .doc-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 2rem;
-  padding-bottom: 1.25rem;
-  margin-bottom: 1.5rem;
-  border-bottom: 3px solid var(--quote-accent);
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid var(--doc-primary);
+  margin-bottom: 0;
 }
 
-.quote-print-document .letterhead-brand {
+.quote-print-document .doc-header-left {
   display: flex;
   align-items: flex-start;
   gap: 1rem;
 }
 
-.quote-print-document .letterhead-logo {
-  max-width: 80px;
-  max-height: 56px;
+.quote-print-document .doc-logo {
+  max-width: 72px;
+  max-height: 72px;
   object-fit: contain;
+  border-radius: 4px;
 }
 
-.quote-print-document .letterhead-company-name {
-  font-size: 22px;
+.quote-print-document .doc-company-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.quote-print-document .doc-company-name {
+  font-size: 20px;
   font-weight: 700;
-  color: var(--quote-charcoal);
+  color: var(--doc-primary);
   line-height: 1.2;
+  letter-spacing: -0.3px;
+  margin-bottom: 4px;
 }
 
-.quote-print-document .letterhead-detail {
-  font-size: 11px;
-  color: var(--quote-muted);
-  margin-top: 1px;
+.quote-print-document .doc-company-detail {
+  font-size: 10.5px;
+  color: var(--doc-text-muted);
+  line-height: 1.5;
 }
 
-.quote-print-document .letterhead-abn {
-  font-size: 11px;
-  color: var(--quote-muted);
-  margin-top: 2px;
-  letter-spacing: 0.25px;
-}
-
-/* ── Meta table (top-right) ────────────────── */
-
-.quote-print-document .letterhead-meta {
+.quote-print-document .doc-header-right {
+  text-align: right;
   flex-shrink: 0;
 }
 
-.quote-print-document .meta-table {
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.quote-print-document .meta-table td {
-  padding: 3px 0;
-}
-
-.quote-print-document .meta-table .meta-label {
-  font-size: 10px;
+.quote-print-document .doc-type-label {
+  font-size: 28px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--quote-light);
+  color: var(--doc-primary);
+  letter-spacing: 2px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.quote-print-document .doc-meta-number {
+  font-size: 13px;
   font-weight: 600;
-  padding-right: 1rem;
-  white-space: nowrap;
+  color: var(--doc-text-secondary);
+  font-variant-numeric: tabular-nums;
 }
 
-.quote-print-document .meta-table .meta-value {
-  color: var(--quote-slate);
-  font-weight: 500;
-  text-align: right;
-  white-space: nowrap;
-}
+/* ═══════════════════════════════════════════════
+   META STRIP
+   ═══════════════════════════════════════════════ */
 
-/* ── Contact Grid ───────────────────────────── */
-
-.quote-print-document .contact-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+.quote-print-document .doc-meta-strip {
+  display: flex;
+  gap: 0;
+  background: var(--doc-primary);
+  border-radius: 0;
   margin-bottom: 1.5rem;
-}
-
-.quote-print-document .contact-box {
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--quote-border);
-  border-radius: 0.375rem;
-}
-
-.quote-print-document .contact-box h3 {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--quote-light);
-  margin-bottom: 0.5rem;
-  font-weight: 700;
-}
-
-.quote-print-document .contact-box p {
-  font-size: 12px;
-  margin: 2px 0;
-  color: var(--quote-slate);
-}
-
-.quote-print-document .contact-name {
-  font-weight: 600;
-  font-size: 14px !important;
-  color: var(--quote-charcoal) !important;
-  margin-bottom: 4px !important;
-}
-
-/* ── Title accent bar ───────────────────────── */
-
-.quote-print-document .quote-title-bar {
-  background: var(--quote-accent);
-  color: #fff;
-  padding: 0.625rem 1.25rem;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-  border-radius: 0.25rem;
+  overflow: hidden;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-/* ── Letter Body ────────────────────────────── */
-
-.quote-print-document .letter-body {
-  margin-bottom: 2rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--quote-border);
+.quote-print-document .doc-meta-item {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.quote-print-document .letter-subject {
-  font-size: 15px;
+.quote-print-document .doc-meta-item:last-child {
+  border-right: none;
+}
+
+.quote-print-document .doc-meta-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.quote-print-document .doc-meta-value {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--doc-white);
+}
+
+.quote-print-document .doc-status-badge {
+  text-transform: capitalize;
+}
+
+/* ═══════════════════════════════════════════════
+   PARTIES (Bill To / Prepared By)
+   ═══════════════════════════════════════════════ */
+
+.quote-print-document .doc-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.quote-print-document .doc-party-card {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  background: var(--doc-bg-subtle);
+}
+
+.quote-print-document .doc-party-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--doc-text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.quote-print-document .doc-party-name {
+  font-size: 14px;
   font-weight: 600;
-  color: var(--quote-charcoal);
+  color: var(--doc-primary);
+  margin-bottom: 4px;
+}
+
+.quote-print-document .doc-party-detail {
+  font-size: 11px;
+  color: var(--doc-text-secondary);
+  line-height: 1.5;
+}
+
+/* ═══════════════════════════════════════════════
+   QUOTE TITLE
+   ═══════════════════════════════════════════════ */
+
+.quote-print-document .doc-quote-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--doc-primary);
+  padding: 0.75rem 1rem;
+  background: var(--doc-accent-soft);
+  border-left: 3px solid var(--doc-primary);
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 1.25rem;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.quote-print-document .doc-quote-title-label {
+  font-weight: 700;
+  color: var(--doc-text-muted);
+  margin-right: 4px;
+}
+
+/* ═══════════════════════════════════════════════
+   SCOPE / DESCRIPTION
+   ═══════════════════════════════════════════════ */
+
+.quote-print-document .doc-scope {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--doc-border);
+}
+
+.quote-print-document .doc-greeting {
+  font-size: 12.5px;
+  color: var(--doc-text);
   margin-bottom: 0.75rem;
 }
 
-.quote-print-document .letter-greeting {
-  font-size: 13px;
-  color: var(--quote-slate);
-  margin-bottom: 0.75rem;
-}
-
-.quote-print-document .letter-content {
-  font-size: 13px;
-  color: #475569;
+.quote-print-document .doc-scope-content {
+  font-size: 12.5px;
+  color: var(--doc-text-secondary);
   line-height: 1.7;
 }
 
-/* Rich text content styling */
+/* Rich text styling */
 .quote-print-document .rich-text-content b,
 .quote-print-document .rich-text-content strong {
   font-weight: 600;
-  color: var(--quote-slate);
+  color: var(--doc-text);
 }
 
 .quote-print-document .rich-text-content i,
@@ -211,231 +265,328 @@
   margin: 3px 0;
 }
 
-/* ── Section headings ───────────────────────── */
+/* ═══════════════════════════════════════════════
+   SECTION HEADERS
+   ═══════════════════════════════════════════════ */
 
-.quote-print-document .section-heading {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--quote-charcoal);
-  margin: 1.5rem 0 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--quote-charcoal);
+.quote-print-document .doc-section {
+  margin-bottom: 0.5rem;
 }
 
-/* ── Items table ────────────────────────────── */
-
-.quote-print-document .items-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 1.25rem;
-  font-size: 12px;
+.quote-print-document .doc-section-header {
+  margin-bottom: 0;
 }
 
-.quote-print-document .items-table th {
-  padding: 0.625rem 0.75rem;
-  background: var(--quote-bg-subtle);
-  font-weight: 700;
-  color: var(--quote-slate);
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.75px;
-  border-bottom: 2px solid #cbd5e1;
-  border-top: 2px solid #cbd5e1;
-}
-
-.quote-print-document .items-table td {
-  padding: 0.5rem 0.75rem;
-  border-bottom: 1px solid var(--quote-border);
-  color: var(--quote-slate);
-}
-
-.quote-print-document .items-table .parent-row td {
-  padding-top: 0.625rem;
-  font-weight: 500;
-  border-left: 3px solid var(--quote-accent);
-  background: var(--quote-accent-light);
-}
-
-.quote-print-document .items-table .parent-row td:not(:first-child) {
-  border-left: none;
-}
-
-.quote-print-document .items-table .parent-row td:first-child {
-  border-left: 3px solid var(--quote-accent);
-}
-
-.quote-print-document .items-table .child-row td {
-  font-size: 11px;
-  color: var(--quote-muted);
-  border-bottom-color: #f1f5f9;
-  background: transparent;
-  border-left: none;
-}
-
-.quote-print-document .items-table .child-row td:first-child {
-  padding-left: 1.5rem;
-}
-
-.quote-print-document .items-table .optional-row td {
-  font-style: italic;
-  color: var(--quote-muted);
-}
-
-.quote-print-document .optional-table {
-  opacity: 0.9;
-}
-
-/* ── Optional group sections ────────────────── */
-
-.quote-print-document .optional-group {
-  margin-bottom: 1.5rem;
-}
-
-.quote-print-document .optional-group-divider {
+.quote-print-document .doc-section-header h2 {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.75px;
-  color: #475569;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.5rem;
-  background: var(--quote-bg-subtle);
-  border-left: 3px solid var(--quote-accent);
-  border-radius: 0 0.25rem 0.25rem 0;
+  letter-spacing: 1.2px;
+  color: var(--doc-primary);
+  padding: 0.5rem 0;
+  margin: 1rem 0 0;
+  border-bottom: 2px solid var(--doc-primary);
 }
 
-.quote-print-document .optional-group-totals {
-  margin-top: -0.5rem;
+/* ═══════════════════════════════════════════════
+   ITEMS TABLE
+   ═══════════════════════════════════════════════ */
+
+.quote-print-document .doc-items-table {
+  width: 100%;
+  border-collapse: collapse;
   margin-bottom: 0.75rem;
+  font-size: 11.5px;
 }
 
-.quote-print-document .optional-group-totals td {
-  border-bottom: none;
-  padding: 0.375rem 0.75rem;
+.quote-print-document .doc-items-table thead th {
+  padding: 0.5rem 0.75rem;
+  font-weight: 700;
+  color: var(--doc-text-muted);
+  font-size: 8.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.75px;
+  border-bottom: 1px solid var(--doc-border-strong);
+  background: transparent;
 }
 
-.quote-print-document .group-subtotal-row td {
+.quote-print-document .doc-items-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--doc-border);
+  color: var(--doc-text);
+  vertical-align: top;
+}
+
+/* Parent rows */
+.quote-print-document .doc-row-parent td {
+  font-weight: 500;
+  background: var(--doc-bg-subtle);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.quote-print-document .doc-cell-parent {
+  font-weight: 600 !important;
+  color: var(--doc-primary) !important;
+}
+
+/* Child rows */
+.quote-print-document .doc-row-child td {
   font-size: 11px;
+  color: var(--doc-text-secondary);
+  background: var(--doc-white);
+  border-bottom-color: var(--doc-border);
 }
 
-/* ── Totals box ─────────────────────────────── */
+.quote-print-document .doc-cell-indent {
+  padding-left: 1.75rem !important;
+  position: relative;
+}
 
-.quote-print-document .totals-box {
-  margin-left: auto;
-  max-width: 320px;
-  margin-top: 1.5rem;
-  border-radius: 0.375rem;
+.quote-print-document .doc-cell-indent::before {
+  content: '';
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  width: 6px;
+  height: 1px;
+  background: var(--doc-border-strong);
+}
+
+/* Number cells */
+.quote-print-document .doc-cell-number {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.quote-print-document .doc-cell-amount {
+  font-weight: 600;
+}
+
+/* Optional rows */
+.quote-print-document .doc-row-optional td {
+  font-style: italic;
+  color: var(--doc-text-muted);
+}
+
+/* Optional group sections */
+.quote-print-document .doc-optional-group {
+  margin-bottom: 1rem;
+}
+
+.quote-print-document .doc-optional-group-name {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--doc-text-secondary);
+  padding: 0.4rem 0.75rem;
+  margin-bottom: 0;
+  background: var(--doc-highlight);
+  border-left: 3px solid var(--doc-primary);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.quote-print-document .doc-optional-table {
+  opacity: 0.92;
+}
+
+.quote-print-document .doc-optional-totals {
+  margin-top: -0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.quote-print-document .doc-optional-totals td {
+  border-bottom: none;
+  padding: 0.3rem 0.75rem;
+  font-size: 10.5px;
+  color: var(--doc-text-muted);
+}
+
+.quote-print-document .doc-optional-subtotal-row td {
+  font-size: 10.5px;
+}
+
+/* ═══════════════════════════════════════════════
+   TOTALS BOX
+   ═══════════════════════════════════════════════ */
+
+.quote-print-document .doc-totals {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.quote-print-document .doc-totals-table {
+  width: 280px;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
   overflow: hidden;
-  border: 1px solid var(--quote-border);
 }
 
-.quote-print-document .totals-row {
+.quote-print-document .doc-totals-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.625rem 1rem;
-  font-size: 13px;
-  color: var(--quote-slate);
-  border-bottom: 1px solid #f1f5f9;
+  padding: 0.5rem 1rem;
+  font-size: 12px;
+  color: var(--doc-text);
+  border-bottom: 1px solid var(--doc-border);
 }
 
-.quote-print-document .totals-row:last-child {
+.quote-print-document .doc-totals-row:last-child {
   border-bottom: none;
 }
 
-.quote-print-document .grand-total {
-  background: var(--quote-accent);
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 16px;
+.quote-print-document .doc-totals-label {
+  font-weight: 500;
+  color: var(--doc-text-secondary);
+}
+
+.quote-print-document .doc-totals-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.quote-print-document .doc-totals-grand {
+  background: var(--doc-primary);
+  color: var(--doc-white) !important;
   padding: 0.75rem 1rem;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-/* ── Notes & Terms ──────────────────────────── */
-
-.quote-print-document .notes-box {
-  margin-top: 1.5rem;
-  padding: 1rem 1.25rem;
-  border: 1px solid var(--quote-border);
-  border-radius: 0.375rem;
+.quote-print-document .doc-totals-grand .doc-totals-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
 }
 
-.quote-print-document .notes-box h3,
-.quote-print-document .terms-box h3 {
-  font-size: 9px;
+.quote-print-document .doc-totals-grand .doc-totals-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--doc-white);
+}
+
+/* ═══════════════════════════════════════════════
+   NOTES & TERMS
+   ═══════════════════════════════════════════════ */
+
+.quote-print-document .doc-notes {
+  margin-bottom: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+}
+
+.quote-print-document .doc-notes h3,
+.quote-print-document .doc-terms h3 {
+  font-size: 8.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.75px;
-  margin-bottom: 0.5rem;
-  color: var(--quote-muted);
+  letter-spacing: 1px;
+  margin-bottom: 0.4rem;
+  color: var(--doc-text-muted);
 }
 
-.quote-print-document .notes-box p {
-  font-size: 12px;
-  color: var(--quote-slate);
+.quote-print-document .doc-notes p {
+  font-size: 11.5px;
+  color: var(--doc-text);
   white-space: pre-wrap;
   line-height: 1.6;
 }
 
-.quote-print-document .terms-box {
-  margin-top: 1rem;
+.quote-print-document .doc-terms {
+  margin-bottom: 1.5rem;
   padding: 1rem 1.25rem;
-  border: 1px solid var(--quote-border);
-  border-radius: 0.375rem;
-  background: var(--quote-bg-subtle);
+  border: 1px solid var(--doc-border);
+  border-radius: 6px;
+  background: var(--doc-bg-subtle);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
-.quote-print-document .terms-box p {
-  font-size: 10px;
-  color: var(--quote-muted);
+.quote-print-document .doc-terms p {
+  font-size: 9.5px;
+  color: var(--doc-text-muted);
   line-height: 1.7;
 }
 
-/* ── Signature ──────────────────────────────── */
+/* ═══════════════════════════════════════════════
+   ACCEPTANCE / SIGNATURE
+   ═══════════════════════════════════════════════ */
 
-.quote-print-document .signature-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  margin-top: 3rem;
-  padding-top: 1rem;
+.quote-print-document .doc-acceptance {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--doc-border);
 }
 
-.quote-print-document .signature-box {
+.quote-print-document .doc-acceptance h3 {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--doc-primary);
+  margin-bottom: 0.5rem;
+}
+
+.quote-print-document .doc-acceptance-text {
+  font-size: 11px;
+  color: var(--doc-text-secondary);
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+.quote-print-document .doc-signature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 2rem;
+}
+
+.quote-print-document .doc-signature-block {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
-.quote-print-document .signature-line {
-  height: 48px;
-  border-bottom: 1px solid var(--quote-slate);
+.quote-print-document .doc-signature-line {
+  height: 40px;
+  border-bottom: 1px solid var(--doc-text);
 }
 
-.quote-print-document .signature-box span {
-  font-size: 9px;
+.quote-print-document .doc-signature-label {
+  font-size: 8.5px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: var(--quote-light);
-  font-weight: 500;
+  color: var(--doc-text-muted);
+  font-weight: 600;
 }
 
-/* ── Footer ─────────────────────────────────── */
+/* ═══════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════ */
 
-.quote-print-document .document-footer {
-  margin-top: 2.5rem;
-  padding-top: 0.75rem;
-  border-top: 2px solid var(--quote-accent);
+.quote-print-document .doc-footer {
+  margin-top: 2rem;
+}
+
+.quote-print-document .doc-footer-bar {
+  height: 3px;
+  background: var(--doc-primary);
+  margin-bottom: 0.75rem;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.quote-print-document .doc-footer-content {
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
   gap: 0.25rem 1.5rem;
   font-size: 9px;
-  color: var(--quote-light);
+  color: var(--doc-text-muted);
   letter-spacing: 0.25px;
 }
 
@@ -444,19 +595,46 @@
    ═══════════════════════════════════════════════ */
 
 .pdf-paper-wrapper {
-  background: #fff;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  background: var(--doc-white);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.08),
+    0 8px 32px rgba(0, 0, 0, 0.12);
   border-radius: 4px;
-  transform: scale(0.58);
   transform-origin: top center;
   width: 210mm;
-  margin: 0 auto;
   min-height: 297mm;
 }
 
-/* When inside sidebar scroll area, negative margin compensates for scale */
+/* Compensate for scale transform to prevent excess whitespace below */
 .pdf-sidebar-scroll .pdf-paper-wrapper {
   margin-bottom: -42%;
+}
+
+/* Sidebar panel animation */
+.pdf-sidebar-panel {
+  animation: slideInRight 0.2s ease-out;
+}
+
+.pdf-sidebar-backdrop {
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ═══════════════════════════════════════════════
@@ -492,6 +670,20 @@
     display: none !important;
   }
 
+  /* Hide custom sidebar elements */
+  .pdf-sidebar-backdrop,
+  .pdf-sidebar-panel > .shrink-0 {
+    display: none !important;
+  }
+
+  .pdf-sidebar-panel {
+    position: static !important;
+    width: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    animation: none !important;
+  }
+
   /* Show only the document content */
   .pdf-paper-wrapper {
     transform: none !important;
@@ -508,6 +700,10 @@
     padding: 0 !important;
   }
 
+  .pdf-sidebar-scroll > div {
+    padding: 0 !important;
+  }
+
   body {
     background: white !important;
     color: #1a1a1a !important;
@@ -521,88 +717,109 @@
     background: white;
   }
 
-  /* Accent colors for print */
-  .quote-print-document .letterhead-header {
-    border-bottom-color: var(--quote-accent);
-  }
-
-  .quote-print-document .quote-title-bar {
-    background: var(--quote-accent) !important;
+  /* Preserve background colors in print */
+  .quote-print-document .doc-meta-strip {
+    background: var(--doc-primary) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .items-table .parent-row td {
-    background: var(--quote-accent-light) !important;
-    border-left-color: var(--quote-accent) !important;
+  .quote-print-document .doc-meta-label {
+    color: rgba(255, 255, 255, 0.6) !important;
+  }
+
+  .quote-print-document .doc-meta-value {
+    color: var(--doc-white) !important;
+  }
+
+  .quote-print-document .doc-row-parent td {
+    background: var(--doc-bg-subtle) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .items-table th {
-    background: var(--quote-bg-subtle) !important;
+  .quote-print-document .doc-totals-grand {
+    background: var(--doc-primary) !important;
+    color: var(--doc-white) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .grand-total {
-    background: var(--quote-accent) !important;
-    color: #ffffff !important;
+  .quote-print-document .doc-totals-grand .doc-totals-label,
+  .quote-print-document .doc-totals-grand .doc-totals-value {
+    color: var(--doc-white) !important;
+  }
+
+  .quote-print-document .doc-quote-title {
+    background: var(--doc-accent-soft) !important;
+    border-left-color: var(--doc-primary) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .optional-group-divider {
-    background: var(--quote-bg-subtle) !important;
-    border-left-color: var(--quote-accent) !important;
+  .quote-print-document .doc-party-card {
+    background: var(--doc-bg-subtle) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .terms-box {
-    background: var(--quote-bg-subtle) !important;
+  .quote-print-document .doc-optional-group-name {
+    background: var(--doc-highlight) !important;
+    border-left-color: var(--doc-primary) !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  .quote-print-document .document-footer {
-    border-top-color: var(--quote-accent);
+  .quote-print-document .doc-terms {
+    background: var(--doc-bg-subtle) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Page breaks */
-  .quote-print-document .letterhead-header {
+  .quote-print-document .doc-footer-bar {
+    background: var(--doc-primary) !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quote-print-document .doc-header {
+    border-bottom-color: var(--doc-primary);
+  }
+
+  /* Page break rules */
+  .quote-print-document .doc-header {
     page-break-after: avoid;
   }
 
-  .quote-print-document .signature-grid {
+  .quote-print-document .doc-acceptance {
     page-break-inside: avoid;
   }
 
-  .quote-print-document .totals-box {
+  .quote-print-document .doc-totals {
     page-break-inside: avoid;
   }
 
-  .quote-print-document .optional-group {
+  .quote-print-document .doc-optional-group {
     page-break-inside: avoid;
   }
 
-  .quote-print-document .contact-grid {
+  .quote-print-document .doc-parties {
     page-break-inside: avoid;
   }
 
-  .quote-print-document .notes-box {
+  .quote-print-document .doc-notes {
     page-break-inside: avoid;
   }
 
-  .quote-print-document .terms-box {
+  .quote-print-document .doc-terms {
     page-break-inside: avoid;
   }
 
-  .quote-print-document .items-table {
+  .quote-print-document .doc-items-table {
     page-break-inside: auto;
   }
 
-  .quote-print-document .items-table tr {
+  .quote-print-document .doc-items-table tr {
     page-break-inside: avoid;
   }
 }

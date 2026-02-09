@@ -1,16 +1,10 @@
-import { Loader2, Printer } from 'lucide-react';
+import { Loader2, Download, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { useState } from 'react';
 import { useQuote } from '@/hooks/useQuotes';
 import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
 import { useOrganizationBranding } from '@/hooks/useOrganizationBranding';
 import { useQuoteOwnerProfile } from '@/hooks/useQuoteOwnerProfile';
 import { useQuotePdfSettings } from '@/hooks/useQuotePdfSettings';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { PreviewToolbar } from './PreviewToolbar';
 import { QuotePdfDocument } from './QuotePdfDocument';
@@ -20,6 +14,9 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   quoteId: string | undefined;
 }
+
+const ZOOM_LEVELS = [0.4, 0.5, 0.6, 0.7, 0.8] as const;
+const DEFAULT_ZOOM_INDEX = 1;
 
 export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
   const { data: quote, isLoading: quoteLoading } = useQuote(quoteId);
@@ -34,40 +31,84 @@ export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
     showTotalColumn,
   } = useQuotePdfSettings();
 
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX);
+  const zoom = ZOOM_LEVELS[zoomIndex];
+
   const isLoading = quoteLoading || itemsLoading;
 
+  if (!open) return null;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="right"
-        className="sm:max-w-[540px] w-full p-0 flex flex-col"
-      >
+    <>
+      {/* Overlay backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm pdf-sidebar-backdrop"
+        onClick={() => onOpenChange(false)}
+      />
+
+      {/* Sidebar panel */}
+      <div className="fixed inset-y-0 right-0 z-50 flex flex-col w-full sm:w-[620px] md:w-[680px] bg-background border-l border-border shadow-2xl pdf-sidebar-panel">
         {/* Header */}
-        <SheetHeader className="px-4 py-3 border-b border-border shrink-0">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="text-base">PDF Preview</SheetTitle>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border bg-card shrink-0">
+          <div className="flex items-center gap-3">
+            <h2 className="text-sm font-semibold tracking-tight">PDF Preview</h2>
+            {quote && (
+              <span className="text-xs text-muted-foreground font-mono">{quote.quote_number}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5">
+            {/* Zoom controls */}
+            <div className="flex items-center gap-0.5 mr-2 border border-border rounded-md">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={zoomIndex === 0}
+                onClick={() => setZoomIndex(i => Math.max(0, i - 1))}
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </Button>
+              <span className="text-[11px] font-mono text-muted-foreground w-10 text-center">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                disabled={zoomIndex === ZOOM_LEVELS.length - 1}
+                onClick={() => setZoomIndex(i => Math.min(ZOOM_LEVELS.length - 1, i + 1))}
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+
             <Button
               size="sm"
-              variant="outline"
-              className="gap-1.5"
+              variant="default"
+              className="gap-1.5 h-8"
               onClick={() => window.print()}
             >
-              <Printer className="w-3.5 h-3.5" />
+              <Download className="w-3.5 h-3.5" />
               Download
             </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="w-4 h-4" />
+            </Button>
           </div>
-          <SheetDescription className="sr-only">
-            Preview and download the quote as PDF
-          </SheetDescription>
-        </SheetHeader>
+        </div>
 
-        {/* Inline toggles toolbar */}
-        <div className="px-4 py-2.5 border-b border-border bg-muted/30 shrink-0">
+        {/* Toolbar */}
+        <div className="px-5 py-2 border-b border-border bg-muted/30 shrink-0">
           <PreviewToolbar settings={settings} onUpdate={update} />
         </div>
 
-        {/* Scrollable document area */}
-        <div className="flex-1 overflow-y-auto bg-muted/40 pdf-sidebar-scroll">
+        {/* Document preview area */}
+        <div className="flex-1 overflow-auto bg-muted/50 pdf-sidebar-scroll">
           {isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -77,8 +118,11 @@ export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
               <p className="text-muted-foreground text-sm">Quote not found</p>
             </div>
           ) : (
-            <div className="p-4">
-              <div className="pdf-paper-wrapper">
+            <div className="flex justify-center py-6 px-4">
+              <div
+                className="pdf-paper-wrapper"
+                style={{ transform: `scale(${zoom})` }}
+              >
                 <QuotePdfDocument
                   quote={quote}
                   lineItems={lineItems}
@@ -93,7 +137,7 @@ export function QuotePdfSidebar({ open, onOpenChange, quoteId }: Props) {
             </div>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+    </>
   );
 }

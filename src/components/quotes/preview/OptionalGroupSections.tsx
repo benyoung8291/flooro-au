@@ -17,17 +17,13 @@ interface OptionalGroup {
 }
 
 function groupOptionalItems(items: LineItem[]): OptionalGroup[] {
-  // Group by parent items as group identifiers
-  // Standalone optional items go into their own group
   const groups: OptionalGroup[] = [];
 
   items.forEach(item => {
     const groupName = item.description || 'Optional Items';
     const subtotal =
       item.subItems.length > 0
-        ? item.subItems
-            .filter(c => c.is_optional || true) // include all children of optional parent
-            .reduce((s, c) => s + c.line_total, 0)
+        ? item.subItems.reduce((s, c) => s + c.line_total, 0)
         : item.line_total;
 
     groups.push({
@@ -69,8 +65,10 @@ export function OptionalGroupSections({
     (showTotalColumn ? 1 : 0);
 
   return (
-    <>
-      <h2 className="section-heading">Optional Items</h2>
+    <div className="doc-section">
+      <div className="doc-section-header">
+        <h2>Optional Items</h2>
+      </div>
 
       {groups.map((group, idx) => {
         const groupWithOption = baseSubtotal + group.subtotal;
@@ -78,9 +76,9 @@ export function OptionalGroupSections({
         const groupTotal = groupWithOption + groupTax;
 
         return (
-          <div key={idx} className="optional-group">
+          <div key={idx} className="doc-optional-group">
             {groups.length > 1 && (
-              <div className="optional-group-divider">
+              <div className="doc-optional-group-name">
                 {group.name}
               </div>
             )}
@@ -91,29 +89,25 @@ export function OptionalGroupSections({
               showQtyColumn={showQtyColumn}
               showUnitPriceColumn={showUnitPriceColumn}
               showTotalColumn={showTotalColumn}
-              className="optional-table"
+              className="doc-optional-table"
             />
 
-            {/* Group subtotal + "Quote total with option" */}
-            <table className="items-table optional-group-totals">
+            <table className="doc-items-table doc-optional-totals">
               <tbody>
-                <tr className="group-subtotal-row">
-                  <td colSpan={colSpan - 1} className="text-right text-xs text-muted-foreground">
+                <tr className="doc-optional-subtotal-row">
+                  <td colSpan={colSpan - 1} className="text-right">
                     Option Subtotal
                   </td>
-                  <td className="text-right font-mono-numbers font-semibold">
+                  <td className="text-right doc-cell-number doc-cell-amount">
                     {formatCurrency(group.subtotal)}
                   </td>
                 </tr>
                 {taxRate > 0 && (
-                  <tr className="group-subtotal-row">
-                    <td
-                      colSpan={colSpan - 1}
-                      className="text-right text-xs text-muted-foreground"
-                    >
+                  <tr className="doc-optional-subtotal-row">
+                    <td colSpan={colSpan - 1} className="text-right">
                       Quote Total with "{group.name}" (inc. GST)
                     </td>
-                    <td className="text-right font-mono-numbers font-semibold">
+                    <td className="text-right doc-cell-number doc-cell-amount">
                       {formatCurrency(groupTotal)}
                     </td>
                   </tr>
@@ -123,6 +117,6 @@ export function OptionalGroupSections({
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
