@@ -57,63 +57,66 @@ export function QuotePdfDocument({
           )}
           <div className="doc-company-info">
             <div className="doc-company-name">{org?.name || 'Your Company'}</div>
-            {org?.abn && <div className="doc-company-detail">ABN {org.abn}</div>}
             {org?.address && <div className="doc-company-detail">{org.address}</div>}
-            {org?.phone && <div className="doc-company-detail">{org.phone}</div>}
+            {org?.phone && <div className="doc-company-detail">Ph: {org.phone}</div>}
             {org?.email && <div className="doc-company-detail">{org.email}</div>}
-            {org?.website && <div className="doc-company-detail">{org.website}</div>}
+            {org?.abn && <div className="doc-company-detail">ABN: {org.abn}</div>}
           </div>
         </div>
         <div className="doc-header-right">
-          <div className="doc-type-label">Quote</div>
-          <div className="doc-meta-number">{quote.quote_number}</div>
+          <table className="doc-meta-grid">
+            <tbody>
+              <tr>
+                <td className="doc-meta-label-cell">Quote No.</td>
+                <td className="doc-meta-value-cell">{quote.quote_number}</td>
+              </tr>
+              <tr>
+                <td className="doc-meta-label-cell">Date</td>
+                <td className="doc-meta-value-cell">{formatDate(quote.created_at)}</td>
+              </tr>
+              {quote.valid_until && (
+                <tr>
+                  <td className="doc-meta-label-cell">Valid Until</td>
+                  <td className="doc-meta-value-cell">{formatDate(quote.valid_until)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </header>
 
-      {/* ── Meta Strip ──────────────────────────────── */}
-      <div className="doc-meta-strip">
-        <div className="doc-meta-item">
-          <span className="doc-meta-label">Date</span>
-          <span className="doc-meta-value">{formatDate(quote.created_at)}</span>
-        </div>
-        {quote.valid_until && (
-          <div className="doc-meta-item">
-            <span className="doc-meta-label">Valid Until</span>
-            <span className="doc-meta-value">{formatDate(quote.valid_until)}</span>
-          </div>
-        )}
-        <div className="doc-meta-item">
-          <span className="doc-meta-label">Status</span>
-          <span className="doc-meta-value doc-status-badge">{quote.status}</span>
-        </div>
-      </div>
-
-      {/* ── Client & Prepared By ────────────────────── */}
+      {/* ── Parties ─────────────────────────────────── */}
       <div className="doc-parties">
         {quote.client_name && (
-          <div className="doc-party-card">
-            <div className="doc-party-label">Bill To</div>
+          <div className="doc-party-block">
+            <div className="doc-party-label">Quote To</div>
             <div className="doc-party-name">{quote.client_name}</div>
             {quote.client_address && <div className="doc-party-detail">{quote.client_address}</div>}
             {quote.client_email && <div className="doc-party-detail">{quote.client_email}</div>}
             {quote.client_phone && <div className="doc-party-detail">{quote.client_phone}</div>}
           </div>
         )}
-        {owner && (
-          <div className="doc-party-card">
-            <div className="doc-party-label">Prepared By</div>
-            <div className="doc-party-name">{owner.full_name || 'Team Member'}</div>
-            {owner.email && <div className="doc-party-detail">{owner.email}</div>}
-            {owner.phone && <div className="doc-party-detail">{owner.phone}</div>}
-          </div>
-        )}
+        <div className="doc-party-block">
+          {owner && (
+            <>
+              <div className="doc-party-label">Prepared By</div>
+              <div className="doc-party-name">{owner.full_name || 'Team Member'}</div>
+              {owner.email && <div className="doc-party-detail">{owner.email}</div>}
+              {owner.phone && <div className="doc-party-detail">{owner.phone}</div>}
+            </>
+          )}
+          {quote.client_address && (
+            <div className="doc-site-location">
+              <span className="doc-party-label">Site Location</span>
+              <div className="doc-party-detail">{quote.client_address}</div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* ── Quote Title ─────────────────────────────── */}
+      {/* ── Quote Title Banner ──────────────────────── */}
       {quote.title && (
-        <div className="doc-quote-title">
-          <span className="doc-quote-title-label">Re:</span> {quote.title}
-        </div>
+        <div className="doc-quote-title">{quote.title}</div>
       )}
 
       {/* ── Scope / Description ─────────────────────── */}
@@ -218,12 +221,9 @@ export function QuotePdfDocument({
 
       {/* ── Footer ──────────────────────────────────── */}
       <footer className="doc-footer">
-        <div className="doc-footer-bar" />
         <div className="doc-footer-content">
-          <span>{org?.name || 'Flooro'}</span>
-          {org?.abn && <span>ABN {org.abn}</span>}
-          {org?.phone && <span>{org.phone}</span>}
           {org?.email && <span>{org.email}</span>}
+          {org?.phone && <span>{org.phone}</span>}
           {org?.website && <span>{org.website}</span>}
         </div>
       </footer>
