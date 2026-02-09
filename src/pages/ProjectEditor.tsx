@@ -4,6 +4,7 @@ import { useProject, useUpdateProject } from '@/hooks/useProjects';
 import { useHasRole } from '@/hooks/useUserProfile';
 import { useMaterials, Material, useCreateMaterial, MaterialSubtype } from '@/hooks/useMaterials';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { supabase } from '@/integrations/supabase/client';
 import { EditorCanvas, EditorTool } from '@/components/editor/EditorCanvas';
 import { EditorToolbar } from '@/components/editor/EditorToolbar';
 import { TakeoffPanel } from '@/components/editor/TakeoffPanel';
@@ -84,6 +85,7 @@ export default function ProjectEditor() {
   const [is3DMode, setIs3DMode] = useState(false);
   const [showFinishesLegend, setShowFinishesLegend] = useState(false);
   const [accessoryDialogOpen, setAccessoryDialogOpen] = useState(false);
+  const [linkedQuoteId, setLinkedQuoteId] = useState<string | null>(null);
   const [shortcutsPanelOpen, setShortcutsPanelOpen] = useState(false);
   const [pendingMaterialRoom, setPendingMaterialRoom] = useState<{
     roomId: string;
@@ -139,6 +141,23 @@ export default function ProjectEditor() {
   // Reset load flag when project ID changes
   useEffect(() => {
     hasLoadedProjectRef.current = false;
+    setLinkedQuoteId(null);
+  }, [projectId]);
+
+  // Check for linked quote
+  useEffect(() => {
+    if (!projectId) return;
+    const checkLinkedQuote = async () => {
+      const { data } = await (supabase as any)
+        .from('quotes')
+        .select('id')
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (data) setLinkedQuoteId(data.id);
+    };
+    checkLinkedQuote();
   }, [projectId]);
 
   // Keyboard shortcuts
@@ -171,7 +190,7 @@ export default function ProjectEditor() {
           setShortcutsPanelOpen(true);
           break;
         case 'q':
-          navigate('/quotes');
+          navigate(linkedQuoteId ? `/quotes/${linkedQuoteId}` : '/quotes');
           break;
         case 'l':
           setRoomsOverviewOpen(true);
@@ -843,7 +862,7 @@ export default function ProjectEditor() {
         setSidebarCollapsed(false);
         break;
       case 'quote':
-        navigate('/quotes');
+        navigate(linkedQuoteId ? `/quotes/${linkedQuoteId}` : '/quotes');
         break;
     }
   }, []);
@@ -924,13 +943,13 @@ export default function ProjectEditor() {
           {/* Quotes Navigation - Desktop Only */}
           {!isMobile && rooms.length > 0 && (
             <Button
-              variant="outline"
+              variant={linkedQuoteId ? 'default' : 'outline'}
               size="sm"
-              onClick={() => navigate('/quotes')}
+              onClick={() => navigate(linkedQuoteId ? `/quotes/${linkedQuoteId}` : '/quotes')}
               className="hidden md:flex"
             >
               <FileText className="w-4 h-4 mr-2" />
-              Quotes
+              {linkedQuoteId ? 'View Quote' : 'Quotes'}
             </Button>
           )}
 
@@ -966,9 +985,9 @@ export default function ProjectEditor() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate('/quotes')}>
+              <DropdownMenuItem onClick={() => navigate(linkedQuoteId ? `/quotes/${linkedQuoteId}` : '/quotes')}>
                 <FileText className="w-4 h-4 mr-2" />
-                Quotes
+                {linkedQuoteId ? 'View Quote' : 'Quotes'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setRoomsOverviewOpen(true)}>
                 <LayoutGrid className="w-4 h-4 mr-2" />
