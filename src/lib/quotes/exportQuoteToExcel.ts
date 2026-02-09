@@ -31,6 +31,12 @@ const TOTAL_BG: ExcelJS.Fill = {
   fgColor: { argb: 'FFE8EDF5' },
 };
 
+const CALC_BG: ExcelJS.Fill = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FFF0F4FF' },
+};
+
 const THIN_BORDER: Partial<ExcelJS.Borders> = {
   top: { style: 'thin', color: { argb: 'FFD0D5DD' } },
   left: { style: 'thin', color: { argb: 'FFD0D5DD' } },
@@ -39,6 +45,7 @@ const THIN_BORDER: Partial<ExcelJS.Borders> = {
 };
 
 const CURRENCY_FMT = '$#,##0.00';
+const PERCENT_FMT = '0.00"%"';
 
 const FONT_BODY: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10 };
 const FONT_BOLD: Partial<ExcelJS.Font> = { ...FONT_BODY, bold: true };
@@ -47,16 +54,10 @@ const FONT_COMPANY: Partial<ExcelJS.Font> = { name: 'Calibri', size: 16, bold: t
 const FONT_SECTION: Partial<ExcelJS.Font> = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FF1B2A4A' } };
 const FONT_MUTED: Partial<ExcelJS.Font> = { name: 'Calibri', size: 9, color: { argb: 'FF667085' } };
 const FONT_LABEL: Partial<ExcelJS.Font> = { name: 'Calibri', size: 9, bold: true, color: { argb: 'FF667085' } };
+const FONT_FORMULA: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF3B5998' } };
+const FONT_FORMULA_BOLD: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10, bold: true, italic: true, color: { argb: 'FF3B5998' } };
 
 // ─── Helpers ─────────────────────────────────────────────────────────
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-AU', {
-    style: 'currency',
-    currency: 'AUD',
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
 
 function stripHtml(html: string | null): string {
   if (!html) return '';
@@ -79,7 +80,7 @@ function stripHtml(html: string | null): string {
 function setCellStyle(
   row: ExcelJS.Row,
   col: number,
-  value: string | number,
+  value: string | number | ExcelJS.CellFormulaValue,
   opts?: {
     font?: Partial<ExcelJS.Font>;
     fill?: ExcelJS.Fill;
@@ -89,7 +90,7 @@ function setCellStyle(
   }
 ) {
   const cell = row.getCell(col);
-  cell.value = value;
+  cell.value = value as any;
   if (opts?.font) cell.font = opts.font;
   if (opts?.fill) cell.fill = opts.fill;
   if (opts?.alignment) cell.alignment = opts.alignment;
@@ -112,22 +113,25 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
   wb.created = new Date();
 
   const ws = wb.addWorksheet('Quote', {
-    properties: { defaultColWidth: 14 },
+    properties: { defaultColWidth: 14, outlineLevelCol: 0, outlineLevelRow: 1 },
     pageSetup: {
       paperSize: 9, // A4
-      orientation: 'portrait',
+      orientation: 'landscape',
       fitToPage: true,
       fitToWidth: 1,
       fitToHeight: 0,
     },
   });
 
-  // Column widths: A=Description, B=Qty, C=Unit Price, D=Amount
+  // Column widths: A-G
   ws.columns = [
-    { width: 52 },  // A – Description
+    { width: 44 },  // A – Description
     { width: 10 },  // B – Qty
-    { width: 16 },  // C – Unit Price
-    { width: 18 },  // D – Amount
+    { width: 14 },  // C – Cost
+    { width: 12 },  // D – Margin %
+    { width: 14 },  // E – Sell
+    { width: 16 },  // F – Line Cost
+    { width: 16 },  // G – Line Sell
   ];
 
   let row = 1;
@@ -136,15 +140,15 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
 
   const companyName = org?.name || 'Your Company';
   setCellStyle(ws.getRow(row), 1, companyName, { font: FONT_COMPANY });
-  setCellStyle(ws.getRow(row), 3, 'Quote No.', { font: FONT_LABEL, alignment: { horizontal: 'right' } });
-  setCellStyle(ws.getRow(row), 4, quote.quote_number, { font: FONT_BOLD, alignment: { horizontal: 'right' } });
+  setCellStyle(ws.getRow(row), 6, 'Quote No.', { font: FONT_LABEL, alignment: { horizontal: 'right' } });
+  setCellStyle(ws.getRow(row), 7, quote.quote_number, { font: FONT_BOLD, alignment: { horizontal: 'right' } });
   row++;
 
   if (org?.address) {
     setCellStyle(ws.getRow(row), 1, org.address, { font: FONT_MUTED });
   }
-  setCellStyle(ws.getRow(row), 3, 'Date', { font: FONT_LABEL, alignment: { horizontal: 'right' } });
-  setCellStyle(ws.getRow(row), 4, format(new Date(quote.created_at), 'dd MMM yyyy'), {
+  setCellStyle(ws.getRow(row), 6, 'Date', { font: FONT_LABEL, alignment: { horizontal: 'right' } });
+  setCellStyle(ws.getRow(row), 7, format(new Date(quote.created_at), 'dd MMM yyyy'), {
     font: FONT_BODY,
     alignment: { horizontal: 'right' },
   });
@@ -154,8 +158,8 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
     setCellStyle(ws.getRow(row), 1, org.phone, { font: FONT_MUTED });
   }
   if (quote.valid_until) {
-    setCellStyle(ws.getRow(row), 3, 'Valid Until', { font: FONT_LABEL, alignment: { horizontal: 'right' } });
-    setCellStyle(ws.getRow(row), 4, format(new Date(quote.valid_until), 'dd MMM yyyy'), {
+    setCellStyle(ws.getRow(row), 6, 'Valid Until', { font: FONT_LABEL, alignment: { horizontal: 'right' } });
+    setCellStyle(ws.getRow(row), 7, format(new Date(quote.valid_until), 'dd MMM yyyy'), {
       font: FONT_BODY,
       alignment: { horizontal: 'right' },
     });
@@ -174,7 +178,7 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
   // ─── Client / Prepared By Block ──────────────────────────────────
 
   setCellStyle(ws.getRow(row), 1, 'QUOTE TO', { font: FONT_SECTION });
-  setCellStyle(ws.getRow(row), 3, 'PREPARED BY', { font: FONT_SECTION });
+  setCellStyle(ws.getRow(row), 5, 'PREPARED BY', { font: FONT_SECTION });
   row++;
 
   const clientLines = [
@@ -196,7 +200,7 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
       setCellStyle(ws.getRow(row), 1, clientLines[i], { font: FONT_BODY });
     }
     if (ownerLines[i]) {
-      setCellStyle(ws.getRow(row), 3, ownerLines[i], { font: FONT_BODY });
+      setCellStyle(ws.getRow(row), 5, ownerLines[i], { font: FONT_BODY });
     }
     row++;
   }
@@ -207,7 +211,7 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
   // ─── Quote Title ─────────────────────────────────────────────────
 
   if (quote.title) {
-    ws.mergeCells(`A${row}:D${row}`);
+    ws.mergeCells(`A${row}:G${row}`);
     setCellStyle(ws.getRow(row), 1, quote.title, {
       font: { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF1B2A4A' } },
     });
@@ -219,12 +223,11 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
 
   const descText = stripHtml(quote.description);
   if (descText) {
-    ws.mergeCells(`A${row}:D${row}`);
+    ws.mergeCells(`A${row}:G${row}`);
     setCellStyle(ws.getRow(row), 1, descText, {
       font: FONT_BODY,
       alignment: { wrapText: true, vertical: 'top' },
     });
-    // Estimate row height based on text length
     const lines = descText.split('\n').length;
     ws.getRow(row).height = Math.max(15, lines * 14);
     row++;
@@ -233,34 +236,39 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
 
   // ─── Line Items Table ────────────────────────────────────────────
 
-  // Separate standard vs optional items
   const standardItems = lineItems.filter(item => !item.is_optional);
   const optionalItems = lineItems.filter(item => item.is_optional);
 
-  // Table header row
-  const headerRow = ws.getRow(row);
-  const headers = ['Description', 'Qty', 'Unit Price', 'Amount'];
-  headers.forEach((h, i) => {
-    const cell = headerRow.getCell(i + 1);
-    cell.value = h;
-    cell.font = FONT_HEADER;
-    cell.fill = NAVY;
-    cell.border = THIN_BORDER;
-    cell.alignment = { horizontal: i === 0 ? 'left' : 'right', vertical: 'middle' };
-  });
-  headerRow.height = 24;
-  row++;
+  const HEADERS = ['Description', 'Qty', 'Cost', 'Margin %', 'Sell', 'Line Cost', 'Line Sell'];
 
-  // Render items helper
-  const renderItems = (items: LineItem[]) => {
-    let itemIndex = 0;
+  function writeTableHeader() {
+    const headerRow = ws.getRow(row);
+    HEADERS.forEach((h, i) => {
+      const cell = headerRow.getCell(i + 1);
+      cell.value = h;
+      cell.font = FONT_HEADER;
+      cell.fill = NAVY;
+      cell.border = THIN_BORDER;
+      cell.alignment = { horizontal: i === 0 ? 'left' : 'right', vertical: 'middle' };
+    });
+    headerRow.height = 24;
+    row++;
+  }
+
+  // Track parent row numbers for totals formulas
+  const standardParentRows: number[] = [];
+  const optionalParentRows: number[] = [];
+
+  function renderItems(items: LineItem[], parentRowTracker: number[]) {
     for (const parent of items) {
       const hasChildren = parent.subItems.length > 0;
-      const parentRow = ws.getRow(row);
-      parentRow.height = 20;
+      const parentRowNum = row;
+      parentRowTracker.push(parentRowNum);
+      const parentExcelRow = ws.getRow(row);
+      parentExcelRow.height = 20;
 
-      // Parent description
-      setCellStyle(parentRow, 1, parent.description, {
+      // Description (col A)
+      setCellStyle(parentExcelRow, 1, parent.description, {
         font: FONT_BOLD,
         fill: LIGHT_GREY,
         border: THIN_BORDER,
@@ -268,159 +276,350 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
       });
 
       if (hasChildren) {
-        // Parent with children: show aggregated total, no qty/unit price
-        const aggTotal = parent.subItems
-          .filter(c => !c.is_optional)
-          .reduce((s, c) => s + c.line_total, 0);
+        // Parent with children: blank qty, formulas for aggregation
+        // B (Qty) – blank
+        setCellStyle(parentExcelRow, 2, '', { fill: LIGHT_GREY, border: THIN_BORDER });
 
-        setCellStyle(parentRow, 2, '', { fill: LIGHT_GREY, border: THIN_BORDER });
-        setCellStyle(parentRow, 3, '', { fill: LIGHT_GREY, border: THIN_BORDER });
-        setCellStyle(parentRow, 4, aggTotal, {
-          font: FONT_BOLD,
-          fill: LIGHT_GREY,
-          border: THIN_BORDER,
-          numFmt: CURRENCY_FMT,
-          alignment: { horizontal: 'right' },
-        });
-      } else {
-        // Standalone parent item
-        setCellStyle(parentRow, 2, parent.quantity, {
-          font: FONT_BODY,
-          fill: LIGHT_GREY,
-          border: THIN_BORDER,
-          numFmt: '0.00',
-          alignment: { horizontal: 'right' },
-        });
-        setCellStyle(parentRow, 3, parent.sell_price, {
-          font: FONT_BODY,
-          fill: LIGHT_GREY,
-          border: THIN_BORDER,
-          numFmt: CURRENCY_FMT,
-          alignment: { horizontal: 'right' },
-        });
-        setCellStyle(parentRow, 4, parent.line_total, {
-          font: FONT_BOLD,
-          fill: LIGHT_GREY,
-          border: THIN_BORDER,
-          numFmt: CURRENCY_FMT,
-          alignment: { horizontal: 'right' },
-        });
-      }
-      row++;
+        row++;
 
-      // Children
-      if (hasChildren) {
+        // Render children first to know the row range
+        const firstChildRow = row;
         for (let ci = 0; ci < parent.subItems.length; ci++) {
           const child = parent.subItems[ci];
-          const childRow = ws.getRow(row);
+          const childExcelRow = ws.getRow(row);
           const stripeFill = ci % 2 === 1 ? SUBTLE_STRIPE : undefined;
 
-          setCellStyle(childRow, 1, `    ${child.description}`, {
+          // A – Description (indented)
+          setCellStyle(childExcelRow, 1, `    ${child.description}`, {
             font: FONT_BODY,
             fill: stripeFill,
             border: THIN_BORDER,
             alignment: { vertical: 'middle' },
           });
-          setCellStyle(childRow, 2, child.quantity, {
+
+          // B – Qty (editable value)
+          setCellStyle(childExcelRow, 2, child.quantity, {
             font: FONT_BODY,
             fill: stripeFill,
             border: THIN_BORDER,
             numFmt: '0.00',
             alignment: { horizontal: 'right' },
           });
-          setCellStyle(childRow, 3, child.sell_price, {
+
+          // C – Cost (editable value)
+          setCellStyle(childExcelRow, 3, child.cost_price, {
             font: FONT_BODY,
             fill: stripeFill,
             border: THIN_BORDER,
             numFmt: CURRENCY_FMT,
             alignment: { horizontal: 'right' },
           });
-          setCellStyle(childRow, 4, child.line_total, {
+
+          // D – Margin % (editable value)
+          setCellStyle(childExcelRow, 4, child.margin_percentage, {
             font: FONT_BODY,
             fill: stripeFill,
+            border: THIN_BORDER,
+            numFmt: '0.00',
+            alignment: { horizontal: 'right' },
+          });
+
+          // E – Sell = Cost * (1 + Margin/100)
+          setCellStyle(childExcelRow, 5, {
+            formula: `C${row}*(1+D${row}/100)`,
+            result: child.sell_price,
+          }, {
+            font: FONT_FORMULA,
+            fill: stripeFill || CALC_BG,
             border: THIN_BORDER,
             numFmt: CURRENCY_FMT,
             alignment: { horizontal: 'right' },
           });
+
+          // F – Line Cost = Qty * Cost
+          setCellStyle(childExcelRow, 6, {
+            formula: `B${row}*C${row}`,
+            result: child.quantity * child.cost_price,
+          }, {
+            font: FONT_FORMULA,
+            fill: stripeFill || CALC_BG,
+            border: THIN_BORDER,
+            numFmt: CURRENCY_FMT,
+            alignment: { horizontal: 'right' },
+          });
+
+          // G – Line Sell = Qty * Sell
+          setCellStyle(childExcelRow, 7, {
+            formula: `B${row}*E${row}`,
+            result: child.line_total,
+          }, {
+            font: FONT_FORMULA,
+            fill: stripeFill || CALC_BG,
+            border: THIN_BORDER,
+            numFmt: CURRENCY_FMT,
+            alignment: { horizontal: 'right' },
+          });
+
+          // Set outline level for grouping
+          childExcelRow.outlineLevel = 1;
+
           row++;
         }
+        const lastChildRow = row - 1;
+
+        // Now fill in parent row formulas (C-G) referencing child range
+        // C – Cost = SUM of Line Cost (total cost for the group)
+        setCellStyle(parentExcelRow, 3, {
+          formula: `SUM(F${firstChildRow}:F${lastChildRow})`,
+          result: parent.subItems.reduce((s, c) => s + c.quantity * c.cost_price, 0),
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        // D – Margin % = IF(F>0, (G-F)/F*100, 0)
+        const totalCost = parent.subItems.reduce((s, c) => s + c.quantity * c.cost_price, 0);
+        const totalSell = parent.subItems.filter(c => !c.is_optional).reduce((s, c) => s + c.line_total, 0);
+        const marginResult = totalCost > 0 ? ((totalSell - totalCost) / totalCost) * 100 : 0;
+        setCellStyle(parentExcelRow, 4, {
+          formula: `IF(F${parentRowNum}>0,(G${parentRowNum}-F${parentRowNum})/F${parentRowNum}*100,0)`,
+          result: marginResult,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: '0.00',
+          alignment: { horizontal: 'right' },
+        });
+
+        // E – Sell = SUM of Line Sell (total sell for the group)
+        setCellStyle(parentExcelRow, 5, {
+          formula: `SUM(G${firstChildRow}:G${lastChildRow})`,
+          result: totalSell,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        // F – Line Cost = SUM of children's Line Cost
+        setCellStyle(parentExcelRow, 6, {
+          formula: `SUM(F${firstChildRow}:F${lastChildRow})`,
+          result: totalCost,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        // G – Line Sell = SUM of children's Line Sell
+        setCellStyle(parentExcelRow, 7, {
+          formula: `SUM(G${firstChildRow}:G${lastChildRow})`,
+          result: totalSell,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+      } else {
+        // Standalone parent item (no children) — behaves like a child row with editable values + formulas
+
+        // B – Qty (editable)
+        setCellStyle(parentExcelRow, 2, parent.quantity, {
+          font: FONT_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: '0.00',
+          alignment: { horizontal: 'right' },
+        });
+
+        // C – Cost (editable)
+        setCellStyle(parentExcelRow, 3, parent.cost_price, {
+          font: FONT_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        // D – Margin % (editable)
+        setCellStyle(parentExcelRow, 4, parent.margin_percentage, {
+          font: FONT_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: '0.00',
+          alignment: { horizontal: 'right' },
+        });
+
+        // E – Sell = Cost * (1 + Margin/100)
+        setCellStyle(parentExcelRow, 5, {
+          formula: `C${row}*(1+D${row}/100)`,
+          result: parent.sell_price,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        // F – Line Cost = Qty * Cost
+        setCellStyle(parentExcelRow, 6, {
+          formula: `B${row}*C${row}`,
+          result: parent.quantity * parent.cost_price,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        // G – Line Sell = Qty * Sell
+        setCellStyle(parentExcelRow, 7, {
+          formula: `B${row}*E${row}`,
+          result: parent.line_total,
+        }, {
+          font: FONT_FORMULA_BOLD,
+          fill: LIGHT_GREY,
+          border: THIN_BORDER,
+          numFmt: CURRENCY_FMT,
+          alignment: { horizontal: 'right' },
+        });
+
+        row++;
       }
-
-      itemIndex++;
     }
-  };
+  }
 
-  renderItems(standardItems);
+  writeTableHeader();
+  renderItems(standardItems, standardParentRows);
 
   // ─── Optional Items ──────────────────────────────────────────────
 
   if (optionalItems.length > 0) {
     row++; // blank row
 
-    // Optional header
-    ws.mergeCells(`A${row}:D${row}`);
-    setCellStyle(ws.getRow(row), 1, 'OPTIONAL ITEMS', {
-      font: FONT_SECTION,
-    });
+    ws.mergeCells(`A${row}:G${row}`);
+    setCellStyle(ws.getRow(row), 1, 'OPTIONAL ITEMS', { font: FONT_SECTION });
     row++;
 
-    // Repeat table header for optional section
-    const optHeaderRow = ws.getRow(row);
-    headers.forEach((h, i) => {
-      const cell = optHeaderRow.getCell(i + 1);
-      cell.value = h;
-      cell.font = FONT_HEADER;
-      cell.fill = NAVY;
-      cell.border = THIN_BORDER;
-      cell.alignment = { horizontal: i === 0 ? 'left' : 'right', vertical: 'middle' };
-    });
-    optHeaderRow.height = 24;
-    row++;
-
-    renderItems(optionalItems);
+    writeTableHeader();
+    renderItems(optionalItems, optionalParentRows);
   }
 
   // ─── Totals ──────────────────────────────────────────────────────
 
   row++; // blank row
 
-  // Subtotal
-  const subtotalRow = ws.getRow(row);
-  setCellStyle(subtotalRow, 3, 'Subtotal', {
+  // Build SUM references for standard parent rows
+  // For Line Sell (col G) and Line Cost (col F) we sum the parent rows
+  const lineSellRefs = standardParentRows.map(r => `G${r}`).join(',');
+  const lineCostRefs = standardParentRows.map(r => `F${r}`).join(',');
+
+  // Subtotal (Line Sell)
+  const subtotalRowNum = row;
+  const subtotalExcelRow = ws.getRow(row);
+  setCellStyle(subtotalExcelRow, 5, 'Subtotal', {
     font: FONT_BOLD,
     alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
   });
-  setCellStyle(subtotalRow, 4, quote.subtotal, {
-    font: FONT_BODY,
+  ws.mergeCells(`E${row}:F${row}`);
+  setCellStyle(subtotalExcelRow, 7, {
+    formula: standardParentRows.length > 0 ? `SUM(${lineSellRefs})` : '0',
+    result: quote.subtotal,
+  }, {
+    font: FONT_FORMULA_BOLD,
     numFmt: CURRENCY_FMT,
     alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
+  });
+  row++;
+
+  // Total Cost
+  const totalCostRowNum = row;
+  const totalCostExcelRow = ws.getRow(row);
+  setCellStyle(totalCostExcelRow, 5, 'Total Cost', {
+    font: FONT_BOLD,
+    alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
+  });
+  ws.mergeCells(`E${row}:F${row}`);
+  setCellStyle(totalCostExcelRow, 7, {
+    formula: standardParentRows.length > 0 ? `SUM(${lineCostRefs})` : '0',
+    result: quote.total_cost,
+  }, {
+    font: FONT_FORMULA_BOLD,
+    numFmt: CURRENCY_FMT,
+    alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
+  });
+  row++;
+
+  // Overall Margin %
+  const marginExcelRow = ws.getRow(row);
+  setCellStyle(marginExcelRow, 5, 'Margin %', {
+    font: FONT_BOLD,
+    alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
+  });
+  ws.mergeCells(`E${row}:F${row}`);
+  setCellStyle(marginExcelRow, 7, {
+    formula: `IF(G${totalCostRowNum}>0,(G${subtotalRowNum}-G${totalCostRowNum})/G${totalCostRowNum}*100,0)`,
+    result: quote.total_margin,
+  }, {
+    font: FONT_FORMULA_BOLD,
+    numFmt: '0.00',
+    alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
   });
   row++;
 
   // GST
-  const gstRow = ws.getRow(row);
-  setCellStyle(gstRow, 3, `GST (${quote.tax_rate}%)`, {
+  const gstRowNum = row;
+  const gstExcelRow = ws.getRow(row);
+  setCellStyle(gstExcelRow, 5, `GST (${quote.tax_rate}%)`, {
     font: FONT_BOLD,
     alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
   });
-  setCellStyle(gstRow, 4, quote.tax_amount, {
-    font: FONT_BODY,
+  ws.mergeCells(`E${row}:F${row}`);
+  setCellStyle(gstExcelRow, 7, {
+    formula: `G${subtotalRowNum}*${quote.tax_rate}/100`,
+    result: quote.tax_amount,
+  }, {
+    font: FONT_FORMULA_BOLD,
     numFmt: CURRENCY_FMT,
     alignment: { horizontal: 'right' },
+    border: THIN_BORDER,
   });
   row++;
 
   // Grand Total
-  const totalRow = ws.getRow(row);
-  totalRow.height = 28;
-  setCellStyle(totalRow, 3, 'TOTAL', {
+  const totalExcelRow = ws.getRow(row);
+  totalExcelRow.height = 28;
+  setCellStyle(totalExcelRow, 5, 'TOTAL', {
     font: { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF1B2A4A' } },
     fill: TOTAL_BG,
     border: THIN_BORDER,
     alignment: { horizontal: 'right', vertical: 'middle' },
   });
-  setCellStyle(totalRow, 4, quote.total_amount, {
-    font: { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF1B2A4A' } },
+  ws.mergeCells(`E${row}:F${row}`);
+  setCellStyle(totalExcelRow, 7, {
+    formula: `G${subtotalRowNum}+G${gstRowNum}`,
+    result: quote.total_amount,
+  }, {
+    font: { name: 'Calibri', size: 12, bold: true, italic: true, color: { argb: 'FF1B2A4A' } },
     fill: TOTAL_BG,
     border: THIN_BORDER,
     numFmt: CURRENCY_FMT,
@@ -432,12 +631,12 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
 
   const notesText = stripHtml(quote.notes);
   if (notesText) {
-    row++; // blank row
-    ws.mergeCells(`A${row}:D${row}`);
+    row++;
+    ws.mergeCells(`A${row}:G${row}`);
     setCellStyle(ws.getRow(row), 1, 'NOTES', { font: FONT_SECTION });
     row++;
 
-    ws.mergeCells(`A${row}:D${row}`);
+    ws.mergeCells(`A${row}:G${row}`);
     setCellStyle(ws.getRow(row), 1, notesText, {
       font: FONT_BODY,
       alignment: { wrapText: true, vertical: 'top' },
@@ -451,12 +650,12 @@ export async function exportQuoteToExcel({ quote, lineItems, org, owner }: Expor
 
   const termsText = stripHtml(quote.terms_and_conditions);
   if (termsText) {
-    row++; // blank row
-    ws.mergeCells(`A${row}:D${row}`);
+    row++;
+    ws.mergeCells(`A${row}:G${row}`);
     setCellStyle(ws.getRow(row), 1, 'TERMS & CONDITIONS', { font: FONT_SECTION });
     row++;
 
-    ws.mergeCells(`A${row}:D${row}`);
+    ws.mergeCells(`A${row}:G${row}`);
     setCellStyle(ws.getRow(row), 1, termsText, {
       font: { name: 'Calibri', size: 9, color: { argb: 'FF667085' } },
       alignment: { wrapText: true, vertical: 'top' },
