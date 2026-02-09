@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuote, useUpdateQuote, type QuoteStatus, type UpdateQuoteInput } from '@/hooks/useQuotes';
 import { useQuoteLineItems } from '@/hooks/useQuoteLineItems';
-import { useSyncQuoteFromProject } from '@/hooks/useSyncQuoteFromProject';
+import { useSyncQuoteFromProject, type OrphanedRoomInfo } from '@/hooks/useSyncQuoteFromProject';
+import { OrphanedRoomsDialog, type OrphanedRoom } from '@/components/quotes/OrphanedRoomsDialog';
 import { QuoteLineItemsTable } from '@/components/quotes/QuoteLineItemsTable';
 import { QuoteClientCard } from '@/components/quotes/QuoteClientCard';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
@@ -73,7 +74,9 @@ export default function QuoteEditor() {
   const [priceBookOpen, setPriceBookOpen] = useState(false);
   const [priceBookParentId, setPriceBookParentId] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
-  const { syncQuote, isSyncing } = useSyncQuoteFromProject();
+  const [orphanedRooms, setOrphanedRooms] = useState<OrphanedRoom[]>([]);
+  const [orphanDialogOpen, setOrphanDialogOpen] = useState(false);
+  const { syncQuote, isSyncing, removeOrphanedRooms, isRemoving } = useSyncQuoteFromProject();
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -331,7 +334,18 @@ export default function QuoteEditor() {
                           size="sm"
                           className="gap-1.5"
                           disabled={isSyncing || quote.status !== 'draft'}
-                          onClick={() => quoteId && syncQuote(quoteId)}
+                          onClick={async () => {
+                            if (!quoteId) return;
+                            const result = await syncQuote(quoteId);
+                            if (result.orphanedRooms.length > 0) {
+                              setOrphanedRooms(result.orphanedRooms.map(r => ({
+                                parentId: r.parentId,
+                                description: r.description,
+                                childIds: r.childIds,
+                              })));
+                              setOrphanDialogOpen(true);
+                            }
+                          }}
                         >
                           {isSyncing ? (
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -409,6 +423,21 @@ export default function QuoteEditor() {
         open={pdfOpen}
         onOpenChange={setPdfOpen}
         quoteId={quoteId}
+      />
+
+      <OrphanedRoomsDialog
+        open={orphanDialogOpen}
+        onOpenChange={setOrphanDialogOpen}
+        orphanedRooms={orphanedRooms}
+        isRemoving={isRemoving}
+        onRemoveSelected={async (parentIds) => {
+          if (!quoteId) return;
+          const selectedOrphans = orphanedRooms.filter(r => parentIds.includes(r.parentId));
+          const allChildIds = selectedOrphans.flatMap(r => r.childIds);
+          await removeOrphanedRooms(quoteId, parentIds, allChildIds);
+          setOrphanDialogOpen(false);
+          setOrphanedRooms([]);
+        }}
       />
     </div>
   );
