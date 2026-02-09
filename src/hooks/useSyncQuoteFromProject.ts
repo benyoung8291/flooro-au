@@ -11,10 +11,16 @@ import { calculateStripPlan, extractRollMaterialSpecs } from '@/lib/rollGoods';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { FloorPlanPage } from '@/lib/canvas/types';
 
+export interface OrphanedRoomInfo {
+  parentId: string;
+  description: string;
+  childIds: string[];
+}
+
 export interface SyncResult {
   updatedRooms: number;
   addedRooms: number;
-  removedRooms: string[];
+  orphanedRooms: OrphanedRoomInfo[];
   totalItemsUpdated: number;
 }
 
@@ -63,6 +69,65 @@ function computeStripPlan(
 export function useSyncQuoteFromProject() {
   const queryClient = useQueryClient();
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+
+  const removeOrphanedRooms = async (quoteId: string, parentIds: string[], childIds: string[]) => {
+    setIsRemoving(true);
+    try {
+      const allIds = [...parentIds, ...childIds];
+      // Soft-delete by setting is_active = false
+      const { error } = await (supabase as any)
+        .from('quote_line_items')
+        .update({ is_active: false })
+        .in('id', allIds);
+      if (error) throw error;
+
+      // Recalculate quote totals
+      const { data: allItems } = await (supabase as any)
+        .from('quote_line_items')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .eq('is_active', true);
+
+      if (allItems) {
+        const activeChildren = allItems.filter((i: any) => i.parent_line_item_id && !i.is_optional);
+        const subtotal = activeChildren.reduce((sum: number, c: any) => sum + Number(c.line_total), 0);
+        const totalCost = activeChildren.reduce((sum: number, c: any) => sum + (Number(c.quantity) * Number(c.cost_price)), 0);
+        const totalMargin = subtotal > 0 ? ((subtotal - totalCost) / subtotal) * 100 : 0;
+
+        const { data: quote } = await (supabase as any)
+          .from('quotes')
+          .select('tax_rate')
+          .eq('id', quoteId)
+          .single();
+
+        const taxRate = Number(quote?.tax_rate) || 10;
+        const taxAmount = subtotal * (taxRate / 100);
+        const totalAmount = subtotal + taxAmount;
+
+        await (supabase as any)
+          .from('quotes')
+          .update({
+            subtotal: Math.round(subtotal * 100) / 100,
+            total_cost: Math.round(totalCost * 100) / 100,
+            total_margin: Math.round(totalMargin * 100) / 100,
+            tax_amount: Math.round(taxAmount * 100) / 100,
+            total_amount: Math.round(totalAmount * 100) / 100,
+          })
+          .eq('id', quoteId);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['quote', quoteId] });
+      queryClient.invalidateQueries({ queryKey: ['quote_line_items', quoteId] });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+
+      toast.success(`Removed ${parentIds.length} orphaned room${parentIds.length !== 1 ? 's' : ''} from quote`);
+    } catch (error: any) {
+      toast.error(`Failed to remove rooms: ${error.message}`);
+    } finally {
+      setIsRemoving(false);
+    }
+  };
 
   const syncQuote = async (quoteId: string): Promise<SyncResult> => {
     setIsSyncing(true);
@@ -390,10 +455,15 @@ export function useSyncQuoteFromProject() {
 
       // Find orphaned rooms (in quote but not in takeoff)
       const takeoffRoomIds = new Set(allRooms.map(r => r.id));
-      const removedRooms: string[] = [];
+      const orphanedRooms: OrphanedRoomInfo[] = [];
       for (const parent of parents) {
         if (parent.source_room_id && !takeoffRoomIds.has(parent.source_room_id)) {
-          removedRooms.push(parent.description);
+          const parentChildren = childrenByParent.get(parent.id) || [];
+          orphanedRooms.push({
+            parentId: parent.id,
+            description: parent.description,
+            childIds: parentChildren.map(c => c.id),
+          });
         }
       }
 
@@ -476,7 +546,7 @@ export function useSyncQuoteFromProject() {
       const result: SyncResult = {
         updatedRooms,
         addedRooms,
-        removedRooms,
+        orphanedRooms,
         totalItemsUpdated,
       };
 
@@ -484,19 +554,12 @@ export function useSyncQuoteFromProject() {
       const parts: string[] = [];
       if (updatedRooms > 0) parts.push(`Updated ${updatedRooms} room${updatedRooms !== 1 ? 's' : ''}`);
       if (addedRooms > 0) parts.push(`added ${addedRooms} new room${addedRooms !== 1 ? 's' : ''}`);
-      if (removedRooms.length > 0) parts.push(`${removedRooms.length} orphaned room${removedRooms.length !== 1 ? 's' : ''}`);
+      if (orphanedRooms.length > 0) parts.push(`${orphanedRooms.length} orphaned room${orphanedRooms.length !== 1 ? 's' : ''}`);
 
       if (parts.length > 0) {
         toast.success(parts.join(', '));
       } else {
         toast.info('Quote is already in sync with takeoff');
-      }
-
-      if (removedRooms.length > 0) {
-        toast.warning(
-          `Rooms no longer in takeoff: ${removedRooms.join(', ')}. You may want to remove them from the quote.`,
-          { duration: 8000 }
-        );
       }
 
       return result;
@@ -508,5 +571,5 @@ export function useSyncQuoteFromProject() {
     }
   };
 
-  return { syncQuote, isSyncing };
+  return { syncQuote, isSyncing, removeOrphanedRooms, isRemoving };
 }
