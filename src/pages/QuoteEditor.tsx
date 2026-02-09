@@ -7,6 +7,7 @@ import { QuoteClientCard } from '@/components/quotes/QuoteClientCard';
 import { QuoteStatusBadge } from '@/components/quotes/QuoteStatusBadge';
 import { QuoteEditorTotals } from '@/components/quotes/QuoteEditorTotals';
 import { QuoteEditorNotesTab } from '@/components/quotes/QuoteEditorNotesTab';
+import { QuotePdfSidebar } from '@/components/quotes/preview/QuotePdfSidebar';
 import { PriceBookPickerDialog } from '@/components/quotes/PriceBookPickerDialog';
 import { QuoteEditorHeader } from '@/components/quotes/QuoteEditorHeader';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import {
 import {
   Loader2,
   Save,
-  FileText,
+  Eye,
   ArrowLeft,
   Send,
   CheckCircle2,
@@ -63,6 +64,7 @@ export default function QuoteEditor() {
 
   const [priceBookOpen, setPriceBookOpen] = useState(false);
   const [priceBookParentId, setPriceBookParentId] = useState<string | null>(null);
+  const [pdfOpen, setPdfOpen] = useState(false);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -234,10 +236,10 @@ export default function QuoteEditor() {
               variant="ghost"
               size="icon"
               className="shrink-0"
-              onClick={() => navigate(`/quotes/${quoteId}/preview`)}
+              onClick={() => setPdfOpen(true)}
               title="Preview PDF"
             >
-              <FileText className="w-4 h-4" />
+              <Eye className="w-4 h-4" />
             </Button>
             <Button
               size="sm"
@@ -352,6 +354,12 @@ export default function QuoteEditor() {
         onOpenChange={setPriceBookOpen}
         parentId={priceBookParentId}
         onSelect={handlePriceBookSelect}
+      />
+
+      <QuotePdfSidebar
+        open={pdfOpen}
+        onOpenChange={setPdfOpen}
+        quoteId={quoteId}
       />
     </div>
   );

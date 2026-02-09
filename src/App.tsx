@@ -21,7 +21,7 @@ import Admin from "./pages/Admin";
 import Organizations from "./pages/admin/Organizations";
 import QuotesList from "./pages/QuotesList";
 import QuoteEditor from "./pages/QuoteEditor";
-import QuotePreview from "./pages/QuotePreview";
+// QuotePreview is now inline via QuotePdfSidebar
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,7 +42,7 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 {/* Full-screen pages — outside AppLayout */}
                 <Route path="/projects/:projectId" element={<ProjectEditor />} />
-                <Route path="/quotes/:quoteId/preview" element={<QuotePreview />} />
+                <Route path="/projects/:projectId" element={<ProjectEditor />} />
 
                 {/* App shell with sidebar */}
                 <Route element={<AppLayout />}>
