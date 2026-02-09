@@ -75,12 +75,17 @@ export function useSyncQuoteFromProject() {
     setIsRemoving(true);
     try {
       const allIds = [...parentIds, ...childIds];
-      // Soft-delete by setting is_active = false
-      const { error } = await (supabase as any)
-        .from('quote_line_items')
-        .update({ is_active: false })
-        .in('id', allIds);
-      if (error) throw error;
+      // Soft-delete by setting is_active = false — use individual updates for reliability
+      const updateResults = await Promise.all(
+        allIds.map(id =>
+          supabase
+            .from('quote_line_items')
+            .update({ is_active: false } as any)
+            .eq('id', id)
+        )
+      );
+      const firstError = updateResults.find(r => r.error)?.error;
+      if (firstError) throw firstError;
 
       // Recalculate quote totals
       const { data: allItems } = await (supabase as any)
