@@ -56,12 +56,18 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
 
     console.log('FloorPlanUpload: Uploading file to floor_plan_images bucket:', fileName);
 
-    const { error: uploadError } = await supabase.storage
+    const uploadPromise = supabase.storage
       .from('floor_plan_images')
       .upload(fileName, file, {
         cacheControl: '3600',
         upsert: false,
       });
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Upload timed out after 60 seconds')), 60000);
+    });
+
+    const { error: uploadError } = await Promise.race([uploadPromise, timeoutPromise]);
 
     if (uploadError) {
       console.error('FloorPlanUpload: Upload error:', uploadError);
@@ -178,6 +184,7 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
         };
 
         onImageUploaded(backgroundImage);
+        setIsUploading(false);
         setIsOpen(false);
         toast({ title: 'Floor plan uploaded!' });
       }
@@ -187,7 +194,11 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
         description: error.message,
         variant: 'destructive',
       });
+    } finally {
       setIsUploading(false);
+      // Reset file input so the same file can be re-selected
+      const input = document.getElementById('floor-plan-input') as HTMLInputElement;
+      if (input) input.value = '';
     }
   }, [projectId, onImageUploaded, toast]);
 
@@ -257,7 +268,15 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <Dialog open={isOpen} onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+          setIsUploading(false);
+          setIsAnalyzingPdf(false);
+          setPdfAnalysis(null);
+          setPendingPdfUrl(null);
+        }
+      }}>
         <DialogTrigger asChild>
           <Button variant="outline" size="sm" className="gap-2">
             <ImageIcon className="w-4 h-4" />
