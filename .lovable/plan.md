@@ -1,87 +1,62 @@
 
 
-# CSV Export for Quote Line Items (Import-Ready)
+# Ensure Floor Plan Upload Works and Prompt Scale Before Drawing
 
 ## Overview
 
-Add a CSV export option that outputs quote line items in a clean, flat, import-friendly format. Unlike the Excel working document (which is styled and formula-driven), this CSV is designed to be ingested by other software -- accounting tools, estimating platforms, CRMs, or custom import scripts.
+Two improvements to the project creation and editing workflow:
 
-## CSV Structure
+1. **Floor plan upload on new project**: The upload flow in NewProject.tsx already works correctly -- it uploads to the `floor_plan_images` bucket and initializes the multi-page `json_data` structure with the background image. No changes needed here.
 
-Each row represents a single line item (children are flattened alongside parents). The columns are structured for maximum compatibility with other systems:
+2. **Scale prompt before drawing rooms**: When a user selects the Draw or Rectangle tool without having set a scale first, intercept the tool change and prompt them to set the scale. This prevents users from drawing rooms with no real-world measurements, which would make all area calculations meaningless.
 
-| Column | Description |
-|--------|-------------|
-| `group` | Parent/room name (for child items) or blank (for standalone items) |
-| `description` | The line item description |
-| `quantity` | Numeric quantity |
-| `unit` | Unit of measure (from metadata if available, otherwise blank) |
-| `cost_price` | Cost per unit |
-| `sell_price` | Sell per unit |
-| `margin_percent` | Margin percentage |
-| `line_cost` | qty x cost |
-| `line_sell` | qty x sell (line total) |
-| `is_optional` | TRUE/FALSE -- whether this is an optional item |
-| `source_room_id` | Room ID from takeoff (for traceability, blank if not linked) |
-| `price_book_item_id` | Price book reference ID (blank if not linked) |
+## What Changes
 
-### Key design decisions for import compatibility
+When a user clicks the Draw (D) or Rectangle tool -- either via toolbar click or keyboard shortcut -- and no scale has been set on the current page:
 
-- **Flat structure**: No nested rows. Every child item is its own row with the parent name in the `group` column, making it trivial to filter/group in any system.
-- **No formulas, no styling**: Pure data values only.
-- **Standard CSV**: Comma-delimited, UTF-8 with BOM (for Excel compatibility), quoted strings.
-- **Header row**: Always present as the first row.
-- **Parent-only rows excluded**: Parents with children are not output as their own row (they're just grouping containers). Standalone parents (no children) are output normally with `group` left blank.
-- **Boolean as TRUE/FALSE**: Standard format most import tools understand.
+- The tool will NOT activate
+- A toast notification will appear: "Set scale first -- Calibrate your floor plan scale before drawing rooms so measurements are accurate."
+- The Scale tool will be automatically activated instead
+- This applies to both desktop toolbar clicks and keyboard shortcuts
 
-### Example output
+The progress bar already visually guides users through the correct order (Floor Plan -> Scale -> Rooms), but currently nothing enforces it. This change adds a soft enforcement.
 
-```
-group,description,quantity,unit,cost_price,sell_price,margin_percent,line_cost,line_sell,is_optional,source_room_id,price_book_item_id
-Room 1,Vinyl Supply,25.00,,18.50,25.90,40.00,462.50,647.50,FALSE,,pb-001
-Room 1,Installation,25.00,,12.00,16.80,40.00,300.00,420.00,FALSE,,pb-002
-Room 1,Coving,15.00,,4.50,6.30,40.00,67.50,94.50,FALSE,,
-Room 2,Carpet Supply,30.00,,22.00,30.80,40.00,660.00,924.00,FALSE,,pb-003
-Transitions,T-Bar Aluminium,3.00,,8.00,11.20,40.00,24.00,33.60,FALSE,,
-```
+## When It Will NOT Block
 
----
-
-## UI Integration
-
-Add a CSV download button next to the existing Excel export button. Both will use icon buttons with tooltips:
-
-- Existing: FileSpreadsheet icon = Excel export (working document)
-- New: FileDown icon = CSV export (import-ready data)
-
-The CSV button will appear right next to the Excel button in the header toolbar.
+- If scale is already set, Draw/Rectangle tools work normally
+- The Scale tool itself is always accessible
+- Select, Pan, Hole, Door, Merge, Split tools are unaffected (Hole/Door require existing rooms anyway)
 
 ---
 
 ## Technical Details
 
-### New file
-
-| File | Purpose |
-|------|---------|
-| `src/lib/quotes/exportQuoteToCsv.ts` | Pure function that takes `lineItems` and returns a CSV string, then triggers a browser download |
-
-### Modified file
+### File to modify
 
 | File | Changes |
 |------|---------|
-| `src/pages/QuoteEditor.tsx` | Add CSV export button and handler next to the Excel export button |
+| `src/pages/ProjectEditor.tsx` | Wrap `setActiveTool` in a handler that checks for scale before allowing draw/rectangle tools; update keyboard shortcut handler similarly |
 
-### Implementation approach
+### Implementation
 
-The CSV export function will:
-1. Accept the `lineItems` array (same data the Excel export uses)
-2. Iterate through parents -- for parents with children, output each child as a row with `group` set to the parent description; for standalone parents, output the parent itself with `group` blank
-3. Build a CSV string with proper escaping (double-quote any field containing commas, quotes, or newlines)
-4. Prepend UTF-8 BOM (`\uFEFF`) for Excel compatibility
-5. Create a Blob and trigger download as `{quote_number} - Line Items.csv`
+Create a `handleToolChange` wrapper function that:
+1. Checks if the requested tool is `'draw'` or `'rectangle'`
+2. If so, checks if `scale` (from the active page) is `null`
+3. If no scale, shows a toast with a message like "Set your scale first so room measurements are accurate" and switches to the `'scale'` tool instead
+4. Otherwise, sets the tool normally
 
-### No new dependencies needed
+This wrapper replaces direct `setActiveTool` calls in:
+- The `EditorToolbar` `onToolChange` prop
+- The keyboard shortcut handler (`useEffect` for `d` key)
+- The `MobileToolFAB` `onToolChange` prop (if applicable)
+- The `handleProgressStepClick` for the 'rooms' step
 
-CSV generation is simple string concatenation -- no library required.
+### Toast behavior
+
+The toast will use the existing `useToast` hook with:
+- Title: "Set scale first"
+- Description: "Calibrate your floor plan scale before drawing rooms so measurements are accurate."
+- No destructive variant -- just informational
+
+After showing the toast, the scale tool activates automatically so the user can immediately start calibrating.
 
