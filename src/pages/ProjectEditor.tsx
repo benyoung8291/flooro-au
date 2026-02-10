@@ -63,6 +63,7 @@ export default function ProjectEditor() {
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
   const previousToolRef = useRef<EditorTool>('select');
   const handleSaveRef = useRef<(() => Promise<void>) | null>(null);
+  const handleToolChangeRef = useRef<((tool: EditorTool) => void)>((() => {}) as (tool: EditorTool) => void);
   
   const { data: project, isLoading } = useProject(projectId);
   const { data: materials } = useMaterials();
@@ -167,7 +168,7 @@ export default function ProjectEditor() {
 
       switch (e.key.toLowerCase()) {
         case 'v': setActiveTool('select'); break;
-        case 'd': setActiveTool('draw'); break;
+        case 'd': handleToolChangeRef.current('draw'); break;
         case 'h': setActiveTool('hole'); break;
         case 'o': setActiveTool('door'); break;
         case 's':
@@ -321,7 +322,22 @@ export default function ProjectEditor() {
   const dropAllocations = (localData.dropAllocations as Record<string, unknown>) || {};
   const projectMaterials = (localData.projectMaterials as ProjectMaterial[]) || [];
 
-  // Project materials change handler
+  // Wrapper that enforces scale-before-draw rule
+  const handleToolChange = useCallback((tool: EditorTool) => {
+    if ((tool === 'draw' || tool === 'rectangle') && !scale) {
+      toast({
+        title: 'Set scale first',
+        description: 'Calibrate your floor plan scale before drawing rooms so measurements are accurate.',
+      });
+      setActiveTool('scale');
+      return;
+    }
+    setActiveTool(tool);
+  }, [scale, toast]);
+
+  // Keep ref in sync so keyboard shortcuts always use latest version
+  useEffect(() => { handleToolChangeRef.current = handleToolChange; });
+
   const handleProjectMaterialsChange = useCallback((materials: ProjectMaterial[]) => {
     setLocalData(prev => ({ ...prev, projectMaterials: materials }));
     setHasUnsavedChanges(true);
@@ -445,7 +461,7 @@ export default function ProjectEditor() {
               handleUpdateRoom(cSelectedId, { fillDirection: newDirection });
             }
           } else {
-            setActiveTool('rectangle');
+            handleToolChangeRef.current('rectangle');
           }
           break;
         }
@@ -853,7 +869,7 @@ export default function ProjectEditor() {
         setActiveTool('scale');
         break;
       case 'rooms':
-        setActiveTool('draw');
+        handleToolChange('draw');
         break;
       case 'materials':
         setSidebarCollapsed(false);
@@ -1028,7 +1044,7 @@ export default function ProjectEditor() {
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
               <EditorToolbar
                 activeTool={activeTool}
-                onToolChange={setActiveTool}
+                onToolChange={handleToolChange}
                 is3DMode={is3DMode}
                 onToggle3D={() => setIs3DMode(!is3DMode)}
                 showDimensionLabels={showDimensionLabels}
@@ -1127,7 +1143,7 @@ export default function ProjectEditor() {
       {isMobile && (
         <MobileNav
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
           onOpenMenu={() => {
             setMobileDrawerTab(undefined);
             setMobileDrawerOpen(true);
@@ -1144,7 +1160,7 @@ export default function ProjectEditor() {
       {isMobile && (
         <MobileToolFAB
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
         />
       )}
 
