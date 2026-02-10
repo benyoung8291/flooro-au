@@ -11,6 +11,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { BackgroundImage } from '@/lib/canvas/types';
+import { renderPdfPage } from '@/lib/pdf/renderPdfPage';
 import { PdfPageSelector } from './PdfPageSelector';
 
 interface PdfAnalysis {
@@ -46,9 +47,27 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isAnalyzingPdf, setIsAnalyzingPdf] = useState(false);
+  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
   const [pdfAnalysis, setPdfAnalysis] = useState<PdfAnalysis | null>(null);
   const [pendingPdfUrl, setPendingPdfUrl] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const uploadPngBlob = async (blob: Blob): Promise<string> => {
+    const fileName = `${projectId}/${Date.now()}.png`;
+    const file = new File([blob], 'floor-plan.png', { type: 'image/png' });
+
+    const { error: uploadError } = await supabase.storage
+      .from('floor_plan_images')
+      .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('floor_plan_images')
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  };
 
   const uploadFile = async (file: File): Promise<string> => {
     const fileExt = file.name.split('.').pop();
@@ -149,25 +168,27 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
           setIsUploading(false);
           // Keep dialog open for page selection
         } catch (analysisError: any) {
-          console.error('FloorPlanUpload: PDF analysis failed, using fallback:', analysisError.message);
-          // If analysis fails, still use the PDF as background
-          const backgroundImage: BackgroundImage = {
-            url: publicUrl,
-            opacity: 0.5,
-            scale: 1,
-            rotation: 0,
-            offsetX: 0,
-            offsetY: 0,
-            locked: true,
-          };
-          onImageUploaded(backgroundImage);
+          console.error('FloorPlanUpload: PDF analysis failed, rendering page 1 as fallback:', analysisError.message);
+          // Render page 1 to PNG as fallback
+          try {
+            const pngBlob = await renderPdfPage(publicUrl, 1);
+            const pngUrl = await uploadPngBlob(pngBlob);
+            const backgroundImage: BackgroundImage = {
+              url: pngUrl,
+              opacity: 0.5,
+              scale: 1,
+              rotation: 0,
+              offsetX: 0,
+              offsetY: 0,
+              locked: true,
+            };
+            onImageUploaded(backgroundImage);
+            toast({ title: 'PDF uploaded', description: 'Page 1 rendered as image.' });
+          } catch (renderError: any) {
+            console.error('FloorPlanUpload: Fallback render also failed:', renderError.message);
+            toast({ title: 'PDF upload failed', description: 'Could not render PDF page.', variant: 'destructive' });
+          }
           setIsOpen(false);
-          toast({ 
-            title: 'PDF uploaded',
-            description: analysisError.message.includes('timeout') 
-              ? 'Analysis timed out. PDF loaded as background.' 
-              : 'Could not analyze pages. Using as background.'
-          });
         } finally {
           setIsAnalyzingPdf(false);
         }
@@ -202,37 +223,48 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
     }
   }, [projectId, onImageUploaded, toast]);
 
-  const handlePdfPageSelect = useCallback((pageNumber: number, analysis: PdfAnalysis) => {
+  const handlePdfPageSelect = useCallback(async (pageNumber: number, analysis: PdfAnalysis) => {
     if (!pendingPdfUrl) return;
 
-    const backgroundImage: BackgroundImage = {
-      url: pendingPdfUrl,
-      opacity: 0.5,
-      scale: 1,
-      rotation: 0,
-      offsetX: 0,
-      offsetY: 0,
-      locked: true, // Lock by default to keep rooms aligned
-    };
+    setIsProcessingPdf(true);
+    try {
+      // Render the selected PDF page to a PNG
+      const pngBlob = await renderPdfPage(pendingPdfUrl, pageNumber);
+      const pngUrl = await uploadPngBlob(pngBlob);
 
-    // Pass the analysis with dimensions to the parent
-    onImageUploaded(backgroundImage, analysis);
-    
-    // Reset state
-    setPdfAnalysis(null);
-    setPendingPdfUrl(null);
-    setIsOpen(false);
-    
-    const page = analysis.pages.find(p => p.pageNumber === pageNumber);
-    const dimensionCount = page?.dimensions?.length || 0;
-    
-    toast({ 
-      title: 'PDF imported successfully',
-      description: dimensionCount > 0 
-        ? `Page ${pageNumber} selected. ${dimensionCount} dimensions detected.`
-        : `Page ${pageNumber} selected.`
-    });
-  }, [pendingPdfUrl, onImageUploaded, toast]);
+      const backgroundImage: BackgroundImage = {
+        url: pngUrl,
+        opacity: 0.5,
+        scale: 1,
+        rotation: 0,
+        offsetX: 0,
+        offsetY: 0,
+        locked: true,
+      };
+
+      onImageUploaded(backgroundImage, analysis);
+
+      // Reset state
+      setPdfAnalysis(null);
+      setPendingPdfUrl(null);
+      setIsOpen(false);
+
+      const page = analysis.pages.find(p => p.pageNumber === pageNumber);
+      const dimensionCount = page?.dimensions?.length || 0;
+
+      toast({
+        title: 'PDF imported successfully',
+        description: dimensionCount > 0
+          ? `Page ${pageNumber} selected. ${dimensionCount} dimensions detected.`
+          : `Page ${pageNumber} selected.`
+      });
+    } catch (error: any) {
+      console.error('FloorPlanUpload: PDF page render failed:', error.message);
+      toast({ title: 'Failed to render PDF page', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsProcessingPdf(false);
+    }
+  }, [pendingPdfUrl, onImageUploaded, toast, projectId]);
 
   const handleClosePdfSelector = useCallback(() => {
     setPdfAnalysis(null);
@@ -358,6 +390,7 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
           analysis={pdfAnalysis}
           pdfUrl={pendingPdfUrl}
           onSelectPage={handlePdfPageSelect}
+          isProcessing={isProcessingPdf}
         />
       )}
     </>
