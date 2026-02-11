@@ -204,6 +204,26 @@ export function RoomDetailView({
             </>
           )}
         </div>
+
+        {/* Door list with delete */}
+        {room.doors.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {room.doors.map((door, idx) => (
+              <div key={door.id} className="flex items-center justify-between text-xs bg-muted/30 rounded px-2 py-1">
+                <span className="text-muted-foreground">
+                  Door {idx + 1} — {door.width}mm
+                </span>
+                <button
+                  className="text-destructive hover:bg-destructive/10 rounded p-0.5"
+                  onClick={() => onUpdateRoom(room.id, { doors: room.doors.filter(d => d.id !== door.id) })}
+                  title="Delete door"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tabs */}

@@ -967,133 +967,171 @@ function drawRoom(
     
     const isWallHovered = hoveredWallIndex === i && !isDragging;
     const isCurved = curve?.type === 'quadratic' && curve.controlPoint;
-    const isTransitionEdge = room.edgeTransitions?.some(t => t.edgeIndex === i);
+    const edgeTransitions = room.edgeTransitions?.filter(t => t.edgeIndex === i) || [];
+    const hasAnyTransition = edgeTransitions.length > 0;
     
-    // Determine stroke style based on state priority
-    if (isMergeTarget) {
-      ctx.strokeStyle = 'hsl(142 71% 45%)';
-      ctx.lineWidth = 4 / zoom;
-      ctx.setLineDash([]);
-    } else if (isMergeSelected) {
-      ctx.strokeStyle = 'hsl(280 70% 50%)';
-      ctx.lineWidth = 4 / zoom;
-      ctx.setLineDash([]);
-    } else if (isMergeable) {
-      ctx.strokeStyle = 'hsl(217 91% 60%)';
-      ctx.lineWidth = 3 / zoom;
-      ctx.setLineDash([4 / zoom, 4 / zoom]);
-    } else if (isMergeDimmed) {
-      ctx.strokeStyle = 'hsl(0 0% 60%)';
-      ctx.lineWidth = 1.5 / zoom;
-      ctx.setLineDash([]);
-    } else if (isDragTarget) {
-      ctx.strokeStyle = 'hsl(142 71% 45%)';
-      ctx.lineWidth = 4 / zoom;
-      ctx.setLineDash([8 / zoom, 4 / zoom]);
-    } else if (isValidDropZone) {
-      ctx.strokeStyle = 'hsl(217 91% 60%)';
-      ctx.lineWidth = 2.5 / zoom;
-      ctx.setLineDash([4 / zoom, 4 / zoom]);
-    } else if (isWallHovered) {
-      ctx.strokeStyle = 'hsl(45 93% 47%)';
-      ctx.lineWidth = 4 / zoom;
-      ctx.setLineDash([]);
-    } else if (isTransitionEdge) {
-      // Transition edges get amber/orange dashed style
-      ctx.strokeStyle = isSelected ? 'hsl(35 90% 50%)' : 'hsl(35 80% 55%)';
-      ctx.lineWidth = 3 / zoom;
-      ctx.setLineDash([6 / zoom, 4 / zoom]);
-    } else if (isCurved) {
-      // Curved edges get a distinct color
-      ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 60% 55%)';
-      ctx.lineWidth = 3 / zoom;
-      ctx.setLineDash([]);
-    } else if (isSelected) {
-      ctx.strokeStyle = 'hsl(142 71% 45%)';
-      ctx.lineWidth = 3 / zoom;
-      ctx.setLineDash([]);
-    } else if (isHovered) {
-      ctx.strokeStyle = 'hsl(217 91% 60%)';
-      ctx.lineWidth = 2.5 / zoom;
-      ctx.setLineDash([]);
+    // For partial transitions, draw wall segments and transition segments separately
+    if (hasAnyTransition && !isMergeTarget && !isMergeSelected && !isMergeable && !isMergeDimmed && !isDragTarget && !isValidDropZone && !isWallHovered) {
+      // Sort transitions by startPercent
+      const sorted = [...edgeTransitions].sort((a, b) => (a.startPercent ?? 0) - (b.startPercent ?? 0));
+      
+      // Draw wall portions (gaps between transitions)
+      let lastEnd = 0;
+      for (const t of sorted) {
+        const tStart = t.startPercent ?? 0;
+        const tEnd = t.endPercent ?? 1;
+        
+        // Draw wall from lastEnd to tStart
+        if (tStart > lastEnd) {
+          const segP1 = { x: p1.x + (p2.x - p1.x) * lastEnd, y: p1.y + (p2.y - p1.y) * lastEnd };
+          const segP2 = { x: p1.x + (p2.x - p1.x) * tStart, y: p1.y + (p2.y - p1.y) * tStart };
+          ctx.strokeStyle = isSelected ? 'hsl(142 71% 45%)' : 'hsl(217 91% 50%)';
+          ctx.lineWidth = (isSelected ? 3 : 2) / zoom;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(segP1.x, segP1.y);
+          ctx.lineTo(segP2.x, segP2.y);
+          ctx.stroke();
+        }
+        
+        // Draw transition portion
+        const segP1 = { x: p1.x + (p2.x - p1.x) * tStart, y: p1.y + (p2.y - p1.y) * tStart };
+        const segP2 = { x: p1.x + (p2.x - p1.x) * tEnd, y: p1.y + (p2.y - p1.y) * tEnd };
+        ctx.strokeStyle = isSelected ? 'hsl(35 90% 50%)' : 'hsl(35 80% 55%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([6 / zoom, 4 / zoom]);
+        ctx.beginPath();
+        ctx.moveTo(segP1.x, segP1.y);
+        ctx.lineTo(segP2.x, segP2.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        lastEnd = tEnd;
+      }
+      
+      // Draw remaining wall after last transition
+      if (lastEnd < 1) {
+        const segP1 = { x: p1.x + (p2.x - p1.x) * lastEnd, y: p1.y + (p2.y - p1.y) * lastEnd };
+        ctx.strokeStyle = isSelected ? 'hsl(142 71% 45%)' : 'hsl(217 91% 50%)';
+        ctx.lineWidth = (isSelected ? 3 : 2) / zoom;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(segP1.x, segP1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      
+      // Draw transition label badges for each segment
+      for (const transition of sorted) {
+        const tStart = transition.startPercent ?? 0;
+        const tEnd = transition.endPercent ?? 1;
+        const midPct = (tStart + tEnd) / 2;
+        const midX = p1.x + (p2.x - p1.x) * midPct;
+        const midY = p1.y + (p2.y - p1.y) * midPct;
+        
+        const edgeLabel = `E${i + 1}`;
+        const typeLabel = transition.transitionType === 'auto' ? '' :
+          transition.transitionType === 'alu-angle' ? `Alu ${transition.aluAngleSizeMm || '?'}mm` :
+          transition.transitionType === 't-molding' ? 'T-Mold' :
+          transition.transitionType === 'reducer' ? 'Reducer' :
+          transition.transitionType === 'threshold' ? 'Threshold' :
+          transition.transitionType === 'ramp' ? 'Ramp' :
+          transition.transitionType === 'end-cap' ? 'End Cap' : '';
+        const adjLabel = transition.adjacentRoomName ? `→ ${transition.adjacentRoomName}` : '';
+        const pctLabel = (tStart > 0 || tEnd < 1) ? `${Math.round(tStart * 100)}-${Math.round(tEnd * 100)}%` : '';
+        const fullLabel = [edgeLabel, typeLabel, pctLabel, adjLabel].filter(Boolean).join(' ');
+
+        const fontSize = 9 / zoom;
+        ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+        const textWidth = ctx.measureText(fullLabel).width;
+        const paddingX = 5 / zoom;
+        const paddingY = 3 / zoom;
+        const badgeHeight = fontSize + paddingY * 2;
+        const badgeWidth = textWidth + paddingX * 2;
+
+        const edgeDx = p2.x - p1.x;
+        const edgeDy = p2.y - p1.y;
+        const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+        const perpX = edgeLen > 0 ? -edgeDy / edgeLen : 0;
+        const perpY = edgeLen > 0 ? edgeDx / edgeLen : 0;
+        const offsetDist = 14 / zoom;
+        const labelX = midX + perpX * offsetDist;
+        const labelY = midY + perpY * offsetDist;
+
+        ctx.fillStyle = 'hsl(35 90% 50%)';
+        ctx.beginPath();
+        ctx.roundRect(labelX - badgeWidth / 2, labelY - badgeHeight / 2, badgeWidth, badgeHeight, 3 / zoom);
+        ctx.fill();
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 1 / zoom;
+        ctx.stroke();
+        ctx.fillStyle = 'white';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(fullLabel, labelX, labelY);
+      }
     } else {
-      ctx.strokeStyle = 'hsl(217 91% 50%)';
-      ctx.lineWidth = 2 / zoom;
-      ctx.setLineDash([]);
-    }
-    
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    if (curve?.type === 'quadratic' && curve.controlPoint) {
-      ctx.quadraticCurveTo(curve.controlPoint.x, curve.controlPoint.y, p2.x, p2.y);
-    } else {
-      ctx.lineTo(p2.x, p2.y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    
-    // Draw transition indicator with label at edge midpoint
-    if (isTransitionEdge && !isDragTarget && !isValidDropZone) {
-      const transition = room.edgeTransitions?.find(t => t.edgeIndex === i);
-      const midX = (p1.x + p2.x) / 2;
-      const midY = (p1.y + p2.y) / 2;
-
-      // Build label text: "E{n} T" + type + adjacent room
-      const edgeLabel = `E${i + 1}`;
-      const typeLabel = transition?.transitionType === 'auto' ? '' :
-        transition?.transitionType === 't-molding' ? 'T-Mold' :
-        transition?.transitionType === 'reducer' ? 'Reducer' :
-        transition?.transitionType === 'threshold' ? 'Threshold' :
-        transition?.transitionType === 'ramp' ? 'Ramp' :
-        transition?.transitionType === 'end-cap' ? 'End Cap' : '';
-      const adjLabel = transition?.adjacentRoomName ? `→ ${transition.adjacentRoomName}` : '';
-      const fullLabel = [edgeLabel, typeLabel, adjLabel].filter(Boolean).join(' ');
-
-      // Measure label for background sizing
-      const fontSize = 9 / zoom;
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-      const textWidth = ctx.measureText(fullLabel).width;
-      const paddingX = 5 / zoom;
-      const paddingY = 3 / zoom;
-      const badgeHeight = fontSize + paddingY * 2;
-      const badgeWidth = textWidth + paddingX * 2;
-
-      // Offset label perpendicular to edge so it doesn't overlap the edge line
-      const edgeDx = p2.x - p1.x;
-      const edgeDy = p2.y - p1.y;
-      const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
-      const perpX = edgeLen > 0 ? -edgeDy / edgeLen : 0;
-      const perpY = edgeLen > 0 ? edgeDx / edgeLen : 0;
-      const offsetDist = 14 / zoom;
-      const labelX = midX + perpX * offsetDist;
-      const labelY = midY + perpY * offsetDist;
-
-      // Draw badge background (rounded rect)
-      ctx.fillStyle = 'hsl(35 90% 50%)';
+      // Original single-stroke drawing for non-transition edges or override states
+      // Determine stroke style based on state priority
+      if (isMergeTarget) {
+        ctx.strokeStyle = 'hsl(142 71% 45%)';
+        ctx.lineWidth = 4 / zoom;
+        ctx.setLineDash([]);
+      } else if (isMergeSelected) {
+        ctx.strokeStyle = 'hsl(280 70% 50%)';
+        ctx.lineWidth = 4 / zoom;
+        ctx.setLineDash([]);
+      } else if (isMergeable) {
+        ctx.strokeStyle = 'hsl(217 91% 60%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+      } else if (isMergeDimmed) {
+        ctx.strokeStyle = 'hsl(0 0% 60%)';
+        ctx.lineWidth = 1.5 / zoom;
+        ctx.setLineDash([]);
+      } else if (isDragTarget) {
+        ctx.strokeStyle = 'hsl(142 71% 45%)';
+        ctx.lineWidth = 4 / zoom;
+        ctx.setLineDash([8 / zoom, 4 / zoom]);
+      } else if (isValidDropZone) {
+        ctx.strokeStyle = 'hsl(217 91% 60%)';
+        ctx.lineWidth = 2.5 / zoom;
+        ctx.setLineDash([4 / zoom, 4 / zoom]);
+      } else if (isWallHovered) {
+        ctx.strokeStyle = 'hsl(45 93% 47%)';
+        ctx.lineWidth = 4 / zoom;
+        ctx.setLineDash([]);
+      } else if (isCurved) {
+        ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 60% 55%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([]);
+      } else if (isSelected) {
+        ctx.strokeStyle = 'hsl(142 71% 45%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([]);
+      } else if (isHovered) {
+        ctx.strokeStyle = 'hsl(217 91% 60%)';
+        ctx.lineWidth = 2.5 / zoom;
+        ctx.setLineDash([]);
+      } else {
+        ctx.strokeStyle = 'hsl(217 91% 50%)';
+        ctx.lineWidth = 2 / zoom;
+        ctx.setLineDash([]);
+      }
+      
       ctx.beginPath();
-      ctx.roundRect(
-        labelX - badgeWidth / 2,
-        labelY - badgeHeight / 2,
-        badgeWidth,
-        badgeHeight,
-        3 / zoom
-      );
-      ctx.fill();
-
-      // Draw white border
-      ctx.strokeStyle = 'white';
-      ctx.lineWidth = 1 / zoom;
+      ctx.moveTo(p1.x, p1.y);
+      if (curve?.type === 'quadratic' && curve.controlPoint) {
+        ctx.quadraticCurveTo(curve.controlPoint.x, curve.controlPoint.y, p2.x, p2.y);
+      } else {
+        ctx.lineTo(p2.x, p2.y);
+      }
       ctx.stroke();
-
-      // Draw label text
-      ctx.fillStyle = 'white';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(fullLabel, labelX, labelY);
+      ctx.setLineDash([]);
     }
 
     // Draw edge number labels for selected rooms (non-transition edges)
-    if (isSelected && !isTransitionEdge && !isDragTarget && !isValidDropZone && !isMergeSelected && !isMergeable && !isMergeTarget && !isMergeDimmed) {
+    if (isSelected && !hasAnyTransition && !isDragTarget && !isValidDropZone && !isMergeSelected && !isMergeable && !isMergeTarget && !isMergeDimmed) {
       const midX = (p1.x + p2.x) / 2;
       const midY = (p1.y + p2.y) / 2;
 

@@ -120,13 +120,14 @@ export function recommendTransitionType(
 /**
  * Get a human-readable label for transition type
  */
-export function getTransitionLabel(type: string): string {
+export function getTransitionLabel(type: string, aluAngleSizeMm?: number): string {
   const labels: Record<string, string> = {
     't-molding': 'T-Molding (same height)',
     'reducer': 'Reducer Strip',
     'threshold': 'Threshold',
     'ramp': 'Ramp System',
     'end-cap': 'End Cap',
+    'alu-angle': `Alu Angle${aluAngleSizeMm ? ` (${aluAngleSizeMm}mm)` : ''}`,
     'auto': 'Auto-select',
   };
   return labels[type] || type;

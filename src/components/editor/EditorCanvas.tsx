@@ -693,7 +693,28 @@ export function EditorCanvas({
     const menuX = e.clientX - rect.left;
     const menuY = e.clientY - rect.top;
 
-    // Hit detection: hole > edge > room
+    // Hit detection: door > hole > edge > room
+    // Check doors first
+    for (const room of state.rooms) {
+      for (const door of room.doors) {
+        const doorWidthPx = state.scale ? door.width * state.scale.pixelsPerMm : door.width / 10;
+        const doorHeight = 8 / state.viewTransform.zoom;
+        // Rotate point into door's local space
+        const cos = Math.cos(-door.rotation * Math.PI / 180);
+        const sin = Math.sin(-door.rotation * Math.PI / 180);
+        const dx = point.x - door.position.x;
+        const dy = point.y - door.position.y;
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+        if (Math.abs(localX) <= doorWidthPx / 2 + 5 / state.viewTransform.zoom && Math.abs(localY) <= doorHeight / 2 + 5 / state.viewTransform.zoom) {
+          setContextTarget({ type: 'door', roomId: room.id, doorId: door.id, point });
+          setContextMenuPos({ x: menuX, y: menuY });
+          dispatch({ type: 'SELECT_ROOM', roomId: room.id });
+          return;
+        }
+      }
+    }
+
     for (const room of state.rooms) {
       for (const hole of room.holes) {
         if (hole.points.length >= 3 && isPointInPolygon(point, hole.points)) {
@@ -726,7 +747,7 @@ export function EditorCanvas({
 
     setContextTarget(null);
     setContextMenuPos(null);
-  }, [screenToCanvas, state.rooms, state.viewTransform.zoom, dispatch]);
+  }, [screenToCanvas, state.rooms, state.viewTransform.zoom, state.scale, dispatch]);
 
   // Handle pointer down
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -1741,6 +1762,10 @@ export function EditorCanvas({
           dispatch({ type: 'DELETE_HOLE', roomId, holeId });
           toast.success('Cutout deleted');
         }}
+        onDeleteDoor={(roomId, doorId) => {
+          dispatch({ type: 'DELETE_DOOR', roomId, doorId });
+          toast.success('Door deleted');
+        }}
         onEditRoom={(roomId) => {
           dispatch({ type: 'SELECT_ROOM', roomId });
         }}
@@ -1759,15 +1784,49 @@ export function EditorCanvas({
           if (hasTransition) {
             dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: existing.filter(t => t.edgeIndex !== edgeIndex) } });
           } else {
-            const newTransition: EdgeTransition = { edgeIndex, transitionType: 'auto' };
+            const newTransition: EdgeTransition = { id: crypto.randomUUID(), edgeIndex, transitionType: 'auto', startPercent: 0, endPercent: 1 };
             dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: [...existing, newTransition] } });
           }
         }}
-        onSetTransitionType={(roomId, edgeIndex, type) => {
+        onAddTransitionSegment={(roomId, edgeIndex) => {
           const room = state.rooms.find(r => r.id === roomId);
           if (!room) return;
           const existing = room.edgeTransitions || [];
-          const updated = existing.map(t => t.edgeIndex === edgeIndex ? { ...t, transitionType: type } : t);
+          // Find uncovered portion of the edge
+          const edgeSegments = existing.filter(t => t.edgeIndex === edgeIndex).sort((a, b) => (a.startPercent ?? 0) - (b.startPercent ?? 0));
+          let start = 0;
+          for (const seg of edgeSegments) {
+            const segEnd = seg.endPercent ?? 1;
+            if ((seg.startPercent ?? 0) > start) break;
+            start = Math.max(start, segEnd);
+          }
+          if (start >= 1) {
+            toast.error('Edge is fully covered by transitions');
+            return;
+          }
+          const newTransition: EdgeTransition = { id: crypto.randomUUID(), edgeIndex, transitionType: 'auto', startPercent: start, endPercent: 1 };
+          dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: [...existing, newTransition] } });
+          toast.success('Added transition segment');
+        }}
+        onDeleteTransitionSegment={(roomId, transitionId) => {
+          const room = state.rooms.find(r => r.id === roomId);
+          if (!room) return;
+          const existing = room.edgeTransitions || [];
+          dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: existing.filter(t => t.id !== transitionId) } });
+          toast.success('Transition removed');
+        }}
+        onSetTransitionType={(roomId, edgeIndex, type, aluAngleSizeMm) => {
+          const room = state.rooms.find(r => r.id === roomId);
+          if (!room) return;
+          const existing = room.edgeTransitions || [];
+          // Update the last transition on this edge
+          const edgeTransitions = existing.filter(t => t.edgeIndex === edgeIndex);
+          const lastId = edgeTransitions[edgeTransitions.length - 1]?.id;
+          const updated = existing.map(t => {
+            if (lastId && t.id === lastId) return { ...t, transitionType: type, aluAngleSizeMm };
+            if (!lastId && t.edgeIndex === edgeIndex) return { ...t, transitionType: type, aluAngleSizeMm };
+            return t;
+          });
           dispatch({ type: 'UPDATE_ROOM', roomId, updates: { edgeTransitions: updated } });
         }}
       />
