@@ -1274,6 +1274,24 @@ function drawRoom(
     ctx.rotate(door.rotation * Math.PI / 180);
     ctx.fillRect(-doorWidthPx / 2, -doorHeight / 2, doorWidthPx, doorHeight);
     ctx.strokeRect(-doorWidthPx / 2, -doorHeight / 2, doorWidthPx, doorHeight);
+    
+    // Draw resize handles when room is selected
+    if (isSelected) {
+      const handleSize = 6 / zoom;
+      const handleY = 0;
+      
+      // Left handle
+      ctx.fillStyle = 'white';
+      ctx.strokeStyle = 'hsl(45 93% 35%)';
+      ctx.lineWidth = 1.5 / zoom;
+      ctx.fillRect(-doorWidthPx / 2 - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+      ctx.strokeRect(-doorWidthPx / 2 - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+      
+      // Right handle
+      ctx.fillRect(doorWidthPx / 2 - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+      ctx.strokeRect(doorWidthPx / 2 - handleSize / 2, handleY - handleSize / 2, handleSize, handleSize);
+    }
+    
     ctx.restore();
   });
 
