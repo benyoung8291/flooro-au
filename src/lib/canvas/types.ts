@@ -56,13 +56,17 @@ export interface AdhesiveConfig {
 
 // Edge transition configuration for material-to-material boundaries
 export interface EdgeTransition {
-  edgeIndex: number;              // Which edge (0-based, matches points array)
-  adjacentRoomId?: string;        // Optional: linked room on other side
-  adjacentRoomName?: string;      // Display name (for cases where room isn't drawn)
-  transitionType: 'reducer' | 'threshold' | 't-molding' | 'end-cap' | 'ramp' | 'auto';
-  materialId?: string;            // Transition strip material
-  heightDifferenceMm?: number;    // Override calculated height diff
-  notes?: string;                 // Installer notes
+  id?: string;                        // Unique ID for this transition instance
+  edgeIndex: number;                  // Which edge (0-based, matches points array)
+  startPercent?: number;              // 0.0-1.0, where along the edge this starts (default 0)
+  endPercent?: number;                // 0.0-1.0, where along the edge this ends (default 1)
+  adjacentRoomId?: string;            // Optional: linked room on other side
+  adjacentRoomName?: string;          // Display name (for cases where room isn't drawn)
+  transitionType: 'reducer' | 'threshold' | 't-molding' | 'end-cap' | 'ramp' | 'alu-angle' | 'auto';
+  aluAngleSizeMm?: number;           // For alu-angle type: 4, 6, 8, 10, 12, 15, 20
+  materialId?: string;                // Transition strip material
+  heightDifferenceMm?: number;        // Override calculated height diff
+  notes?: string;                     // Installer notes
 }
 
 export interface RoomAccessories {
@@ -214,7 +218,10 @@ export type CanvasAction =
   | { type: 'RESET' }
   | { type: 'DELETE_HOLE'; roomId: string; holeId: string }
   | { type: 'UPDATE_HOLE'; roomId: string; holeId: string; updates: Partial<Hole> }
+  | { type: 'DELETE_DOOR'; roomId: string; doorId: string }
   | { type: 'BATCH'; actions: CanvasAction[] };
+
+export const ALU_ANGLE_SIZES = [4, 6, 8, 10, 12, 15, 20] as const;
 
 export const DOOR_WIDTHS = [
   { label: "620mm", value: 620 },

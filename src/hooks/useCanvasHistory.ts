@@ -85,6 +85,16 @@ function canvasReducer(state: CanvasState, action: CanvasAction): CanvasState {
         ),
       };
     
+    case 'DELETE_DOOR':
+      return {
+        ...state,
+        rooms: state.rooms.map(room =>
+          room.id === action.roomId
+            ? { ...room, doors: room.doors.filter(d => d.id !== action.doorId) }
+            : room
+        ),
+      };
+    
     case 'SET_SCALE':
       return { ...state, scale: action.scale };
     
