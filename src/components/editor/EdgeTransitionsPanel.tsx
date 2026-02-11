@@ -426,30 +426,35 @@ export function EdgeTransitionsPanel({
                                 </Button>
                               </div>
 
-                              {/* Range sliders */}
-                              <div className="space-y-1">
-                                <Label className="text-[10px]">
-                                  Range: {Math.round((transition.startPercent ?? 0) * 100)}% — {Math.round((transition.endPercent ?? 1) * 100)}%
-                                </Label>
-                                <div className="flex gap-2 items-center">
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    max={Math.round((transition.endPercent ?? 1) * 100) - 1}
-                                    value={Math.round((transition.startPercent ?? 0) * 100)}
-                                    onChange={(e) => transition.id && updateTransitionById(transition.id, { startPercent: Math.max(0, Math.min(1, parseInt(e.target.value) / 100)) })}
-                                    className="h-6 w-16 text-[10px] font-mono"
-                                  />
-                                  <span className="text-[10px] text-muted-foreground">to</span>
-                                  <Input
-                                    type="number"
-                                    min={Math.round((transition.startPercent ?? 0) * 100) + 1}
-                                    max={100}
-                                    value={Math.round((transition.endPercent ?? 1) * 100)}
-                                    onChange={(e) => transition.id && updateTransitionById(transition.id, { endPercent: Math.max(0, Math.min(1, parseInt(e.target.value) / 100)) })}
-                                    className="h-6 w-16 text-[10px] font-mono"
-                                  />
-                                  <span className="text-[10px] text-muted-foreground">%</span>
+                               {/* Range slider */}
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-[10px]">Coverage Range</Label>
+                                  <span className="text-[10px] font-mono text-muted-foreground">
+                                    {Math.round((transition.startPercent ?? 0) * 100)}% — {Math.round((transition.endPercent ?? 1) * 100)}%
+                                  </span>
+                                </div>
+                                <Slider
+                                  min={0}
+                                  max={100}
+                                  step={5}
+                                  value={[
+                                    Math.round((transition.startPercent ?? 0) * 100),
+                                    Math.round((transition.endPercent ?? 1) * 100),
+                                  ]}
+                                  onValueChange={(vals) => {
+                                    if (!transition.id) return;
+                                    updateTransitionById(transition.id, {
+                                      startPercent: vals[0] / 100,
+                                      endPercent: vals[1] / 100,
+                                    });
+                                  }}
+                                  className="w-full"
+                                />
+                                <div className="flex justify-between text-[9px] text-muted-foreground">
+                                  <span>0%</span>
+                                  <span>50%</span>
+                                  <span>100%</span>
                                 </div>
                               </div>
 

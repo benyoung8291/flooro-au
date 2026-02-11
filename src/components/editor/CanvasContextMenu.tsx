@@ -79,6 +79,7 @@ export function CanvasContextMenu({
         className="absolute z-50 bg-popover border border-border rounded-lg shadow-lg p-1 min-w-[200px] max-h-[400px] overflow-y-auto animate-in fade-in-0 zoom-in-95"
         style={{ left: position.x, top: position.y }}
         onPointerDown={stopPropagation}
+        onWheel={(e) => e.stopPropagation()}
       >
         {/* Room Context Menu */}
         {target.type === 'room' && room && (
