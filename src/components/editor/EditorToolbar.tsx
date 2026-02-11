@@ -33,6 +33,7 @@ import {
   Combine,
   Scissors,
   Magnet,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 // Custom icon: dashed rectangle with scissors for "Cut Hole" tool
@@ -81,6 +82,7 @@ const toolGroups = {
   ],
   elements: [
     { id: 'door' as EditorTool, icon: DoorOpen, label: 'Add Door', shortcut: 'O' },
+    { id: 'transition' as EditorTool, icon: ArrowLeftRight, label: 'Draw Transition', shortcut: 'T' },
     { id: 'scale' as EditorTool, icon: Ruler, label: 'Set Scale', shortcut: 'S' },
   ],
   edit: [

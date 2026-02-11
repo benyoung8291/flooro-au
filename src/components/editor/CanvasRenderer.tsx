@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { CanvasState, CanvasPoint, Room, ViewTransform, MATERIAL_TYPE_COLORS, DEFAULT_ROOM_COLOR, BackgroundImage, DimensionUnit, EdgeCurve, ProjectMaterial } from '@/lib/canvas/types';
-import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, getQuadraticBezierPoint, getEdgeMidpoint } from '@/lib/canvas/geometry';
+import { calculatePolygonArea, calculateRoomNetArea, mmSquaredToMSquared, pixelAreaToRealArea, getQuadraticBezierPoint, getEdgeMidpoint, distance } from '@/lib/canvas/geometry';
 import { StripPlanResult } from '@/lib/rollGoods/types';
 import { SharedEdge, detectSharedEdges } from '@/lib/canvas/sharedEdgeDetector';
 import { HoveredHoleVertex, HoveredHoleWall } from '@/hooks/useCanvasEditing';
@@ -58,6 +58,9 @@ interface CanvasRendererProps {
   // Hole editing hover state
   hoveredHoleVertex?: HoveredHoleVertex | null;
   hoveredHoleWall?: HoveredHoleWall | null;
+  // Transition drawing tool state
+  transitionDrawStart?: { roomId: string; edgeIndex: number; percent: number } | null;
+  transitionHoverEdge?: { roomId: string; edgeIndex: number; percent: number; projectedPoint: CanvasPoint } | null;
 }
 
 // Cache for loaded images
@@ -125,6 +128,8 @@ export function CanvasRenderer({
   holeRectStart,
   hoveredHoleVertex,
   hoveredHoleWall,
+  transitionDrawStart,
+  transitionHoverEdge,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -645,6 +650,125 @@ export function CanvasRenderer({
       }
     }
 
+    // Draw transition tool visuals
+    if (activeTool === 'transition') {
+      // Draw hover highlight on nearest edge
+      if (transitionHoverEdge) {
+        const hoverRoom = state.rooms.find(r => r.id === transitionHoverEdge.roomId);
+        if (hoverRoom) {
+          const ei = transitionHoverEdge.edgeIndex;
+          const hp1 = hoverRoom.points[ei];
+          const hp2 = hoverRoom.points[(ei + 1) % hoverRoom.points.length];
+          
+          // Highlight the edge in amber
+          ctx.strokeStyle = 'hsla(35, 90%, 50%, 0.6)';
+          ctx.lineWidth = 5 / zoom;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(hp1.x, hp1.y);
+          ctx.lineTo(hp2.x, hp2.y);
+          ctx.stroke();
+
+          // Draw snap dot at projected point
+          ctx.fillStyle = 'hsl(35 90% 50%)';
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 2 / zoom;
+          ctx.beginPath();
+          ctx.arc(transitionHoverEdge.projectedPoint.x, transitionHoverEdge.projectedPoint.y, 6 / zoom, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      // Draw start marker and preview line if first click is set
+      if (transitionDrawStart) {
+        const startRoom = state.rooms.find(r => r.id === transitionDrawStart.roomId);
+        if (startRoom) {
+          const ei = transitionDrawStart.edgeIndex;
+          const sp1 = startRoom.points[ei];
+          const sp2 = startRoom.points[(ei + 1) % startRoom.points.length];
+          const startPos = {
+            x: sp1.x + (sp2.x - sp1.x) * transitionDrawStart.percent,
+            y: sp1.y + (sp2.y - sp1.y) * transitionDrawStart.percent,
+          };
+
+          // Draw start marker
+          ctx.fillStyle = 'hsl(35 90% 50%)';
+          ctx.strokeStyle = 'white';
+          ctx.lineWidth = 2.5 / zoom;
+          ctx.beginPath();
+          ctx.arc(startPos.x, startPos.y, 7 / zoom, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+
+          // Draw preview line to hover position if on same edge
+          if (transitionHoverEdge && transitionHoverEdge.roomId === transitionDrawStart.roomId && transitionHoverEdge.edgeIndex === transitionDrawStart.edgeIndex) {
+            const endPos = transitionHoverEdge.projectedPoint;
+            // Amber dashed preview between start and hover
+            ctx.strokeStyle = 'hsl(35 90% 50%)';
+            ctx.lineWidth = 4 / zoom;
+            ctx.setLineDash([8 / zoom, 4 / zoom]);
+            ctx.beginPath();
+            ctx.moveTo(startPos.x, startPos.y);
+            ctx.lineTo(endPos.x, endPos.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Semi-transparent fill strip along the preview
+            const edgeDx = sp2.x - sp1.x;
+            const edgeDy = sp2.y - sp1.y;
+            const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+            if (edgeLen > 0) {
+              const perpX = -edgeDy / edgeLen;
+              const perpY = edgeDx / edgeLen;
+              const stripWidth = 3 / zoom;
+
+              ctx.fillStyle = 'hsla(35, 90%, 50%, 0.2)';
+              ctx.beginPath();
+              ctx.moveTo(startPos.x + perpX * stripWidth, startPos.y + perpY * stripWidth);
+              ctx.lineTo(endPos.x + perpX * stripWidth, endPos.y + perpY * stripWidth);
+              ctx.lineTo(endPos.x - perpX * stripWidth, endPos.y - perpY * stripWidth);
+              ctx.lineTo(startPos.x - perpX * stripWidth, startPos.y - perpY * stripWidth);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+        }
+      }
+    }
+
+    // Draw subtle amber tint strips on existing transition segments (always visible)
+    for (const room of state.rooms) {
+      if (!room.edgeTransitions || room.edgeTransitions.length === 0) continue;
+      for (const transition of room.edgeTransitions) {
+        const ei = transition.edgeIndex;
+        if (ei < 0 || ei >= room.points.length) continue;
+        const tp1 = room.points[ei];
+        const tp2 = room.points[(ei + 1) % room.points.length];
+        const tStart = transition.startPercent ?? 0;
+        const tEnd = transition.endPercent ?? 1;
+        const segStart = { x: tp1.x + (tp2.x - tp1.x) * tStart, y: tp1.y + (tp2.y - tp1.y) * tStart };
+        const segEnd = { x: tp1.x + (tp2.x - tp1.x) * tEnd, y: tp1.y + (tp2.y - tp1.y) * tEnd };
+
+        const edgeDx = tp2.x - tp1.x;
+        const edgeDy = tp2.y - tp1.y;
+        const edgeLen = Math.sqrt(edgeDx * edgeDx + edgeDy * edgeDy);
+        if (edgeLen === 0) continue;
+        const perpX = -edgeDy / edgeLen;
+        const perpY = edgeDx / edgeLen;
+        const stripWidth = 3 / zoom;
+
+        ctx.fillStyle = 'hsla(35, 90%, 50%, 0.15)';
+        ctx.beginPath();
+        ctx.moveTo(segStart.x, segStart.y);
+        ctx.lineTo(segEnd.x, segEnd.y);
+        ctx.lineTo(segEnd.x - perpX * stripWidth * 2, segEnd.y - perpY * stripWidth * 2);
+        ctx.lineTo(segStart.x - perpX * stripWidth * 2, segStart.y - perpY * stripWidth * 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
     ctx.restore();
 
     // Draw ortho indicator (outside transform)
@@ -653,7 +777,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall, transitionDrawStart, transitionHoverEdge]);
 
   useEffect(() => {
     render();
