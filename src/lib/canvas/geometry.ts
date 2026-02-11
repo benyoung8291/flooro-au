@@ -595,6 +595,62 @@ export function getGridSizeInPixels(gridSize: number, scale: ScaleCalibration | 
 }
 
 /**
+ * Project a point onto an edge segment and return percent along edge + distance from edge
+ * Used by transition drawing tool for edge hit-testing and percent calculation
+ */
+export function projectPointOntoEdge(
+  point: CanvasPoint,
+  edgeStart: CanvasPoint,
+  edgeEnd: CanvasPoint
+): { percent: number; distance: number; projectedPoint: CanvasPoint } {
+  const dx = edgeEnd.x - edgeStart.x;
+  const dy = edgeEnd.y - edgeStart.y;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared === 0) {
+    return { percent: 0, distance: distance(point, edgeStart), projectedPoint: { ...edgeStart } };
+  }
+
+  let t = ((point.x - edgeStart.x) * dx + (point.y - edgeStart.y) * dy) / lengthSquared;
+  t = Math.max(0, Math.min(1, t));
+
+  const projectedPoint = {
+    x: edgeStart.x + t * dx,
+    y: edgeStart.y + t * dy,
+  };
+
+  return {
+    percent: t,
+    distance: distance(point, projectedPoint),
+    projectedPoint,
+  };
+}
+
+/**
+ * Find the closest edge across all rooms, returning room, edge index, percent, and distance
+ * Used by the transition drawing tool
+ */
+export function findClosestEdgeAcrossRooms(
+  point: CanvasPoint,
+  rooms: Room[],
+  maxDistance: number
+): { roomId: string; edgeIndex: number; percent: number; distance: number; projectedPoint: CanvasPoint } | null {
+  let best: { roomId: string; edgeIndex: number; percent: number; distance: number; projectedPoint: CanvasPoint } | null = null;
+
+  for (const room of rooms) {
+    for (let i = 0; i < room.points.length; i++) {
+      const j = (i + 1) % room.points.length;
+      const result = projectPointOntoEdge(point, room.points[i], room.points[j]);
+      if (result.distance < maxDistance && (!best || result.distance < best.distance)) {
+        best = { roomId: room.id, edgeIndex: i, percent: result.percent, distance: result.distance, projectedPoint: result.projectedPoint };
+      }
+    }
+  }
+
+  return best;
+}
+
+/**
  * Parse dimension input with unit support
  * Returns length in mm
  */

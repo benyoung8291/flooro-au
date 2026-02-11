@@ -21,6 +21,7 @@ import {
   findSmartSnapPoint,
   getGridSizeInPixels,
   distance,
+  findClosestEdgeAcrossRooms,
 } from '@/lib/canvas/geometry';
 import { detectSharedEdges, detectSharedEdgesForNewRoom } from '@/lib/canvas/sharedEdgeDetector';
 import { mergeRoomsAtSharedEdge, findSharedEdgeBetweenRooms } from '@/lib/canvas/polygonMerge';
@@ -39,7 +40,7 @@ import { toast } from 'sonner';
 const SNAP_SETTINGS_KEY = 'flooro_snap_settings';
 
 
-export type EditorTool = 'select' | 'draw' | 'rectangle' | 'hole' | 'door' | 'scale' | 'pan' | 'merge' | 'split';
+export type EditorTool = 'select' | 'draw' | 'rectangle' | 'hole' | 'door' | 'scale' | 'pan' | 'merge' | 'split' | 'transition';
 
 interface EditorCanvasProps {
   activeTool: EditorTool;
@@ -191,6 +192,18 @@ export function EditorCanvas({
   const [splitPreviewEnd, setSplitPreviewEnd] = useState<CanvasPoint | null>(null);
   const [splitStartEdge, setSplitStartEdge] = useState<number | null>(null);
 
+  // Transition drawing tool state
+  const [transitionDrawStart, setTransitionDrawStart] = useState<{
+    roomId: string;
+    edgeIndex: number;
+    percent: number;
+  } | null>(null);
+  const [transitionHoverEdge, setTransitionHoverEdge] = useState<{
+    roomId: string;
+    edgeIndex: number;
+    percent: number;
+    projectedPoint: CanvasPoint;
+  } | null>(null);
   // Persist snap settings
   useEffect(() => {
     localStorage.setItem(SNAP_SETTINGS_KEY, JSON.stringify(snapSettings));
@@ -427,6 +440,9 @@ export function EditorCanvas({
         setSplitStartPoint(null);
         setSplitPreviewEnd(null);
         setSplitStartEdge(null);
+        // Cancel transition draw
+        setTransitionDrawStart(null);
+        setTransitionHoverEdge(null);
         // Close context menu
         setContextTarget(null);
         setContextMenuPos(null);
@@ -457,6 +473,12 @@ export function EditorCanvas({
       if (e.key === 'x' || e.key === 'X') {
         if (!e.metaKey && !e.ctrlKey && onToolChange) {
           onToolChange('split');
+        }
+      }
+      // Keyboard shortcut for transition tool
+      if (e.key === 't' || e.key === 'T') {
+        if (!e.metaKey && !e.ctrlKey && onToolChange) {
+          onToolChange('transition');
         }
       }
     };
@@ -496,6 +518,10 @@ export function EditorCanvas({
     }
     if (activeTool !== 'hole') {
       setHoleRectStart(null);
+    }
+    if (activeTool !== 'transition') {
+      setTransitionDrawStart(null);
+      setTransitionHoverEdge(null);
     }
   }, [activeTool]);
 
@@ -1177,8 +1203,59 @@ export function EditorCanvas({
         }
         break;
       }
+
+      case 'transition': {
+        const hitThreshold = 15 / state.viewTransform.zoom;
+        const closest = findClosestEdgeAcrossRooms(point, state.rooms, hitThreshold);
+        if (!closest) {
+          toast.error('Click on a room edge');
+          return;
+        }
+
+        if (!transitionDrawStart) {
+          // First click - set start
+          setTransitionDrawStart({
+            roomId: closest.roomId,
+            edgeIndex: closest.edgeIndex,
+            percent: closest.percent,
+          });
+        } else {
+          // Second click - must be same room+edge
+          if (closest.roomId !== transitionDrawStart.roomId || closest.edgeIndex !== transitionDrawStart.edgeIndex) {
+            toast.error('Click on the same edge to set the end point');
+            return;
+          }
+          const startPct = Math.min(transitionDrawStart.percent, closest.percent);
+          const endPct = Math.max(transitionDrawStart.percent, closest.percent);
+          if (endPct - startPct < 0.02) {
+            toast.error('Transition too small');
+            setTransitionDrawStart(null);
+            return;
+          }
+          const room = state.rooms.find(r => r.id === closest.roomId);
+          if (room) {
+            const existing = room.edgeTransitions || [];
+            const newTransition: EdgeTransition = {
+              id: crypto.randomUUID(),
+              edgeIndex: closest.edgeIndex,
+              transitionType: 'auto',
+              startPercent: Math.round(startPct * 100) / 100,
+              endPercent: Math.round(endPct * 100) / 100,
+            };
+            dispatch({
+              type: 'UPDATE_ROOM',
+              roomId: room.id,
+              updates: { edgeTransitions: [...existing, newTransition] },
+            });
+            toast.success('Transition created');
+          }
+          setTransitionDrawStart(null);
+          setTransitionHoverEdge(null);
+        }
+        break;
+      }
     }
-  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, scaleInputOpen, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom, rectangleStart, holeRectStart]);
+  }, [activeTool, isDrawing, drawingPoints, state.rooms, state.selectedRoomId, state.viewTransform.zoom, orthoLocked, selectedDoorWidth, scaleStart, scaleInputOpen, getEventPoint, dispatch, isTouchGesture, isTwoFingerGesture, startDrag, mergeFirstRoom, mergeableRoomIds, sharedEdges, handleMergeRooms, splitRoom, splitStartPoint, splitStartEdge, handleSplitRoom, rectangleStart, holeRectStart, transitionDrawStart]);
 
   // Handle pointer move (RAF-throttled to avoid per-pixel expensive operations)
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -1336,6 +1413,20 @@ export function EditorCanvas({
           } else {
             setSplitPreviewEnd(point);
           }
+        }
+      } else if (activeTool === 'transition') {
+        // Track nearest edge for transition tool hover
+        const hitThreshold = 15 / state.viewTransform.zoom;
+        const closest = findClosestEdgeAcrossRooms(point, state.rooms, hitThreshold);
+        if (closest) {
+          setTransitionHoverEdge({
+            roomId: closest.roomId,
+            edgeIndex: closest.edgeIndex,
+            percent: closest.percent,
+            projectedPoint: closest.projectedPoint,
+          });
+        } else {
+          setTransitionHoverEdge(null);
         }
       } else {
         setHoveredRoomId(null);
@@ -1607,6 +1698,8 @@ export function EditorCanvas({
         }
         if (hoveredRoomId) return 'pointer';
         return 'crosshair';
+      case 'transition':
+        return 'crosshair';
       default:
         return 'default';
     }
@@ -1698,6 +1791,8 @@ export function EditorCanvas({
         holeRectStart={holeRectStart}
         hoveredHoleVertex={hoveredHoleVertex}
         hoveredHoleWall={hoveredHoleWall}
+        transitionDrawStart={transitionDrawStart}
+        transitionHoverEdge={transitionHoverEdge}
       />
 
       {/* Material drag indicator */}
@@ -1798,6 +1893,16 @@ export function EditorCanvas({
               ? `Splitting: ${splitRoom.name} • Click another edge to complete • Esc to cancel`
               : `Splitting: ${splitRoom.name} • Click on an edge to start • Esc to cancel`
             : 'Click a room to split • Esc to cancel'
+          }
+        </div>
+      )}
+
+      {/* Transition tool indicator */}
+      {activeTool === 'transition' && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium">
+          {transitionDrawStart
+            ? 'Click again on the same edge to set end point • Esc to cancel'
+            : 'Click on an edge to start the transition'
           }
         </div>
       )}

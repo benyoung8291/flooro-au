@@ -7,6 +7,7 @@ import {
   DoorOpen, 
   Ruler, 
   Move,
+  ArrowLeftRight,
   Plus,
   X
 } from 'lucide-react';
@@ -21,6 +22,7 @@ const fabTools: { id: EditorTool; icon: React.ElementType; label: string }[] = [
   { id: 'draw', icon: Pencil, label: 'Draw Room' },
   { id: 'hole', icon: Square, label: 'Cut Hole' },
   { id: 'door', icon: DoorOpen, label: 'Add Door' },
+  { id: 'transition', icon: ArrowLeftRight, label: 'Transition' },
   { id: 'scale', icon: Ruler, label: 'Set Scale' },
   { id: 'pan', icon: Move, label: 'Pan' },
 ];
