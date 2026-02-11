@@ -1295,6 +1295,36 @@ function drawRoom(
     ctx.restore();
   });
 
+  // Draw transition resize handles (diamond-shaped, only for selected room)
+  if (isSelected && room.edgeTransitions && room.edgeTransitions.length > 0) {
+    for (const transition of room.edgeTransitions) {
+      const edgeIdx = transition.edgeIndex;
+      if (edgeIdx < 0 || edgeIdx >= room.points.length) continue;
+      const ep1 = room.points[edgeIdx];
+      const ep2 = room.points[(edgeIdx + 1) % room.points.length];
+      const tStart = transition.startPercent ?? 0;
+      const tEnd = transition.endPercent ?? 1;
+
+      const handleSize = 7 / zoom;
+      const positions = [
+        { x: ep1.x + (ep2.x - ep1.x) * tStart, y: ep1.y + (ep2.y - ep1.y) * tStart },
+        { x: ep1.x + (ep2.x - ep1.x) * tEnd, y: ep1.y + (ep2.y - ep1.y) * tEnd },
+      ];
+
+      for (const pos of positions) {
+        ctx.save();
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(Math.PI / 4); // Diamond = rotated square
+        ctx.fillStyle = 'hsl(35 90% 50%)';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2 / zoom;
+        ctx.fillRect(-handleSize / 2, -handleSize / 2, handleSize, handleSize);
+        ctx.strokeRect(-handleSize / 2, -handleSize / 2, handleSize, handleSize);
+        ctx.restore();
+      }
+    }
+  }
+
   // Draw vertices with hover highlighting
   room.points.forEach((point, index) => {
     const isVertexHovered = hoveredVertexIndex === index && !isDragging;

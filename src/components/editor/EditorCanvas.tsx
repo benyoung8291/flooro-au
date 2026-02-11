@@ -139,6 +139,18 @@ export function EditorCanvas({
   } | null>(null);
   const [isDraggingDoorResize, setIsDraggingDoorResize] = useState(false);
   const [doorResizeWidth, setDoorResizeWidth] = useState<number | null>(null);
+
+  // Transition resize drag state
+  const transitionResizeRef = useRef<{
+    roomId: string;
+    transitionId: string;
+    edgeIndex: number;
+    handle: 'start' | 'end';
+    edgeP1: CanvasPoint;
+    edgeP2: CanvasPoint;
+  } | null>(null);
+  const [isDraggingTransitionResize, setIsDraggingTransitionResize] = useState(false);
+  const [transitionResizePercent, setTransitionResizePercent] = useState<number | null>(null);
   
   // Unified select-mode pan refs (refs avoid dependency re-creation)
   const selectClickPointRef = useRef<CanvasPoint | null>(null);
@@ -823,6 +835,43 @@ export function EditorCanvas({
             }
           }
         }
+
+        // Check transition resize handles (before vertex/wall drag)
+        if (state.selectedRoomId) {
+          const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
+          if (selectedRoom?.edgeTransitions) {
+            const hitRadius = 10 / state.viewTransform.zoom;
+            for (const transition of selectedRoom.edgeTransitions) {
+              const edgeIdx = transition.edgeIndex;
+              if (edgeIdx < 0 || edgeIdx >= selectedRoom.points.length) continue;
+              const ep1 = selectedRoom.points[edgeIdx];
+              const ep2 = selectedRoom.points[(edgeIdx + 1) % selectedRoom.points.length];
+              const tStart = transition.startPercent ?? 0;
+              const tEnd = transition.endPercent ?? 1;
+              const startPos = { x: ep1.x + (ep2.x - ep1.x) * tStart, y: ep1.y + (ep2.y - ep1.y) * tStart };
+              const endPos = { x: ep1.x + (ep2.x - ep1.x) * tEnd, y: ep1.y + (ep2.y - ep1.y) * tEnd };
+
+              if (distance(point, startPos) < hitRadius) {
+                transitionResizeRef.current = {
+                  roomId: selectedRoom.id, transitionId: transition.id || `${edgeIdx}`,
+                  edgeIndex: edgeIdx, handle: 'start', edgeP1: ep1, edgeP2: ep2,
+                };
+                setIsDraggingTransitionResize(true);
+                setTransitionResizePercent(tStart);
+                return;
+              }
+              if (distance(point, endPos) < hitRadius) {
+                transitionResizeRef.current = {
+                  roomId: selectedRoom.id, transitionId: transition.id || `${edgeIdx}`,
+                  edgeIndex: edgeIdx, handle: 'end', edgeP1: ep1, edgeP2: ep2,
+                };
+                setIsDraggingTransitionResize(true);
+                setTransitionResizePercent(tEnd);
+                return;
+              }
+            }
+          }
+        }
         
         // Try to start dragging vertex or wall first (immediate)
         if (startDrag(point)) {
@@ -1185,6 +1234,49 @@ export function EditorCanvas({
         return;
       }
 
+      // Handle transition resize dragging
+      if (isDraggingTransitionResize && transitionResizeRef.current) {
+        const ref = transitionResizeRef.current;
+        const edgeDx = ref.edgeP2.x - ref.edgeP1.x;
+        const edgeDy = ref.edgeP2.y - ref.edgeP1.y;
+        const edgeLenSq = edgeDx * edgeDx + edgeDy * edgeDy;
+        if (edgeLenSq > 0) {
+          const t = ((point.x - ref.edgeP1.x) * edgeDx + (point.y - ref.edgeP1.y) * edgeDy) / edgeLenSq;
+          const clampedT = Math.max(0, Math.min(1, t));
+          
+          // Find the current transition to enforce min gap
+          const room = state.rooms.find(r => r.id === ref.roomId);
+          const transition = room?.edgeTransitions?.find(
+            tr => (tr.id || `${tr.edgeIndex}`) === ref.transitionId && tr.edgeIndex === ref.edgeIndex
+          );
+          if (transition) {
+            let newPercent = Math.round(clampedT * 20) / 20; // Snap to 5% increments
+            const minGap = 0.05;
+            if (ref.handle === 'start') {
+              newPercent = Math.min(newPercent, (transition.endPercent ?? 1) - minGap);
+              newPercent = Math.max(0, newPercent);
+            } else {
+              newPercent = Math.max(newPercent, (transition.startPercent ?? 0) + minGap);
+              newPercent = Math.min(1, newPercent);
+            }
+            setTransitionResizePercent(newPercent);
+            
+            // Update room in real-time
+            const updatedTransitions = (room!.edgeTransitions || []).map(tr => {
+              if ((tr.id || `${tr.edgeIndex}`) === ref.transitionId && tr.edgeIndex === ref.edgeIndex) {
+                return ref.handle === 'start'
+                  ? { ...tr, startPercent: newPercent }
+                  : { ...tr, endPercent: newPercent };
+              }
+              return tr;
+            });
+            dispatch({ type: 'UPDATE_ROOM', roomId: ref.roomId, updates: { edgeTransitions: updatedTransitions } });
+          }
+        }
+        setCursorPosition(point);
+        return;
+      }
+
       // Handle select-mode panning (click + hold + drag)
       if (activeTool === 'select' && pointerDownPosRef.current && !isDragging && !isSelectPanningRef.current) {
         const moveDx = clientX - pointerDownPosRef.current.x;
@@ -1314,7 +1406,7 @@ export function EditorCanvas({
 
       setCursorPosition(finalPoint);
     });
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, screenToCanvas, dispatch, activeTool, isDragging, isDraggingDoorResize, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, screenToCanvas, dispatch, activeTool, isDragging, isDraggingDoorResize, isDraggingTransitionResize, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
@@ -1338,6 +1430,14 @@ export function EditorCanvas({
       return;
     }
 
+    // Commit transition resize
+    if (isDraggingTransitionResize && transitionResizeRef.current) {
+      transitionResizeRef.current = null;
+      setIsDraggingTransitionResize(false);
+      setTransitionResizePercent(null);
+      return;
+    }
+
     // End any dragging operation
     if (isDragging) {
       endDrag();
@@ -1353,7 +1453,7 @@ export function EditorCanvas({
     pointerDownPosRef.current = null;
     isSelectPanningRef.current = false;
     selectPanStartRef.current = null;
-  }, [isDragging, endDrag, activeTool, isDraggingDoorResize, doorResizeWidth, state.rooms, dispatch]);
+  }, [isDragging, endDrag, activeTool, isDraggingDoorResize, isDraggingTransitionResize, doorResizeWidth, state.rooms, dispatch]);
 
   // Handle pointer leave (reset without selection)
   const handlePointerLeave = useCallback(() => {
@@ -1365,11 +1465,16 @@ export function EditorCanvas({
       setIsDraggingDoorResize(false);
       setDoorResizeWidth(null);
     }
+    if (isDraggingTransitionResize) {
+      transitionResizeRef.current = null;
+      setIsDraggingTransitionResize(false);
+      setTransitionResizePercent(null);
+    }
     selectClickPointRef.current = null;
     pointerDownPosRef.current = null;
     isSelectPanningRef.current = false;
     selectPanStartRef.current = null;
-  }, [isDragging, endDrag, isDraggingDoorResize]);
+  }, [isDragging, endDrag, isDraggingDoorResize, isDraggingTransitionResize]);
 
   // Handle double-click (for removing curves)
   const handleDoubleClickEvent = useCallback((e: React.MouseEvent) => {
@@ -1466,6 +1571,7 @@ export function EditorCanvas({
     if (isPanning) return 'grabbing';
     if (isDragging) return 'grabbing';
     if (isDraggingDoorResize) return 'ew-resize';
+    if (isDraggingTransitionResize) return 'grabbing';
     if (isSelectPanningRef.current) return 'grabbing';
     
     // Check for edit cursor in select mode
@@ -1605,6 +1711,13 @@ export function EditorCanvas({
       {isDraggingDoorResize && doorResizeWidth !== null && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-fade-in">
           Door width: {doorResizeWidth}mm
+        </div>
+      )}
+
+      {/* Transition resize indicator */}
+      {isDraggingTransitionResize && transitionResizePercent !== null && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-fade-in">
+          Transition: {Math.round(transitionResizePercent * 100)}%
         </div>
       )}
 
