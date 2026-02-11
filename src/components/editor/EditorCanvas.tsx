@@ -128,6 +128,18 @@ export function EditorCanvas({
   // Rectangle hole tool state
   const [holeRectStart, setHoleRectStart] = useState<CanvasPoint | null>(null);
   
+  // Door resize drag state
+  const doorResizeRef = useRef<{
+    roomId: string;
+    doorId: string;
+    side: 'left' | 'right';
+    initialWidth: number;
+    startCanvasPoint: CanvasPoint;
+    doorRotation: number;
+  } | null>(null);
+  const [isDraggingDoorResize, setIsDraggingDoorResize] = useState(false);
+  const [doorResizeWidth, setDoorResizeWidth] = useState<number | null>(null);
+  
   // Unified select-mode pan refs (refs avoid dependency re-creation)
   const selectClickPointRef = useRef<CanvasPoint | null>(null);
   const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -774,6 +786,44 @@ export function EditorCanvas({
 
     switch (activeTool) {
       case 'select': {
+        // Check door resize handles first (only for selected room)
+        if (state.selectedRoomId) {
+          const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
+          if (selectedRoom) {
+            for (const door of selectedRoom.doors) {
+              const doorWidthPx = state.scale ? door.width * state.scale.pixelsPerMm : door.width / 10;
+              const handleSize = 8 / state.viewTransform.zoom;
+              const cos = Math.cos(-door.rotation * Math.PI / 180);
+              const sin = Math.sin(-door.rotation * Math.PI / 180);
+              const dx = point.x - door.position.x;
+              const dy = point.y - door.position.y;
+              const localX = dx * cos - dy * sin;
+              const localY = dx * sin + dy * cos;
+              
+              // Check left handle
+              if (Math.abs(localX - (-doorWidthPx / 2)) < handleSize && Math.abs(localY) < handleSize) {
+                doorResizeRef.current = {
+                  roomId: selectedRoom.id, doorId: door.id, side: 'left',
+                  initialWidth: door.width, startCanvasPoint: point, doorRotation: door.rotation,
+                };
+                setIsDraggingDoorResize(true);
+                setDoorResizeWidth(door.width);
+                return;
+              }
+              // Check right handle
+              if (Math.abs(localX - (doorWidthPx / 2)) < handleSize && Math.abs(localY) < handleSize) {
+                doorResizeRef.current = {
+                  roomId: selectedRoom.id, doorId: door.id, side: 'right',
+                  initialWidth: door.width, startCanvasPoint: point, doorRotation: door.rotation,
+                };
+                setIsDraggingDoorResize(true);
+                setDoorResizeWidth(door.width);
+                return;
+              }
+            }
+          }
+        }
+        
         // Try to start dragging vertex or wall first (immediate)
         if (startDrag(point)) {
           return;
@@ -1118,6 +1168,23 @@ export function EditorCanvas({
         return;
       }
 
+      // Handle door resize dragging
+      if (isDraggingDoorResize && doorResizeRef.current) {
+        const ref = doorResizeRef.current;
+        const cos = Math.cos(-ref.doorRotation * Math.PI / 180);
+        const sin = Math.sin(-ref.doorRotation * Math.PI / 180);
+        const dx = point.x - ref.startCanvasPoint.x;
+        const dy = point.y - ref.startCanvasPoint.y;
+        // Project movement onto door axis
+        const localDx = dx * cos - dy * sin;
+        const sign = ref.side === 'right' ? 1 : -1;
+        const deltaMm = state.scale ? (localDx * sign) / state.scale.pixelsPerMm : localDx * sign * 10;
+        const newWidth = Math.max(400, Math.min(2000, ref.initialWidth + deltaMm * 2));
+        setDoorResizeWidth(Math.round(newWidth));
+        setCursorPosition(point);
+        return;
+      }
+
       // Handle select-mode panning (click + hold + drag)
       if (activeTool === 'select' && pointerDownPosRef.current && !isDragging && !isSelectPanningRef.current) {
         const moveDx = clientX - pointerDownPosRef.current.x;
@@ -1247,12 +1314,29 @@ export function EditorCanvas({
 
       setCursorPosition(finalPoint);
     });
-  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, screenToCanvas, dispatch, activeTool, isDragging, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
+  }, [isPanning, panStart, orthoLocked, drawingPoints, state.rooms, state.viewTransform, state.scale, screenToCanvas, dispatch, activeTool, isDragging, isDraggingDoorResize, updateDrag, handleHover, isTouchGesture, isTwoFingerGesture, splitRoom, splitStartPoint, effectiveSnapSettings]);
 
   // Handle pointer up
   const handlePointerUp = useCallback(() => {
     setIsPanning(false);
     setPanStart(null);
+
+    // Commit door resize
+    if (isDraggingDoorResize && doorResizeRef.current && doorResizeWidth !== null) {
+      const ref = doorResizeRef.current;
+      const room = state.rooms.find(r => r.id === ref.roomId);
+      if (room) {
+        const updatedDoors = room.doors.map(d =>
+          d.id === ref.doorId ? { ...d, width: doorResizeWidth } : d
+        );
+        dispatch({ type: 'UPDATE_ROOM', roomId: ref.roomId, updates: { doors: updatedDoors } });
+        toast.success(`Door resized to ${doorResizeWidth}mm`);
+      }
+      doorResizeRef.current = null;
+      setIsDraggingDoorResize(false);
+      setDoorResizeWidth(null);
+      return;
+    }
 
     // End any dragging operation
     if (isDragging) {
@@ -1269,18 +1353,23 @@ export function EditorCanvas({
     pointerDownPosRef.current = null;
     isSelectPanningRef.current = false;
     selectPanStartRef.current = null;
-  }, [isDragging, endDrag, activeTool]);
+  }, [isDragging, endDrag, activeTool, isDraggingDoorResize, doorResizeWidth, state.rooms, dispatch]);
 
   // Handle pointer leave (reset without selection)
   const handlePointerLeave = useCallback(() => {
     setIsPanning(false);
     setPanStart(null);
     if (isDragging) endDrag();
+    if (isDraggingDoorResize) {
+      doorResizeRef.current = null;
+      setIsDraggingDoorResize(false);
+      setDoorResizeWidth(null);
+    }
     selectClickPointRef.current = null;
     pointerDownPosRef.current = null;
     isSelectPanningRef.current = false;
     selectPanStartRef.current = null;
-  }, [isDragging, endDrag]);
+  }, [isDragging, endDrag, isDraggingDoorResize]);
 
   // Handle double-click (for removing curves)
   const handleDoubleClickEvent = useCallback((e: React.MouseEvent) => {
@@ -1376,6 +1465,7 @@ export function EditorCanvas({
   const getCursor = useCallback((): string => {
     if (isPanning) return 'grabbing';
     if (isDragging) return 'grabbing';
+    if (isDraggingDoorResize) return 'ew-resize';
     if (isSelectPanningRef.current) return 'grabbing';
     
     // Check for edit cursor in select mode
@@ -1508,6 +1598,13 @@ export function EditorCanvas({
       {isDraggingMaterial && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-fade-in">
           {dragTargetRoomId ? 'Drop to assign material' : 'Drag over a room to assign'}
+        </div>
+      )}
+
+      {/* Door resize indicator */}
+      {isDraggingDoorResize && doorResizeWidth !== null && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-fade-in">
+          Door width: {doorResizeWidth}mm
         </div>
       )}
 
