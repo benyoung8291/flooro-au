@@ -19,7 +19,7 @@ export default function Index() {
   }, [user, loading, navigate]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="light min-h-screen bg-background text-foreground">
       <SiteNavbar />
       <main>
         <HeroSection />
