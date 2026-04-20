@@ -205,6 +205,17 @@ export function EditorCanvas({
     percent: number;
     projectedPoint: CanvasPoint;
   } | null>(null);
+
+  // Inline edge-length editing state
+  const dimensionLabelRectsRef = useRef<DimensionLabelRect[]>([]);
+  const [edgeEdit, setEdgeEdit] = useState<{
+    roomId: string;
+    edgeIndex: number;
+    screenX: number;
+    screenY: number;
+    initialMm: number;
+  } | null>(null);
+  const [edgeEditValue, setEdgeEditValue] = useState('');
   // Persist snap settings
   useEffect(() => {
     localStorage.setItem(SNAP_SETTINGS_KEY, JSON.stringify(snapSettings));
