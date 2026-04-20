@@ -416,8 +416,35 @@ export function EditorCanvas({
     });
   }, [jsonData?.rooms, dispatch, state.rooms]);
 
+  // Tab cycle order for keyboard tool cycling
+  const TOOL_CYCLE: EditorTool[] = ['select', 'draw', 'rectangle', 'hole', 'door', 'transition', 'scale'];
+  // Number-key tool map (1-7)
+  const TOOL_NUMBER_MAP: Record<string, EditorTool> = {
+    '1': 'select',
+    '2': 'draw',
+    '3': 'rectangle',
+    '4': 'hole',
+    '5': 'door',
+    '6': 'transition',
+    '7': 'scale',
+  };
+
+  // Track tool prior to temporary Space-pan so we can restore on key-up
+  const previousToolRef = useRef<EditorTool | null>(null);
+
   // Handle keyboard events
   useEffect(() => {
+    const isTextInput = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        target.isContentEditable
+      );
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') {
         setOrthoLocked(true);
@@ -446,6 +473,8 @@ export function EditorCanvas({
         // Close context menu
         setContextTarget(null);
         setContextMenuPos(null);
+        // If we were in temporary pan, abandon restore
+        previousToolRef.current = null;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -455,6 +484,57 @@ export function EditorCanvas({
           undo();
         }
       }
+
+      // Skip remaining shortcuts if user is typing
+      if (isTextInput(e.target)) return;
+
+      // Type-as-you-draw: digit auto-opens dimension input
+      if (
+        isDrawing &&
+        drawingPoints.length > 0 &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        /^[0-9.]$/.test(e.key)
+      ) {
+        if (!showDimensionInput) {
+          setShowDimensionInput(true);
+          // Seed the input via custom event (overlay listens for it)
+          window.dispatchEvent(new CustomEvent('dim-input-seed', { detail: e.key }));
+        }
+        // Don't return — let overlay grab focus naturally
+      }
+
+      // ? toggles shortcuts panel
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('toggle-shortcuts-panel'));
+      }
+
+      // Tab cycles tools
+      if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && onToolChange) {
+        e.preventDefault();
+        const currentIdx = TOOL_CYCLE.indexOf(activeTool);
+        const nextIdx = e.shiftKey
+          ? (currentIdx - 1 + TOOL_CYCLE.length) % TOOL_CYCLE.length
+          : (currentIdx + 1) % TOOL_CYCLE.length;
+        onToolChange(TOOL_CYCLE[nextIdx]);
+      }
+
+      // Number keys 1-7 jump to tools
+      if (TOOL_NUMBER_MAP[e.key] && !e.metaKey && !e.ctrlKey && !e.altKey && onToolChange) {
+        onToolChange(TOOL_NUMBER_MAP[e.key]);
+      }
+
+      // Space = temporary pan
+      if (e.code === 'Space' && !e.repeat && !e.metaKey && !e.ctrlKey && onToolChange) {
+        e.preventDefault();
+        if (activeTool !== 'pan') {
+          previousToolRef.current = activeTool;
+          onToolChange('pan');
+        }
+      }
+
       // Toggle grid snap
       if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) {
         setSnapSettings({ ...snapSettings, gridEnabled: !snapSettings.gridEnabled });
@@ -490,6 +570,11 @@ export function EditorCanvas({
       if (e.key === 'Alt') {
         setTempSnapDisabled(false);
       }
+      // Release Space — restore previous tool
+      if (e.code === 'Space' && previousToolRef.current && onToolChange) {
+        onToolChange(previousToolRef.current);
+        previousToolRef.current = null;
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -499,7 +584,7 @@ export function EditorCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [undo, redo, onToolChange, isDrawing]);
+  }, [undo, redo, onToolChange, isDrawing, activeTool, drawingPoints.length, showDimensionInput, snapSettings, setSnapSettings]);
 
   // Reset tool state when tool changes
   useEffect(() => {
