@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
-import { CanvasRenderer } from './CanvasRenderer';
+import { CanvasRenderer, type DimensionLabelRect } from './CanvasRenderer';
 import { Minimap } from './Minimap';
 import { DimensionInputOverlay } from './DimensionInputOverlay';
 import { useCanvasHistory } from '@/hooks/useCanvasHistory';
