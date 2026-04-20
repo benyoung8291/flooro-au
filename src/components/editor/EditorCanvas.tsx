@@ -96,7 +96,7 @@ export function EditorCanvas({
   const hasInitializedRef = useRef(false);
   const hasAppliedZoomRef = useRef(false);
   const lastJsonDataRef = useRef<Record<string, unknown> | null>(null);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastExportedDataRef = useRef<string>('');
   const rafIdRef = useRef<number | null>(null);
   const { state, dispatch, undo, redo, canUndo, canRedo, loadFromJson, exportToJson, fitToView, animateViewTransform } = useCanvasHistory();

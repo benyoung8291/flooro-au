@@ -78,7 +78,7 @@ export default function ProjectEditor() {
   const [localData, setLocalData] = useState<Record<string, unknown>>({});
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [reportPreviewOpen, setReportPreviewOpen] = useState(false);
   // quoteSummaryOpen removed — quotes are now a standalone page
   const [roomsOverviewOpen, setRoomsOverviewOpen] = useState(false);
