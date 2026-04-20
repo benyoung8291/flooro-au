@@ -489,6 +489,42 @@ export function TakeoffPanel({
                               <Percent className="w-2.5 h-2.5 mr-0.5" />
                               {room.wastePercent ?? (material.specs as any).wastePercent ?? 10}%
                             </Badge>
+                            {/* Smart waste suggestion chip */}
+                            {scale && (() => {
+                              const netM2 = getNetAreaM2(room);
+                              if (netM2 < 1) return null;
+                              const currentWaste = room.wastePercent ?? (material.specs as any).wastePercent ?? 10;
+                              const suggestion = suggestWastePercent({
+                                totalAreaM2: netM2,
+                                roomCount: 1,
+                                averageRoomAreaM2: netM2,
+                                totalVertices: room.points.length,
+                                totalHoles: room.holes.length,
+                                totalDoors: room.doors.length,
+                              });
+                              if (Math.abs(suggestion.suggestedPercent - currentWaste) < 1) return null;
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onUpdateRoom?.(room.id, { wastePercent: suggestion.suggestedPercent });
+                                      }}
+                                      className="text-[10px] h-5 px-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary font-mono hover:bg-primary/20 transition-colors flex items-center gap-0.5"
+                                    >
+                                      <Sparkles className="w-2.5 h-2.5" />
+                                      Try {suggestion.suggestedPercent}%
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px]">
+                                    <p className="text-xs">{suggestion.reasoning}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">Click to apply</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                             {accessoryCount > 0 && (
                               <Badge variant="outline" className="text-[10px] h-5 px-1.5">
                                 <Wrench className="w-2.5 h-2.5 mr-0.5" />
