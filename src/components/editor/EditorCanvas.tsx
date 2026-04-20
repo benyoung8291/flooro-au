@@ -221,6 +221,30 @@ export function EditorCanvas({
     return getGridSizeInPixels(snapSettings.gridSize, state.scale);
   }, [snapSettings.gridEnabled, snapSettings.enabled, snapSettings.gridSize, state.scale]);
 
+  // Auto-close snapping detection: when polyline cursor approaches start vertex
+  const isCloseSnapping = useMemo(() => {
+    if (!isDrawing || drawingPoints.length < 3 || !cursorPosition) return false;
+    const start = drawingPoints[0];
+    const dist = distance(cursorPosition, start);
+    return dist < 15 / state.viewTransform.zoom;
+  }, [isDrawing, drawingPoints, cursorPosition, state.viewTransform.zoom]);
+
+  // Live area preview while drawing (for close indicator badge)
+  const livePreviewArea = useMemo(() => {
+    if (!isCloseSnapping || drawingPoints.length < 3 || !state.scale) return null;
+    // Calculate area as if user closed now (use existing helper inline)
+    const pts = drawingPoints;
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const j = (i + 1) % pts.length;
+      area += pts[i].x * pts[j].y;
+      area -= pts[j].x * pts[i].y;
+    }
+    const areaPx = Math.abs(area) / 2;
+    const pxPerM = state.scale.pixelsPerMm * 1000;
+    return areaPx / (pxPerM * pxPerM);
+  }, [isCloseSnapping, drawingPoints, state.scale]);
+
   // Detect shared edges for merge tool
   const sharedEdges = useMemo(() => {
     return detectSharedEdges(state.rooms);
