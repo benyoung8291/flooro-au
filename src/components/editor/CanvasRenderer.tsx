@@ -265,6 +265,9 @@ export function CanvasRenderer({
       ctx.setLineDash([]);
     }
 
+    // Collect dimension label rects for inline-edit hit testing
+    const labelRects: DimensionLabelRect[] = [];
+
     // Draw existing rooms
     state.rooms.forEach(room => {
       const roomHoveredVertex = hoveredVertex?.roomId === room.id ? hoveredVertex.index : null;
