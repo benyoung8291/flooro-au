@@ -54,7 +54,12 @@ export function MaterialEfficiencyCard({
       if (groupRooms.length < 2) continue;
       const material = allMaterialsMap.get(materialId);
       if (!material) continue;
-      const specs = extractRollMaterialSpecs(material);
+      let specs;
+      try {
+        specs = extractRollMaterialSpecs(material.specs as Record<string, unknown>);
+      } catch {
+        continue;
+      }
       if (!specs) continue;
 
       try {
@@ -112,7 +117,7 @@ export function MaterialEfficiencyCard({
 
       <div className="grid grid-cols-3 gap-1.5 mt-2">
         <div className="bg-background/60 rounded-md px-2 py-1.5 text-center">
-          <div className={cn('text-sm font-bold font-mono', hasSavings ? 'text-emerald-600 dark:text-emerald-500' : 'text-muted-foreground')}>
+          <div className={cn('text-sm font-bold font-mono', hasSavings ? 'text-primary' : 'text-muted-foreground')}>
             {formatCurrency(summary.costSaved)}
           </div>
           <div className="text-[9px] text-muted-foreground uppercase tracking-wide">Saved</div>
