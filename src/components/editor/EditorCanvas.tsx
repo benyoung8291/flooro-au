@@ -1959,29 +1959,39 @@ export function EditorCanvas({
         dimensionUnit={dimensionUnit}
         visible={showDimensionInput}
         onClose={() => setShowDimensionInput(false)}
-        onSubmitDimension={(lengthMm) => {
-          if (!cursorPosition || drawingPoints.length === 0) return;
-          
+        onSubmitDimension={(lengthMm, angleDeg) => {
+          if (drawingPoints.length === 0) return;
           const lastPoint = drawingPoints[drawingPoints.length - 1];
-          
-          // Calculate direction from last point to cursor
-          const dx = cursorPosition.x - lastPoint.x;
-          const dy = cursorPosition.y - lastPoint.y;
-          const currentLength = Math.sqrt(dx * dx + dy * dy);
-          
-          if (currentLength === 0) return;
-          
-          // Normalize direction
-          const dirX = dx / currentLength;
-          const dirY = dy / currentLength;
-          
-          // Calculate new point at exact distance
+
+          let dirX = 0;
+          let dirY = 0;
+
+          if (typeof angleDeg === 'number' && !Number.isNaN(angleDeg)) {
+            // Angle is relative to previous segment if available, else absolute (0° = right, screen coords y-down)
+            let baseAngleRad = 0;
+            if (drawingPoints.length >= 2) {
+              const prev = drawingPoints[drawingPoints.length - 2];
+              baseAngleRad = Math.atan2(lastPoint.y - prev.y, lastPoint.x - prev.x);
+            }
+            const totalAngleRad = baseAngleRad + (angleDeg * Math.PI) / 180;
+            dirX = Math.cos(totalAngleRad);
+            dirY = Math.sin(totalAngleRad);
+          } else {
+            // Use cursor direction
+            if (!cursorPosition) return;
+            const dx = cursorPosition.x - lastPoint.x;
+            const dy = cursorPosition.y - lastPoint.y;
+            const currentLength = Math.sqrt(dx * dx + dy * dy);
+            if (currentLength === 0) return;
+            dirX = dx / currentLength;
+            dirY = dy / currentLength;
+          }
+
           const lengthPx = state.scale ? lengthMm * state.scale.pixelsPerMm : lengthMm;
           const newPoint = {
             x: lastPoint.x + dirX * lengthPx,
             y: lastPoint.y + dirY * lengthPx,
           };
-          
           setDrawingPoints([...drawingPoints, newPoint]);
         }}
       />
