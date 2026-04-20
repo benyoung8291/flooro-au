@@ -50,6 +50,8 @@ import { RoomDetailView } from './RoomDetailView';
 import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
 import { useGenerateQuoteFromProject, useProjectQuote } from '@/hooks/useGenerateQuoteFromProject';
 import { cn } from '@/lib/utils';
+import { MaterialEfficiencyCard } from './MaterialEfficiencyCard';
+import { suggestWastePercent } from '@/lib/reports/wasteCalculator';
 
 interface TakeoffPanelProps {
   collapsed?: boolean;
@@ -67,6 +69,7 @@ interface TakeoffPanelProps {
   projectAddress?: string;
   stripPlans?: Map<string, StripPlanResult>;
   onOpenFinishesSchedule?: () => void;
+  onOpenReport?: () => void;
   // Project materials support
   projectMaterials?: ProjectMaterial[];
 }
@@ -93,6 +96,7 @@ export function TakeoffPanel({
   projectAddress,
   stripPlans,
   onOpenFinishesSchedule,
+  onOpenReport,
   projectMaterials = [],
 }: TakeoffPanelProps) {
   const navigate = useNavigate();
