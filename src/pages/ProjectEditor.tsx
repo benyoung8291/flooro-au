@@ -17,6 +17,8 @@ import { MobileRoomActionBar } from '@/components/editor/MobileRoomActionBar';
 import { MobileTakeoffSheet } from '@/components/editor/MobileTakeoffSheet';
 import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
+import { CanvasEmptyState } from '@/components/editor/CanvasEmptyState';
+import { FirstRunTour } from '@/components/editor/FirstRunTour';
 import { PageTabs } from '@/components/editor/PageTabs';
 import { ProjectProgressBar } from '@/components/editor/ProjectProgressBar';
 import { RoomsOverviewDialog } from '@/components/editor/RoomsOverviewDialog';
@@ -1108,6 +1110,16 @@ export default function ProjectEditor() {
             />
           )}
 
+          {/* Empty-state onboarding card */}
+          {!is3DMode && rooms.length === 0 && (
+            <CanvasEmptyState
+              hasBackground={!!backgroundImage}
+              hasScale={!!scale}
+              hasRooms={rooms.length > 0}
+              isMobile={isMobile}
+            />
+          )}
+
           {/* Status Bar - Bottom of canvas */}
           {!isMobile && !is3DMode && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
@@ -1234,6 +1246,9 @@ export default function ProjectEditor() {
           initialTab={mobileDrawerTab}
         />
       )}
+
+      {/* First-run feature tour (Phase 1-3 highlights) */}
+      <FirstRunTour />
 
       {/* Report Preview Dialog */}
       <ReportPreviewDialog
