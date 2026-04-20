@@ -266,7 +266,7 @@ export function findSnapPoint(
 export function applyOrthoLock(point: CanvasPoint, lastPoint: CanvasPoint): CanvasPoint {
   const dx = Math.abs(point.x - lastPoint.x);
   const dy = Math.abs(point.y - lastPoint.y);
-  
+
   if (dx > dy) {
     // Snap to horizontal
     return { x: point.x, y: lastPoint.y };
@@ -274,6 +274,48 @@ export function applyOrthoLock(point: CanvasPoint, lastPoint: CanvasPoint): Canv
     // Snap to vertical
     return { x: lastPoint.x, y: point.y };
   }
+}
+
+/**
+ * Snap point to a 45° increment (0/45/90/135/180/-135/-90/-45) relative to a
+ * baseline angle. If `prevPoint` is provided, the baseline is the direction of
+ * the previous segment (lastPoint -> ... -> prevPoint reversed); otherwise the
+ * baseline is the world x-axis (so this behaves like an 8-way ortho lock).
+ *
+ * Preserves the cursor distance from `lastPoint` so the user still controls
+ * length while only the angle is constrained.
+ */
+export function applyRightAngleSnap(
+  point: CanvasPoint,
+  lastPoint: CanvasPoint,
+  prevPoint?: CanvasPoint | null
+): CanvasPoint {
+  const dx = point.x - lastPoint.x;
+  const dy = point.y - lastPoint.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist < 0.0001) return point;
+
+  // Cursor angle in world space (canvas y is screen-down, that's fine — we
+  // round in the same space we render in).
+  const cursorAngle = Math.atan2(dy, dx);
+
+  // Baseline: previous segment direction (lastPoint -> point of last segment),
+  // i.e. the direction the user was just drawing in. Default = world x-axis.
+  let baseline = 0;
+  if (prevPoint) {
+    baseline = Math.atan2(lastPoint.y - prevPoint.y, lastPoint.x - prevPoint.x);
+  }
+
+  // Relative angle, snapped to nearest 45°
+  const STEP = Math.PI / 4; // 45°
+  const rel = cursorAngle - baseline;
+  const snappedRel = Math.round(rel / STEP) * STEP;
+  const snappedAngle = baseline + snappedRel;
+
+  return {
+    x: lastPoint.x + Math.cos(snappedAngle) * dist,
+    y: lastPoint.y + Math.sin(snappedAngle) * dist,
+  };
 }
 
 /**

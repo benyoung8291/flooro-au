@@ -1119,9 +1119,10 @@ export default function ProjectEditor() {
           )}
         </div>
 
+
         {/* Desktop Right Sidebar - TakeoffPanel */}
         {!isMobile && (
-          <TakeoffPanel 
+          <TakeoffPanel
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             rooms={rooms}
@@ -1137,6 +1138,7 @@ export default function ProjectEditor() {
             projectAddress={project.address || undefined}
             stripPlans={stripPlans}
             onOpenFinishesSchedule={() => setFinishesScheduleOpen(true)}
+            onOpenReport={() => setReportPreviewOpen(true)}
             projectMaterials={projectMaterials}
           />
         )}

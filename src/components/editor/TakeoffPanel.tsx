@@ -40,6 +40,7 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
@@ -50,6 +51,8 @@ import { RoomDetailView } from './RoomDetailView';
 import { projectMaterialToMaterial } from '@/hooks/useProjectMaterials';
 import { useGenerateQuoteFromProject, useProjectQuote } from '@/hooks/useGenerateQuoteFromProject';
 import { cn } from '@/lib/utils';
+import { MaterialEfficiencyCard } from './MaterialEfficiencyCard';
+import { suggestWastePercent } from '@/lib/reports/wasteCalculator';
 
 interface TakeoffPanelProps {
   collapsed?: boolean;
@@ -67,6 +70,7 @@ interface TakeoffPanelProps {
   projectAddress?: string;
   stripPlans?: Map<string, StripPlanResult>;
   onOpenFinishesSchedule?: () => void;
+  onOpenReport?: () => void;
   // Project materials support
   projectMaterials?: ProjectMaterial[];
 }
@@ -93,6 +97,7 @@ export function TakeoffPanel({
   projectAddress,
   stripPlans,
   onOpenFinishesSchedule,
+  onOpenReport,
   projectMaterials = [],
 }: TakeoffPanelProps) {
   const navigate = useNavigate();
@@ -317,6 +322,13 @@ export function TakeoffPanel({
 
           {/* Room List */}
           <ScrollArea className="flex-1">
+            <MaterialEfficiencyCard
+              rooms={rooms}
+              scale={scale}
+              allMaterialsMap={allMaterialsMap}
+              projectMaterials={projectMaterials}
+              onOpenReport={onOpenReport}
+            />
             <div className="p-2 space-y-1">
               {rooms.length === 0 ? (
                 <div className="text-center py-8 px-4">
@@ -485,6 +497,42 @@ export function TakeoffPanel({
                               <Percent className="w-2.5 h-2.5 mr-0.5" />
                               {room.wastePercent ?? (material.specs as any).wastePercent ?? 10}%
                             </Badge>
+                            {/* Smart waste suggestion chip */}
+                            {scale && (() => {
+                              const netM2 = getNetAreaM2(room);
+                              if (netM2 < 1) return null;
+                              const currentWaste = room.wastePercent ?? (material.specs as any).wastePercent ?? 10;
+                              const suggestion = suggestWastePercent({
+                                totalAreaM2: netM2,
+                                roomCount: 1,
+                                averageRoomAreaM2: netM2,
+                                totalVertices: room.points.length,
+                                totalHoles: room.holes.length,
+                                totalDoors: room.doors.length,
+                              });
+                              if (Math.abs(suggestion.suggestedPercent - currentWaste) < 1) return null;
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onUpdateRoom?.(room.id, { wastePercent: suggestion.suggestedPercent });
+                                      }}
+                                      className="text-[10px] h-5 px-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary font-mono hover:bg-primary/20 transition-colors flex items-center gap-0.5"
+                                    >
+                                      <Sparkles className="w-2.5 h-2.5" />
+                                      Try {suggestion.suggestedPercent}%
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px]">
+                                    <p className="text-xs">{suggestion.reasoning}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">Click to apply</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                             {accessoryCount > 0 && (
                               <Badge variant="outline" className="text-[10px] h-5 px-1.5">
                                 <Wrench className="w-2.5 h-2.5 mr-0.5" />
