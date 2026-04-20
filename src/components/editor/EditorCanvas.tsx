@@ -657,8 +657,8 @@ export function EditorCanvas({
       const h = heightMm * pxPerMm;
 
       // Anchor at viewport center in canvas coords
-      const cx = (canvasSize.width / 2 - state.viewTransform.x) / state.viewTransform.zoom;
-      const cy = (canvasSize.height / 2 - state.viewTransform.y) / state.viewTransform.zoom;
+      const cx = (canvasSize.width / 2 - state.viewTransform.offsetX) / state.viewTransform.zoom;
+      const cy = (canvasSize.height / 2 - state.viewTransform.offsetY) / state.viewTransform.zoom;
       const x0 = cx - w / 2;
       const y0 = cy - h / 2;
 
