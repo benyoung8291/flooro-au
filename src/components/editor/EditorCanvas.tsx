@@ -2044,6 +2044,7 @@ export function EditorCanvas({
         transitionDrawStart={transitionDrawStart}
         transitionHoverEdge={transitionHoverEdge}
         isCloseSnapping={isCloseSnapping}
+        onDimensionLabelsRendered={(rects) => { dimensionLabelRectsRef.current = rects; }}
       />
 
       {/* Auto-close preview badge */}
