@@ -323,11 +323,25 @@ export function EditorToolbar({
                   disabled={!snapSettings.enabled}
                 />
               </div>
-              
+
+              {/* Right-Angle Enforcement */}
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <div className="flex flex-col">
+                  <Label htmlFor="right-angle" className="text-sm">90° / 45° Lock</Label>
+                  <span className="text-[10px] text-muted-foreground">Snap each segment to 45° increments</span>
+                </div>
+                <Switch
+                  id="right-angle"
+                  checked={!!snapSettings.enforceRightAngles}
+                  onCheckedChange={(checked) => handleSnapToggle('enforceRightAngles', checked)}
+                  disabled={!snapSettings.enabled}
+                />
+              </div>
+
               <DropdownMenuSeparator />
-              
+
               <div className="px-2 py-1.5 text-xs text-muted-foreground">
-                <p><kbd className="bg-muted px-1 rounded">G</kbd> Toggle grid • <kbd className="bg-muted px-1 rounded">Alt</kbd> Hold to disable</p>
+                <p><kbd className="bg-muted px-1 rounded">G</kbd> Grid • <kbd className="bg-muted px-1 rounded">A</kbd> 45° • <kbd className="bg-muted px-1 rounded">Alt</kbd> hold off</p>
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
