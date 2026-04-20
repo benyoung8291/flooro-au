@@ -1163,11 +1163,56 @@ export default function ProjectEditor() {
         />
       )}
 
-      {/* Mobile Floating Action Button */}
-      {isMobile && (
-        <MobileToolFAB
-          activeTool={activeTool}
-          onToolChange={handleToolChange}
+      {/* Mobile Floating Action Button + Floor Plan Upload */}
+      {isMobile && !is3DMode && (
+        <>
+          <MobileToolFAB
+            activeTool={activeTool}
+            onToolChange={handleToolChange}
+          />
+          {!isViewer && !backgroundImage && (
+            <div className="fixed left-4 bottom-24 z-40">
+              <FloorPlanUpload
+                projectId={projectId!}
+                onImageUploaded={handleSetBackgroundImage}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Mobile contextual room action bar (when a room is selected) */}
+      {isMobile && !is3DMode && selectedRoomId && (() => {
+        const selRoom = rooms.find(r => r.id === selectedRoomId);
+        if (!selRoom) return null;
+        return (
+          <MobileRoomActionBar
+            room={selRoom}
+            scale={scale}
+            materials={materials || []}
+            onRename={(name) => handleRenameRoom(selectedRoomId, name)}
+            onChangeWaste={(pct) => handleUpdateRoom(selectedRoomId, { wastePercent: pct })}
+            onPickMaterial={() => {
+              setMobileDrawerTab('materials');
+              setMobileDrawerOpen(true);
+            }}
+            onDelete={() => handleDeleteRoom(selectedRoomId)}
+          />
+        );
+      })()}
+
+      {/* Mobile peek-style takeoff bottom sheet */}
+      {isMobile && !is3DMode && !selectedRoomId && rooms.length > 0 && (
+        <MobileTakeoffSheet
+          rooms={rooms}
+          selectedRoomId={selectedRoomId}
+          scale={scale}
+          materials={materials || []}
+          onSelectRoom={(id) => handleSelectRoom(id)}
+          onExpand={() => {
+            setMobileDrawerTab('takeoff');
+            setMobileDrawerOpen(true);
+          }}
         />
       )}
 
