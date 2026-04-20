@@ -35,6 +35,7 @@ import {
   Magnet,
   ArrowLeftRight,
 } from 'lucide-react';
+import { RoomTemplatesMenu, RoomTemplateId } from './RoomTemplatesMenu';
 
 // Custom icon: dashed rectangle with scissors for "Cut Hole" tool
 const CutHoleIcon = ({ className }: { className?: string }) => (
@@ -67,6 +68,8 @@ interface EditorToolbarProps {
   // Snap settings props
   snapSettings?: SnapSettings;
   onSnapSettingsChange?: (settings: SnapSettings) => void;
+  // Room templates
+  onPickRoomTemplate?: (id: RoomTemplateId) => void;
 }
 
 // Tool groups for organized toolbar
@@ -124,6 +127,7 @@ export function EditorToolbar({
   onShowShortcuts,
   snapSettings,
   onSnapSettingsChange,
+  onPickRoomTemplate,
 }: EditorToolbarProps) {
   const handleSnapToggle = (key: keyof SnapSettings, value: boolean) => {
     if (snapSettings && onSnapSettingsChange) {
@@ -209,6 +213,9 @@ export function EditorToolbar({
       {/* Draw Tools */}
       <div className="flex items-center gap-0.5">
         {toolGroups.draw.map(renderToolButton)}
+        {onPickRoomTemplate && (
+          <RoomTemplatesMenu onPickTemplate={onPickRoomTemplate} disabled={is3DMode} />
+        )}
       </div>
 
       <Separator orientation="vertical" className="h-6 mx-0.5 opacity-50" />

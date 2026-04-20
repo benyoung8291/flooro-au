@@ -221,6 +221,30 @@ export function EditorCanvas({
     return getGridSizeInPixels(snapSettings.gridSize, state.scale);
   }, [snapSettings.gridEnabled, snapSettings.enabled, snapSettings.gridSize, state.scale]);
 
+  // Auto-close snapping detection: when polyline cursor approaches start vertex
+  const isCloseSnapping = useMemo(() => {
+    if (!isDrawing || drawingPoints.length < 3 || !cursorPosition) return false;
+    const start = drawingPoints[0];
+    const dist = distance(cursorPosition, start);
+    return dist < 15 / state.viewTransform.zoom;
+  }, [isDrawing, drawingPoints, cursorPosition, state.viewTransform.zoom]);
+
+  // Live area preview while drawing (for close indicator badge)
+  const livePreviewArea = useMemo(() => {
+    if (!isCloseSnapping || drawingPoints.length < 3 || !state.scale) return null;
+    // Calculate area as if user closed now (use existing helper inline)
+    const pts = drawingPoints;
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const j = (i + 1) % pts.length;
+      area += pts[i].x * pts[j].y;
+      area -= pts[j].x * pts[i].y;
+    }
+    const areaPx = Math.abs(area) / 2;
+    const pxPerM = state.scale.pixelsPerMm * 1000;
+    return areaPx / (pxPerM * pxPerM);
+  }, [isCloseSnapping, drawingPoints, state.scale]);
+
   // Detect shared edges for merge tool
   const sharedEdges = useMemo(() => {
     return detectSharedEdges(state.rooms);
@@ -416,8 +440,35 @@ export function EditorCanvas({
     });
   }, [jsonData?.rooms, dispatch, state.rooms]);
 
+  // Tab cycle order for keyboard tool cycling
+  const TOOL_CYCLE: EditorTool[] = ['select', 'draw', 'rectangle', 'hole', 'door', 'transition', 'scale'];
+  // Number-key tool map (1-7)
+  const TOOL_NUMBER_MAP: Record<string, EditorTool> = {
+    '1': 'select',
+    '2': 'draw',
+    '3': 'rectangle',
+    '4': 'hole',
+    '5': 'door',
+    '6': 'transition',
+    '7': 'scale',
+  };
+
+  // Track tool prior to temporary Space-pan so we can restore on key-up
+  const previousToolRef = useRef<EditorTool | null>(null);
+
   // Handle keyboard events
   useEffect(() => {
+    const isTextInput = (target: EventTarget | null) => {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      return (
+        tag === 'INPUT' ||
+        tag === 'TEXTAREA' ||
+        tag === 'SELECT' ||
+        target.isContentEditable
+      );
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Shift') {
         setOrthoLocked(true);
@@ -446,6 +497,8 @@ export function EditorCanvas({
         // Close context menu
         setContextTarget(null);
         setContextMenuPos(null);
+        // If we were in temporary pan, abandon restore
+        previousToolRef.current = null;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
         e.preventDefault();
@@ -455,6 +508,57 @@ export function EditorCanvas({
           undo();
         }
       }
+
+      // Skip remaining shortcuts if user is typing
+      if (isTextInput(e.target)) return;
+
+      // Type-as-you-draw: digit auto-opens dimension input
+      if (
+        isDrawing &&
+        drawingPoints.length > 0 &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        /^[0-9.]$/.test(e.key)
+      ) {
+        if (!showDimensionInput) {
+          setShowDimensionInput(true);
+          // Seed the input via custom event (overlay listens for it)
+          window.dispatchEvent(new CustomEvent('dim-input-seed', { detail: e.key }));
+        }
+        // Don't return — let overlay grab focus naturally
+      }
+
+      // ? toggles shortcuts panel
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent('toggle-shortcuts-panel'));
+      }
+
+      // Tab cycles tools
+      if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey && onToolChange) {
+        e.preventDefault();
+        const currentIdx = TOOL_CYCLE.indexOf(activeTool);
+        const nextIdx = e.shiftKey
+          ? (currentIdx - 1 + TOOL_CYCLE.length) % TOOL_CYCLE.length
+          : (currentIdx + 1) % TOOL_CYCLE.length;
+        onToolChange(TOOL_CYCLE[nextIdx]);
+      }
+
+      // Number keys 1-7 jump to tools
+      if (TOOL_NUMBER_MAP[e.key] && !e.metaKey && !e.ctrlKey && !e.altKey && onToolChange) {
+        onToolChange(TOOL_NUMBER_MAP[e.key]);
+      }
+
+      // Space = temporary pan
+      if (e.code === 'Space' && !e.repeat && !e.metaKey && !e.ctrlKey && onToolChange) {
+        e.preventDefault();
+        if (activeTool !== 'pan') {
+          previousToolRef.current = activeTool;
+          onToolChange('pan');
+        }
+      }
+
       // Toggle grid snap
       if ((e.key === 'g' || e.key === 'G') && !e.metaKey && !e.ctrlKey) {
         setSnapSettings({ ...snapSettings, gridEnabled: !snapSettings.gridEnabled });
@@ -490,6 +594,11 @@ export function EditorCanvas({
       if (e.key === 'Alt') {
         setTempSnapDisabled(false);
       }
+      // Release Space — restore previous tool
+      if (e.code === 'Space' && previousToolRef.current && onToolChange) {
+        onToolChange(previousToolRef.current);
+        previousToolRef.current = null;
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -499,7 +608,7 @@ export function EditorCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [undo, redo, onToolChange, isDrawing]);
+  }, [undo, redo, onToolChange, isDrawing, activeTool, drawingPoints.length, showDimensionInput, snapSettings, setSnapSettings]);
 
   // Reset tool state when tool changes
   useEffect(() => {
@@ -534,7 +643,88 @@ export function EditorCanvas({
     };
   }, []);
 
-  // Handle merge rooms
+  // Room template picker — listens for events from toolbar
+  useEffect(() => {
+    const handleTemplate = (e: Event) => {
+      const id = (e as CustomEvent).detail as 'l-shape' | 'u-shape' | 'rect-notch';
+
+      // Default size in real-world mm
+      const widthMm = 5000;
+      const heightMm = 4000;
+      // Convert to pixels via current scale (fallback to 300x240 px)
+      const pxPerMm = state.scale?.pixelsPerMm ?? 0.06; // ~300px / 5000mm
+      const w = widthMm * pxPerMm;
+      const h = heightMm * pxPerMm;
+
+      // Anchor at viewport center in canvas coords
+      const cx = (canvasSize.width / 2 - state.viewTransform.offsetX) / state.viewTransform.zoom;
+      const cy = (canvasSize.height / 2 - state.viewTransform.offsetY) / state.viewTransform.zoom;
+      const x0 = cx - w / 2;
+      const y0 = cy - h / 2;
+
+      let points: CanvasPoint[] = [];
+      if (id === 'l-shape') {
+        // Bottom-left corner cut: rectangle minus top-right notch (3/5 width, 2/4 height notch)
+        const nw = w * 0.4;
+        const nh = h * 0.5;
+        points = [
+          { x: x0, y: y0 },
+          { x: x0 + w - nw, y: y0 },
+          { x: x0 + w - nw, y: y0 + nh },
+          { x: x0 + w, y: y0 + nh },
+          { x: x0 + w, y: y0 + h },
+          { x: x0, y: y0 + h },
+        ];
+      } else if (id === 'u-shape') {
+        // U-shape: rectangle with a top-center notch
+        const nw = w * 0.34;
+        const nh = h * 0.55;
+        const nx = x0 + (w - nw) / 2;
+        points = [
+          { x: x0, y: y0 },
+          { x: nx, y: y0 },
+          { x: nx, y: y0 + nh },
+          { x: nx + nw, y: y0 + nh },
+          { x: nx + nw, y: y0 },
+          { x: x0 + w, y: y0 },
+          { x: x0 + w, y: y0 + h },
+          { x: x0, y: y0 + h },
+        ];
+      } else {
+        // Rectangle with side notch (right side)
+        const nw = w * 0.25;
+        const nh = h * 0.4;
+        const ny = y0 + (h - nh) / 2;
+        points = [
+          { x: x0, y: y0 },
+          { x: x0 + w, y: y0 },
+          { x: x0 + w, y: ny },
+          { x: x0 + w - nw, y: ny },
+          { x: x0 + w - nw, y: ny + nh },
+          { x: x0 + w, y: ny + nh },
+          { x: x0 + w, y: y0 + h },
+          { x: x0, y: y0 + h },
+        ];
+      }
+
+      const newRoom: Room = {
+        id: generateRoomId(),
+        name: `Room ${state.rooms.length + 1}`,
+        points,
+        holes: [],
+        doors: [],
+        materialId: null,
+        color: DEFAULT_ROOM_COLOR,
+        edgeTransitions: [],
+      };
+      dispatch({ type: 'ADD_ROOM', room: newRoom });
+      dispatch({ type: 'SELECT_ROOM', roomId: newRoom.id });
+      toast.success(`${id === 'l-shape' ? 'L-shape' : id === 'u-shape' ? 'U-shape' : 'Rectangle + notch'} added — drag corners to resize`);
+    };
+
+    window.addEventListener('room-template-pick', handleTemplate);
+    return () => window.removeEventListener('room-template-pick', handleTemplate);
+  }, [state.scale, state.rooms.length, state.viewTransform, canvasSize, dispatch]);
   const handleMergeRooms = useCallback((room1: Room, room2: Room) => {
     // Find shared edge
     const sharedEdge = findSharedEdgeBetweenRooms(room1, room2);
@@ -1025,6 +1215,7 @@ export function EditorCanvas({
             dispatch({ type: 'ADD_ROOM', room: newRoom });
           }
           setRectangleStart(null);
+          // Batch mode: stay on rectangle tool when Shift held; otherwise stay too (tool persistence — user can press V to exit)
         }
         break;
       }
@@ -1793,7 +1984,15 @@ export function EditorCanvas({
         hoveredHoleWall={hoveredHoleWall}
         transitionDrawStart={transitionDrawStart}
         transitionHoverEdge={transitionHoverEdge}
+        isCloseSnapping={isCloseSnapping}
       />
+
+      {/* Auto-close preview badge */}
+      {isCloseSnapping && livePreviewArea !== null && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm font-semibold shadow-lg animate-pulse z-30">
+          Click to close • {livePreviewArea.toFixed(2)} m²
+        </div>
+      )}
 
       {/* Material drag indicator */}
       {isDraggingMaterial && (
@@ -1841,29 +2040,39 @@ export function EditorCanvas({
         dimensionUnit={dimensionUnit}
         visible={showDimensionInput}
         onClose={() => setShowDimensionInput(false)}
-        onSubmitDimension={(lengthMm) => {
-          if (!cursorPosition || drawingPoints.length === 0) return;
-          
+        onSubmitDimension={(lengthMm, angleDeg) => {
+          if (drawingPoints.length === 0) return;
           const lastPoint = drawingPoints[drawingPoints.length - 1];
-          
-          // Calculate direction from last point to cursor
-          const dx = cursorPosition.x - lastPoint.x;
-          const dy = cursorPosition.y - lastPoint.y;
-          const currentLength = Math.sqrt(dx * dx + dy * dy);
-          
-          if (currentLength === 0) return;
-          
-          // Normalize direction
-          const dirX = dx / currentLength;
-          const dirY = dy / currentLength;
-          
-          // Calculate new point at exact distance
+
+          let dirX = 0;
+          let dirY = 0;
+
+          if (typeof angleDeg === 'number' && !Number.isNaN(angleDeg)) {
+            // Angle is relative to previous segment if available, else absolute (0° = right, screen coords y-down)
+            let baseAngleRad = 0;
+            if (drawingPoints.length >= 2) {
+              const prev = drawingPoints[drawingPoints.length - 2];
+              baseAngleRad = Math.atan2(lastPoint.y - prev.y, lastPoint.x - prev.x);
+            }
+            const totalAngleRad = baseAngleRad + (angleDeg * Math.PI) / 180;
+            dirX = Math.cos(totalAngleRad);
+            dirY = Math.sin(totalAngleRad);
+          } else {
+            // Use cursor direction
+            if (!cursorPosition) return;
+            const dx = cursorPosition.x - lastPoint.x;
+            const dy = cursorPosition.y - lastPoint.y;
+            const currentLength = Math.sqrt(dx * dx + dy * dy);
+            if (currentLength === 0) return;
+            dirX = dx / currentLength;
+            dirY = dy / currentLength;
+          }
+
           const lengthPx = state.scale ? lengthMm * state.scale.pixelsPerMm : lengthMm;
           const newPoint = {
             x: lastPoint.x + dirX * lengthPx,
             y: lastPoint.y + dirY * lengthPx,
           };
-          
           setDrawingPoints([...drawingPoints, newPoint]);
         }}
       />

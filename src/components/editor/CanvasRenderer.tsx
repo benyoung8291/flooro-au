@@ -61,6 +61,8 @@ interface CanvasRendererProps {
   // Transition drawing tool state
   transitionDrawStart?: { roomId: string; edgeIndex: number; percent: number } | null;
   transitionHoverEdge?: { roomId: string; edgeIndex: number; percent: number; projectedPoint: CanvasPoint } | null;
+  // Polyline auto-close indicator (glowing ring around start vertex)
+  isCloseSnapping?: boolean;
 }
 
 // Cache for loaded images
@@ -130,6 +132,7 @@ export function CanvasRenderer({
   hoveredHoleWall,
   transitionDrawStart,
   transitionHoverEdge,
+  isCloseSnapping = false,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -367,13 +370,31 @@ export function CanvasRenderer({
       if (drawingPoints.length >= 3) {
         const firstPoint = drawingPoints[0];
         ctx.save();
-        ctx.strokeStyle = 'hsla(142, 71%, 45%, 0.5)';
-        ctx.lineWidth = 1 / zoom;
-        ctx.setLineDash([4 / zoom, 4 / zoom]);
-        ctx.beginPath();
-        ctx.arc(firstPoint.x, firstPoint.y, 15 / zoom, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        if (isCloseSnapping) {
+          // Strong glowing ring when actively snapping to close
+          ctx.shadowColor = 'hsl(142 71% 45%)';
+          ctx.shadowBlur = 16 / zoom;
+          ctx.strokeStyle = 'hsl(142 71% 45%)';
+          ctx.lineWidth = 3 / zoom;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.arc(firstPoint.x, firstPoint.y, 14 / zoom, 0, Math.PI * 2);
+          ctx.stroke();
+          // Inner filled marker
+          ctx.shadowBlur = 0;
+          ctx.fillStyle = 'hsl(142 71% 45%)';
+          ctx.beginPath();
+          ctx.arc(firstPoint.x, firstPoint.y, 6 / zoom, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = 'hsla(142, 71%, 45%, 0.5)';
+          ctx.lineWidth = 1 / zoom;
+          ctx.setLineDash([4 / zoom, 4 / zoom]);
+          ctx.beginPath();
+          ctx.arc(firstPoint.x, firstPoint.y, 15 / zoom, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
         ctx.restore();
       }
     }
@@ -777,7 +798,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall, transitionDrawStart, transitionHoverEdge]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall, transitionDrawStart, transitionHoverEdge, isCloseSnapping]);
 
   useEffect(() => {
     render();
