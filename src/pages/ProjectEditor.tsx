@@ -1247,6 +1247,9 @@ export default function ProjectEditor() {
         />
       )}
 
+      {/* First-run feature tour (Phase 1-3 highlights) */}
+      <FirstRunTour />
+
       {/* Report Preview Dialog */}
       <ReportPreviewDialog
         open={reportPreviewOpen}
