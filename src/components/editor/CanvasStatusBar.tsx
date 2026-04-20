@@ -1,14 +1,14 @@
 import { useMemo } from 'react';
 import { EditorTool } from './EditorCanvas';
 import { Room, ScaleCalibration, DimensionUnit } from '@/lib/canvas/types';
-import { calculatePolygonAreaWithCurves, calculatePerimeterWithCurves } from '@/lib/canvas/geometry';
-import { 
-  MousePointer2, 
-  Pencil, 
-  Move, 
-  Ruler, 
-  DoorOpen, 
-  Combine, 
+import { calculatePolygonAreaWithCurves, calculatePerimeterWithCurves, calculateRoomNetArea } from '@/lib/canvas/geometry';
+import {
+  MousePointer2,
+  Pencil,
+  Move,
+  Ruler,
+  DoorOpen,
+  Combine,
   Scissors,
   SquareDashed,
   RectangleHorizontal,
@@ -16,6 +16,8 @@ import {
   Crosshair,
   Grid3X3,
   CornerDownRight,
+  Percent,
+  Triangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +30,10 @@ interface CanvasStatusBarProps {
   isOrthoLocked?: boolean;
   isSnapEnabled?: boolean;
   isGridEnabled?: boolean;
+  isRightAngleLocked?: boolean;
   zoom?: number;
+  /** Default waste % to apply when room has no override */
+  defaultWastePercent?: number;
 }
 
 const toolInfo: Record<EditorTool, { icon: React.ElementType; label: string; shortcut: string }> = {
@@ -44,7 +49,6 @@ const toolInfo: Record<EditorTool, { icon: React.ElementType; label: string; sho
   split: { icon: Scissors, label: 'Split', shortcut: 'X' },
 };
 
-// Convert pixels to meters using scale (pixelsPerMm)
 function pixelsToMeters(pixels: number, scale: ScaleCalibration): number {
   return (pixels / scale.pixelsPerMm) / 1000;
 }
@@ -96,28 +100,46 @@ export function CanvasStatusBar({
   isOrthoLocked = false,
   isSnapEnabled = true,
   isGridEnabled = false,
+  isRightAngleLocked = false,
   zoom = 1,
+  defaultWastePercent = 10,
 }: CanvasStatusBarProps) {
   const tool = toolInfo[activeTool];
   const ToolIcon = tool.icon;
 
+  // Live measurement HUD: net area, order area (with waste), perimeter, doors,
+  // transitions, applied waste %. Updates whenever the selected room changes.
   const roomStats = useMemo(() => {
     if (!selectedRoom || !scale) return null;
-    
-    const areaPixels = calculatePolygonAreaWithCurves(selectedRoom.points, selectedRoom.edgeCurves);
+
+    const grossPixels = calculatePolygonAreaWithCurves(selectedRoom.points, selectedRoom.edgeCurves);
+    const netPixels = calculateRoomNetArea(selectedRoom);
     const perimeterPixels = calculatePerimeterWithCurves(selectedRoom.points, selectedRoom.edgeCurves);
-    
-    // Convert from pixels to meters (pixelsPerMm / 1000 = pixelsPerMeter)
+
     const pixelsPerMeter = scale.pixelsPerMm * 1000;
-    const areaSqM = areaPixels / (pixelsPerMeter * pixelsPerMeter);
+    const grossSqM = grossPixels / (pixelsPerMeter * pixelsPerMeter);
+    const netSqM = netPixels / (pixelsPerMeter * pixelsPerMeter);
     const perimeterM = perimeterPixels / pixelsPerMeter;
-    
+
+    const wastePct = selectedRoom.wastePercent ?? defaultWastePercent;
+    const orderSqM = netSqM * (1 + wastePct / 100);
+
+    const doorCount = selectedRoom.doors?.length ?? 0;
+    const transitionCount = selectedRoom.edgeTransitions?.length ?? 0;
+    const holeCount = selectedRoom.holes?.length ?? 0;
+
     return {
-      area: formatArea(areaSqM, dimensionUnit),
-      perimeter: formatDimension(perimeterM, dimensionUnit),
       name: selectedRoom.name || 'Unnamed Room',
+      net: formatArea(netSqM, dimensionUnit),
+      order: formatArea(orderSqM, dimensionUnit),
+      gross: formatArea(grossSqM, dimensionUnit),
+      perimeter: formatDimension(perimeterM, dimensionUnit),
+      wastePct,
+      doorCount,
+      transitionCount,
+      holeCount,
     };
-  }, [selectedRoom, scale, dimensionUnit]);
+  }, [selectedRoom, scale, dimensionUnit, defaultWastePercent]);
 
   return (
     <div className="glass-panel flex items-center justify-between gap-4 px-3 py-1.5 text-xs">
@@ -131,7 +153,6 @@ export function CanvasStatusBar({
           </kbd>
         </div>
 
-        {/* Scale Indicator */}
         {scale && (
           <div className="hidden sm:flex items-center gap-1 text-muted-foreground border-l border-border pl-3">
             <Ruler className="w-3 h-3" />
@@ -142,28 +163,68 @@ export function CanvasStatusBar({
         )}
       </div>
 
-      {/* Center: Cursor Position & Room Info */}
-      <div className="flex items-center gap-4">
-        {cursorPosition && (
+      {/* Center: Cursor Position & Live Room HUD */}
+      <div className="flex items-center gap-3 min-w-0">
+        {cursorPosition && !roomStats && (
           <div className="hidden md:flex items-center gap-1 text-muted-foreground font-mono">
             <Crosshair className="w-3 h-3" />
-            <span>
-              X: {formatCoordinate(cursorPosition.x, scale, dimensionUnit)}
-            </span>
+            <span>X: {formatCoordinate(cursorPosition.x, scale, dimensionUnit)}</span>
             <span className="mx-1">·</span>
-            <span>
-              Y: {formatCoordinate(cursorPosition.y, scale, dimensionUnit)}
-            </span>
+            <span>Y: {formatCoordinate(cursorPosition.y, scale, dimensionUnit)}</span>
           </div>
         )}
 
         {roomStats && (
-          <div className="flex items-center gap-2 text-foreground">
-            <span className="font-medium truncate max-w-[120px]">{roomStats.name}</span>
+          <div className="flex items-center gap-2 text-foreground min-w-0">
+            <span className="font-medium truncate max-w-[140px]">{roomStats.name}</span>
             <span className="text-muted-foreground">·</span>
-            <span className="font-mono">{roomStats.area}</span>
+
+            {/* Net area */}
+            <div className="flex items-baseline gap-1">
+              <span className="text-[10px] text-muted-foreground uppercase">Net</span>
+              <span className="font-mono">{roomStats.net}</span>
+            </div>
+
+            {/* Order area (always shown) */}
+            <span className="text-muted-foreground">·</span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-[10px] text-primary uppercase font-medium">Order</span>
+              <span className="font-mono text-primary">{roomStats.order}</span>
+            </div>
+
+            {/* Perimeter */}
             <span className="hidden lg:inline text-muted-foreground">·</span>
-            <span className="hidden lg:inline font-mono text-muted-foreground">{roomStats.perimeter}</span>
+            <div className="hidden lg:flex items-baseline gap-1">
+              <span className="text-[10px] text-muted-foreground uppercase">Perim</span>
+              <span className="font-mono text-muted-foreground">{roomStats.perimeter}</span>
+            </div>
+
+            {/* Waste % chip */}
+            <span className="hidden lg:inline text-muted-foreground">·</span>
+            <div className="hidden lg:flex items-center gap-0.5 text-muted-foreground">
+              <Percent className="w-3 h-3" />
+              <span className="font-mono">{roomStats.wastePct}%</span>
+            </div>
+
+            {/* Door / transition counts */}
+            {roomStats.doorCount > 0 && (
+              <>
+                <span className="hidden xl:inline text-muted-foreground">·</span>
+                <div className="hidden xl:flex items-center gap-0.5 text-muted-foreground">
+                  <DoorOpen className="w-3 h-3" />
+                  <span>{roomStats.doorCount}</span>
+                </div>
+              </>
+            )}
+            {roomStats.transitionCount > 0 && (
+              <>
+                <span className="hidden xl:inline text-muted-foreground">·</span>
+                <div className="hidden xl:flex items-center gap-0.5 text-muted-foreground">
+                  <ArrowLeftRight className="w-3 h-3" />
+                  <span>{roomStats.transitionCount}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -176,7 +237,14 @@ export function CanvasStatusBar({
             <span className="hidden sm:inline">Ortho</span>
           </div>
         )}
-        
+
+        {isRightAngleLocked && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/15 text-primary rounded text-[10px] font-medium">
+            <Triangle className="w-3 h-3" />
+            <span className="hidden sm:inline">45°</span>
+          </div>
+        )}
+
         {isSnapEnabled && (
           <div className={cn(
             "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium",
