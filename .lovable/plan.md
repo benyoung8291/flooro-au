@@ -1,112 +1,96 @@
 
 
-# Transition Drawing Tool
+# Canvas & Takeoff Editor — Phased Overhaul Roadmap
 
-## Problem
-Transitions on edges are hard to see and place. The current workflow requires right-clicking an edge to add a transition, then using a sidebar slider to resize it. Users want to visually draw exactly where transitions start and stop on an edge.
-
-## Solution
-Add a new **"Transition" drawing tool** to the toolbar. When active, the user clicks on a room edge to set the start point, then clicks again on the same edge to set the end point. A transition is created covering exactly that segment. The tool provides strong visual feedback throughout.
+Goal: beat MeasureSquare on **speed of takeoff**, **estimate accuracy**, and **mobile/on-site usability**. Each phase ships independently. We approve and execute one phase at a time.
 
 ---
 
-## How It Works
+## Phase 1 — Speed of Takeoff (the biggest UX gap)
 
-1. Select the **Transition tool** from the toolbar (new icon, dashed line with arrow)
-2. Hover over any room edge -- the edge highlights in amber and a snap indicator appears
-3. **Click once** on the edge to set the transition start point
-4. **Move the mouse** along the same edge -- a live amber dashed preview shows the coverage
-5. **Click again** on the same edge to set the end point and create the transition
-6. The transition is added to the room with the correct `startPercent` and `endPercent`
-7. Transition type defaults to `auto`; user can change it via context menu or sidebar panel
+Reduce clicks-per-room and make drawing feel effortless.
 
-Press **Escape** to cancel mid-draw.
+1. **Keyboard-first drawing model**
+   - Persistent shortcut HUD (toggle with `?`) showing every tool key.
+   - `Tab` cycles tools, `Space` = temporary pan, `Esc` = always cancels current op cleanly.
+   - Number keys `1-9` jump to tools (Select/Draw/Rect/Hole/Door/Transition/Scale).
+2. **Smarter dimension input overlay**
+   - Type-as-you-draw: typing any digit while drawing auto-focuses the dimension input (no click needed).
+   - Tab between length and angle fields; Enter commits.
+   - Remember last unit per project; show recent values as quick-pick chips.
+3. **Smart room templates**
+   - "L-shape", "U-shape", "Rectangle with notch" presets — click to drop, drag corners to size.
+   - Replaces tedious polyline drawing for the 80% case.
+4. **Auto-close detection improvements**
+   - When polyline endpoint comes within snap radius of start, show a glowing "click to close" indicator with the resulting area preview live.
+5. **Multi-room rectangle batch mode**
+   - Hold `Shift` after rectangle tool to keep placing rectangles without re-selecting the tool.
+6. **Background image enhancements**
+   - Drag-to-calibrate scale directly on a known dimension on the PDF (currently requires tool switch).
+   - Auto-fit & one-click "lock background" after calibration.
 
----
-
-## Visual Enhancements (Always Visible)
-
-Transitions will be easier to see even when using other tools:
-- Transition edges already draw with an amber dashed line and label badges -- this is good
-- Add a subtle amber background tint along transition segments (a thin filled strip offset inward from the edge) so transitions are visible at a glance even when zoomed out
-- Make the transition dashed line slightly thicker (4px instead of 3px) for better visibility
-
----
-
-## Changes
-
-### 1. Add `'transition'` to `EditorTool` union
-
-**File: `src/components/editor/EditorCanvas.tsx`**
-- Add `'transition'` to the `EditorTool` type
-- Add state: `transitionDrawStart: { roomId: string, edgeIndex: number, percent: number } | null`
-- In `handlePointerDown` for the transition tool:
-  - Find the closest edge on any room (within a hit distance threshold)
-  - Calculate the percent along that edge where the click landed
-  - If no start is set, record it; if start is set and same edge, create the transition
-- In `handlePointerMove`: calculate hover/preview percent along the nearest edge
-- Pass preview data to `CanvasRenderer`
-- Add the tool to the dependency arrays
-
-### 2. Add toolbar button
-
-**File: `src/components/editor/EditorToolbar.tsx`**
-- Add a "Transition" tool button with a dashed-line icon (custom SVG or use an existing icon like `ArrowLeftRight` from lucide)
-- Place it after the Door tool in the toolbar
-- Show tooltip: "Draw Transition (T)"
-- Add keyboard shortcut `T` for the tool
-
-### 3. Add to mobile tool FAB
-
-**File: `src/components/editor/MobileToolFAB.tsx`**
-- Add the transition tool to the FAB menu
-
-### 4. Canvas rendering for transition tool
-
-**File: `src/components/editor/CanvasRenderer.tsx`**
-- Add new props: `transitionDrawStart`, `transitionPreviewEdge` (for hover preview)
-- When transition tool is active:
-  - Highlight the nearest edge in amber on hover
-  - Show a dot/marker at the snap position on the edge
-  - If a start point is set, draw the amber dashed preview from start to cursor position along the edge
-- Enhance existing transition rendering:
-  - Add a subtle amber fill strip (2-3px wide, semi-transparent) along transition segments so they're always visible
-
-### 5. Edge hit-testing helper
-
-**File: `src/lib/canvas/geometry.ts`**
-- Add/use a function `projectPointOntoEdge(point, edgeStart, edgeEnd)` that returns `{ percent: number, distance: number, projectedPoint: CanvasPoint }` 
-- This calculates how far along an edge a point falls and how far away from the edge it is
-- Used by the transition tool for both hit-testing and percent calculation
-
-### 6. Instruction banner
-
-**File: `src/components/editor/EditorCanvas.tsx`**
-- When transition tool is active, show a top banner similar to the scale tool:
-  - Before first click: "Click on an edge to start the transition"
-  - After first click: "Click again on the same edge to set the end point"
+**Files touched:** `EditorCanvas.tsx`, `EditorToolbar.tsx`, `DimensionInputOverlay.tsx`, `KeyboardShortcutsPanel.tsx`, new `RoomTemplates.tsx`, `useCanvasEditing.ts`.
 
 ---
 
-## Technical Details
+## Phase 2 — Accuracy of Estimates (quiet differentiator)
 
-### Edge detection algorithm
-When the transition tool is active and the mouse moves:
-1. For each room, for each edge, calculate the perpendicular distance from the mouse to the edge segment
-2. Find the closest edge within a threshold (e.g., 15px screen space)
-3. Calculate the percent along that edge using vector projection
-4. Clamp percent to 0.0-1.0
+Make the numbers MeasureSquare produces look sloppy by comparison.
 
-### Creating the transition
-When both clicks are complete:
-- `startPercent` = min of the two click percents
-- `endPercent` = max of the two click percents
-- Generate a unique `id` for the transition
-- Default `transitionType: 'auto'`
-- Dispatch `UPDATE_ROOM` to add to the room's `edgeTransitions` array
-- Switch back to the select tool (or stay on transition tool for rapid placement)
+1. **Live measurement HUD**
+   - Always-visible status overlay showing: selected room area (net + order), perimeter, count of doors/transitions, applied waste %. Updates as you drag.
+2. **Edge length inline editing**
+   - Click any edge dimension label to type a new exact length — vertex moves to satisfy it while preserving adjacent angles.
+3. **Right-angle enforcement toggle**
+   - Optional mode that snaps every drawn segment to 90°/45° relative to previous segment, with visual indicator.
+4. **Smart waste suggestions per room**
+   - Inline badge on each room in the Takeoff panel: "Suggested waste 8% (currently 10%)" with one-click accept, based on room shape complexity and material roll width.
+5. **Cross-room cut optimizer surfacing**
+   - Promote the existing `CrossRoomOptimizer` from a buried report to an always-visible "Material Efficiency" card showing $ saved by combining cuts.
+6. **Seam preview on canvas, not just in modal**
+   - Render seam lines directly on rooms by default for roll goods; drag to nudge; show conflict highlights with doors/avoid zones.
 
-### Keyboard shortcut
-- `T` key activates the transition tool (added to the existing keyboard handler)
-- `Escape` cancels an in-progress transition draw
+**Files touched:** `CanvasRenderer.tsx`, `CanvasStatusBar.tsx`, `TakeoffPanel.tsx`, `useCanvasEditing.ts`, `lib/reports/wasteCalculator.ts`, `SeamEditor.tsx`.
+
+---
+
+## Phase 3 — Mobile & On-Site Usability (where MeasureSquare is weakest)
+
+Make the iPad/phone experience first-class so estimators can quote on site.
+
+1. **Touch-optimized drawing**
+   - Long-press for context menu, two-finger pinch-zoom (already exists — verify smoothness), three-finger pan.
+   - Larger hit targets for vertices/handles when `coarse` pointer detected.
+2. **Floating contextual toolbar**
+   - Replace the current bottom FAB with a smart contextual bar that appears next to the selected room/door/transition with the most likely 3-4 actions.
+3. **Tap-to-edit dimensions on mobile**
+   - Tap any edge label → number pad overlay with unit toggle.
+4. **Offline-capable canvas**
+   - Service worker + IndexedDB cache for the active project so on-site estimators can keep drawing if connection drops, syncing when back online.
+5. **Photo background capture**
+   - "Take photo" button (mobile) → use device camera → place as background image with quick scale calibration.
+6. **Mobile-friendly Takeoff panel**
+   - Convert right-hand sidebar to a swipe-up bottom sheet on phones with snap points (peek / half / full).
+
+**Files touched:** `MobileToolFAB.tsx` → `ContextualToolbar.tsx`, `MobileSidebarDrawer.tsx`, `useTouchGestures.ts`, `EditorCanvas.tsx`, new `useOfflineSync.ts`, service worker setup.
+
+---
+
+## Phase 4 — Polish & Performance (the "feels expensive" pass)
+
+1. Audit all canvas re-render paths; ensure 60fps with 50+ rooms (profile with React DevTools + Performance panel).
+2. Replace remaining modals with inline panels or popovers where possible.
+3. Consistent micro-animations on tool switch, room select, snap acquisition.
+4. Empty states and onboarding tooltips on first project.
+5. Dark mode parity check across canvas overlays.
+
+---
+
+## Execution Model
+
+- We tackle **one phase per approval cycle**.
+- After each phase: I list every change, you test end-to-end, we adjust, then move on.
+- Recommended start: **Phase 1** (highest user-visible impact, lowest risk).
+
+Reply "Approve Phase 1" (or pick a different phase to start with) and I'll produce the detailed per-task implementation plan for that phase.
 
