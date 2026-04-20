@@ -2054,6 +2054,66 @@ export function EditorCanvas({
         </div>
       )}
 
+      {/* Inline edge-length editor */}
+      {edgeEdit && (
+        <div
+          className="absolute z-40 -translate-x-1/2 -translate-y-1/2 flex items-center gap-1 rounded-md border border-border bg-background/95 px-2 py-1 shadow-lg backdrop-blur"
+          style={{ left: `${edgeEdit.screenX}px`, top: `${edgeEdit.screenY}px` }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <Input
+            autoFocus
+            value={edgeEditValue}
+            onChange={(e) => setEdgeEditValue(e.target.value)}
+            onFocus={(e) => e.currentTarget.select()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                setEdgeEdit(null);
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const raw = parseFloat(edgeEditValue);
+                if (!isFinite(raw) || raw <= 0) {
+                  setEdgeEdit(null);
+                  return;
+                }
+                // Convert input back to mm
+                const mm =
+                  dimensionUnit === 'mm' ? raw :
+                  dimensionUnit === 'cm' ? raw * 10 :
+                  dimensionUnit === 'm'  ? raw * 1000 :
+                  raw * 25.4;
+                const room = state.rooms.find(r => r.id === edgeEdit.roomId);
+                if (!room || !state.scale) { setEdgeEdit(null); return; }
+                const i = edgeEdit.edgeIndex;
+                const j = (i + 1) % room.points.length;
+                const p1 = room.points[i];
+                const p2 = room.points[j];
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const curLenPx = Math.hypot(dx, dy);
+                if (curLenPx < 0.0001) { setEdgeEdit(null); return; }
+                const newLenPx = mm * state.scale.pixelsPerMm;
+                const ux = dx / curLenPx;
+                const uy = dy / curLenPx;
+                const newP2 = { x: p1.x + ux * newLenPx, y: p1.y + uy * newLenPx };
+                const newPoints = [...room.points];
+                newPoints[j] = newP2;
+                dispatch({ type: 'UPDATE_ROOM', roomId: room.id, updates: { points: newPoints } });
+                setEdgeEdit(null);
+                toast.success(`Edge resized to ${edgeEditValue}${dimensionUnit === 'imperial' ? '"' : dimensionUnit}`);
+              }
+            }}
+            onBlur={() => setEdgeEdit(null)}
+            className="h-7 w-24 text-xs"
+            inputMode="decimal"
+          />
+          <span className="text-xs text-muted-foreground pr-1">
+            {dimensionUnit === 'imperial' ? 'in' : dimensionUnit}
+          </span>
+        </div>
+      )}
+
       {/* Material drag indicator */}
       {isDraggingMaterial && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-medium animate-fade-in">
