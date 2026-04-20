@@ -1683,6 +1683,29 @@ function drawDimensionLabels(
     ctx.fillText(dimensionText, 0, 0);
 
     ctx.restore();
+
+    // Capture label rect for inline-edit hit testing (axis-aligned bbox in canvas coords)
+    if (collector && roomId) {
+      const labelCx = midX + offsetX;
+      const labelCy = midY + offsetY;
+      const halfW = textWidth / 2 + padding;
+      const halfH = fontSize / 2 + padding;
+      // Account for rotation: use largest axis-aligned bbox of the rotated rect
+      const cosA = Math.abs(Math.cos(textAngle));
+      const sinA = Math.abs(Math.sin(textAngle));
+      const bboxHalfW = halfW * cosA + halfH * sinA;
+      const bboxHalfH = halfW * sinA + halfH * cosA;
+      collector.push({
+        roomId,
+        edgeIndex: i,
+        cx: labelCx,
+        cy: labelCy,
+        halfWidth: bboxHalfW,
+        halfHeight: bboxHalfH,
+        pixelLength,
+        realLengthMm: scale ? pixelLength / scale.pixelsPerMm : null,
+      });
+    }
   }
 }
 
