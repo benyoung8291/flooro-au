@@ -1110,6 +1110,7 @@ export function EditorCanvas({
             dispatch({ type: 'ADD_ROOM', room: newRoom });
           }
           setRectangleStart(null);
+          // Batch mode: stay on rectangle tool when Shift held; otherwise stay too (tool persistence — user can press V to exit)
         }
         break;
       }
