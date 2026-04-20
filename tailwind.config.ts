@@ -74,6 +74,17 @@ export default {
           grid: "hsl(var(--canvas-grid))",
           selection: "hsl(var(--canvas-selection))",
         },
+        cream: {
+          DEFAULT: "hsl(var(--cream))",
+          2: "hsl(var(--cream-2))",
+        },
+        fr: {
+          "coral-bg": "hsl(var(--fr-coral-bg))",
+          "orange-bg": "hsl(var(--fr-orange-bg))",
+          "warm-bg": "hsl(var(--fr-warm-bg))",
+          "rose-bg": "hsl(var(--fr-rose-bg))",
+          "amber-bg": "hsl(var(--fr-amber-bg))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
