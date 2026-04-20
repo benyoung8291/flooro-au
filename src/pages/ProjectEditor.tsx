@@ -1052,6 +1052,9 @@ export default function ProjectEditor() {
                 dimensionUnit={dimensionUnit}
                 onDimensionUnitChange={setDimensionUnit}
                 onShowShortcuts={() => setShortcutsPanelOpen(true)}
+                onPickRoomTemplate={(id) => {
+                  window.dispatchEvent(new CustomEvent('room-template-pick', { detail: id }));
+                }}
               />
               {!isViewer && !is3DMode && (
                 <>
