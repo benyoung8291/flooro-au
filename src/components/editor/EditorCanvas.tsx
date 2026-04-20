@@ -11,6 +11,7 @@ import { StripPlanResult } from '@/lib/rollGoods/types';
 import {
   findSnapPoint,
   applyOrthoLock,
+  applyRightAngleSnap,
   findAxisSnapLines,
   isPointInPolygon,
   findClosestWallSegment,
@@ -585,6 +586,10 @@ export function EditorCanvas({
           onToolChange('transition');
         }
       }
+      // Toggle right-angle (90°/45°) enforcement
+      if ((e.key === 'a' || e.key === 'A') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        setSnapSettings({ ...snapSettings, enforceRightAngles: !snapSettings.enforceRightAngles });
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -1155,10 +1160,16 @@ export function EditorCanvas({
             setDrawingPoints([]);
             setShowDimensionInput(false);
           } else {
-            // Apply ortho lock if active
+            // Apply right-angle snap (90°/45° from previous segment) first, then ortho.
+            // Ortho-lock (Shift) wins because it's an explicit user override.
             let finalPoint = actualPoint;
+            if (effectiveSnapSettings.enforceRightAngles && drawingPoints.length > 0) {
+              const last = drawingPoints[drawingPoints.length - 1];
+              const prev = drawingPoints.length > 1 ? drawingPoints[drawingPoints.length - 2] : null;
+              finalPoint = applyRightAngleSnap(actualPoint, last, prev);
+            }
             if (orthoLocked && drawingPoints.length > 0) {
-              finalPoint = applyOrthoLock(actualPoint, drawingPoints[drawingPoints.length - 1]);
+              finalPoint = applyOrthoLock(finalPoint, drawingPoints[drawingPoints.length - 1]);
             }
             setDrawingPoints([...drawingPoints, finalPoint]);
           }
@@ -1627,8 +1638,15 @@ export function EditorCanvas({
       // Update cursor position
       let finalPoint = point;
 
+      // Right-angle (45° increment) live preview while drawing
+      if (effectiveSnapSettings.enforceRightAngles && drawingPoints.length > 0 && isDrawing) {
+        const last = drawingPoints[drawingPoints.length - 1];
+        const prev = drawingPoints.length > 1 ? drawingPoints[drawingPoints.length - 2] : null;
+        finalPoint = applyRightAngleSnap(finalPoint, last, prev);
+      }
+
       if (orthoLocked && drawingPoints.length > 0) {
-        finalPoint = applyOrthoLock(point, drawingPoints[drawingPoints.length - 1]);
+        finalPoint = applyOrthoLock(finalPoint, drawingPoints[drawingPoints.length - 1]);
       }
 
       // Use smart snapping when drawing - zoom-aware radius
