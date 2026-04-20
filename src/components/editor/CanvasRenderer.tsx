@@ -1849,58 +1849,60 @@ function drawSeamLines(
   isSelected: boolean
 ) {
   if (!scale || !stripPlan.seamLines || stripPlan.seamLines.length === 0) return;
-  
+
+  // Build door conflict zones in pixel space (door center + half-width buffer)
+  const DOOR_CLEAR_BUFFER_MM = 75; // installer clearance from doorway
+  const doorZones = room.doors.map(door => {
+    const widthPx = door.width * scale.pixelsPerMm;
+    const bufferPx = DOOR_CLEAR_BUFFER_MM * scale.pixelsPerMm;
+    return {
+      cx: door.position.x,
+      cy: door.position.y,
+      radiusPx: widthPx / 2 + bufferPx,
+    };
+  });
+
+  // Helper: minimum distance from point to line segment
+  const pointToSegDist = (px: number, py: number, ax: number, ay: number, bx: number, by: number) => {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) return Math.hypot(px - ax, py - ay);
+    let t = ((px - ax) * dx + (py - ay) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+  };
+
   ctx.save();
-  
-  // Set seam line style - purple/magenta to distinguish from other elements
-  ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 50% 60%)';
-  ctx.lineWidth = 2 / zoom;
-  ctx.setLineDash([6 / zoom, 4 / zoom]);
   ctx.lineCap = 'round';
-  
+
   stripPlan.seamLines.forEach(seam => {
-    // Convert mm coordinates to pixels
     const x1Px = seam.x1 * scale.pixelsPerMm;
     const y1Px = seam.y1 * scale.pixelsPerMm;
     const x2Px = seam.x2 * scale.pixelsPerMm;
     const y2Px = seam.y2 * scale.pixelsPerMm;
-    
-    // Get intersection points with outer room polygon
-    let allIntersections = getLinePolygonIntersections(
-      x1Px, y1Px, x2Px, y2Px,
-      room.points
-    );
-    
-    // Get intersections with each hole polygon
+
+    let allIntersections = getLinePolygonIntersections(x1Px, y1Px, x2Px, y2Px, room.points);
     room.holes.forEach(hole => {
       if (hole.points.length >= 3) {
-        const holeIntersections = getLinePolygonIntersections(
-          x1Px, y1Px, x2Px, y2Px,
-          hole.points
-        );
-        allIntersections = [...allIntersections, ...holeIntersections];
+        allIntersections = [...allIntersections, ...getLinePolygonIntersections(x1Px, y1Px, x2Px, y2Px, hole.points)];
       }
     });
-    
-    // Need at least 2 intersection points to draw segments
+
     if (allIntersections.length < 2) return;
-    
-    // Sort intersections along the seam direction
+
     const isVertical = Math.abs(x2Px - x1Px) < Math.abs(y2Px - y1Px);
     allIntersections.sort((a, b) => isVertical ? a.y - b.y : a.x - b.x);
-    
-    // Draw segments where midpoint is inside the room (not in a hole)
+
     for (let i = 0; i < allIntersections.length - 1; i++) {
       const p1 = allIntersections[i];
       const p2 = allIntersections[i + 1];
       const midX = (p1.x + p2.x) / 2;
       const midY = (p1.y + p2.y) / 2;
       const midPoint = { x: midX, y: midY };
-      
-      // Check if midpoint is inside outer polygon
+
       if (!isPointInPolygon(midPoint, room.points)) continue;
-      
-      // Check if midpoint is inside any hole (if so, skip this segment)
+
       let inHole = false;
       for (const hole of room.holes) {
         if (hole.points.length >= 3 && isPointInPolygon(midPoint, hole.points)) {
@@ -1909,15 +1911,35 @@ function drawSeamLines(
         }
       }
       if (inHole) continue;
-      
-      // Draw this valid segment
+
+      // Check if this segment conflicts with any door zone
+      let hasConflict = false;
+      for (const dz of doorZones) {
+        const d = pointToSegDist(dz.cx, dz.cy, p1.x, p1.y, p2.x, p2.y);
+        if (d < dz.radiusPx) {
+          hasConflict = true;
+          break;
+        }
+      }
+
+      // Style: amber for conflict, purple otherwise
+      if (hasConflict) {
+        ctx.strokeStyle = isSelected ? 'hsl(0 84% 55%)' : 'hsl(0 75% 60%)';
+        ctx.lineWidth = 3 / zoom;
+        ctx.setLineDash([4 / zoom, 3 / zoom]);
+      } else {
+        ctx.strokeStyle = isSelected ? 'hsl(280 70% 50%)' : 'hsl(280 50% 60%)';
+        ctx.lineWidth = 2 / zoom;
+        ctx.setLineDash([6 / zoom, 4 / zoom]);
+      }
+
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     }
   });
-  
+
   ctx.setLineDash([]);
   ctx.restore();
 }
