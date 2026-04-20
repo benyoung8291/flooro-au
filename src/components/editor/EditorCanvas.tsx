@@ -1908,7 +1908,7 @@ export function EditorCanvas({
 
       {/* Auto-close preview badge */}
       {isCloseSnapping && livePreviewArea !== null && (
-        <div className="absolute top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-sm font-semibold shadow-lg animate-pulse z-30">
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-accent text-accent-foreground text-sm font-semibold shadow-lg animate-pulse z-30">
           Click to close • {livePreviewArea.toFixed(2)} m²
         </div>
       )}

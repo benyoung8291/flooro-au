@@ -61,6 +61,8 @@ interface CanvasRendererProps {
   // Transition drawing tool state
   transitionDrawStart?: { roomId: string; edgeIndex: number; percent: number } | null;
   transitionHoverEdge?: { roomId: string; edgeIndex: number; percent: number; projectedPoint: CanvasPoint } | null;
+  // Polyline auto-close indicator (glowing ring around start vertex)
+  isCloseSnapping?: boolean;
 }
 
 // Cache for loaded images
