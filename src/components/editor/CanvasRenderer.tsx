@@ -1577,7 +1577,9 @@ function drawDimensionLabels(
   edgeCurves: EdgeCurve[] | undefined,
   zoom: number,
   scale: CanvasState['scale'],
-  dimensionUnit: DimensionUnit = 'm'
+  dimensionUnit: DimensionUnit = 'm',
+  roomId?: string,
+  collector?: DimensionLabelRect[]
 ) {
   if (points.length < 2) return;
 
