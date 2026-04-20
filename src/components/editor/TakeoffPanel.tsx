@@ -40,6 +40,7 @@ import {
   Clock,
   ExternalLink,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useMaterials, Material } from '@/hooks/useMaterials';
 import { Room, ScaleCalibration, RoomAccessories, ProjectMaterial } from '@/lib/canvas/types';
