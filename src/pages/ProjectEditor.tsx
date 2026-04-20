@@ -13,6 +13,8 @@ import { ImageControls } from '@/components/editor/ImageControls';
 import { MobileNav } from '@/components/editor/MobileNav';
 import { MobileToolFAB } from '@/components/editor/MobileToolFAB';
 import { MobileSidebarDrawer } from '@/components/editor/MobileSidebarDrawer';
+import { MobileRoomActionBar } from '@/components/editor/MobileRoomActionBar';
+import { MobileTakeoffSheet } from '@/components/editor/MobileTakeoffSheet';
 import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
 import { PageTabs } from '@/components/editor/PageTabs';
