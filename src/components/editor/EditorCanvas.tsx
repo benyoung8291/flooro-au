@@ -1030,6 +1030,36 @@ export function EditorCanvas({
 
     switch (activeTool) {
       case 'select': {
+        // Inline edge-length editing: hit-test dimension labels first
+        {
+          const rects = dimensionLabelRectsRef.current;
+          for (const r of rects) {
+            if (r.realLengthMm == null) continue;
+            if (
+              Math.abs(point.x - r.cx) <= r.halfWidth &&
+              Math.abs(point.y - r.cy) <= r.halfHeight
+            ) {
+              const screenX = r.cx * state.viewTransform.zoom + state.viewTransform.offsetX;
+              const screenY = r.cy * state.viewTransform.zoom + state.viewTransform.offsetY;
+              setEdgeEdit({
+                roomId: r.roomId,
+                edgeIndex: r.edgeIndex,
+                screenX,
+                screenY,
+                initialMm: r.realLengthMm,
+              });
+              // Pre-fill in current dimension unit
+              const initInUnit =
+                dimensionUnit === 'mm' ? r.realLengthMm.toFixed(0) :
+                dimensionUnit === 'cm' ? (r.realLengthMm / 10).toFixed(1) :
+                dimensionUnit === 'm'  ? (r.realLengthMm / 1000).toFixed(3) :
+                (r.realLengthMm / 25.4).toFixed(2);
+              setEdgeEditValue(initInUnit);
+              return;
+            }
+          }
+        }
+
         // Check door resize handles first (only for selected room)
         if (state.selectedRoomId) {
           const selectedRoom = state.rooms.find(r => r.id === state.selectedRoomId);
