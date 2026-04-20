@@ -1119,12 +1119,6 @@ export default function ProjectEditor() {
           )}
         </div>
 
-        {/* spacer */}
-        <div style={{ display: 'none' }} />
-              />
-            </div>
-          )}
-        </div>
 
         {/* Desktop Right Sidebar - TakeoffPanel */}
         {!isMobile && (
