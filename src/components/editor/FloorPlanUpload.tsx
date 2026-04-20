@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Upload, Loader2, Image as ImageIcon, FileText } from 'lucide-react';
+import { Upload, Loader2, Image as ImageIcon, FileText, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
   Dialog, 
@@ -342,6 +342,14 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
               onChange={handleFileInput}
               className="hidden"
             />
+            <input
+              id="floor-plan-camera-input"
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFileInput}
+              className="hidden"
+            />
             
             {isUploading || isAnalyzingPdf ? (
               <div className="flex flex-col items-center gap-3">
@@ -363,6 +371,19 @@ export function FloorPlanUpload({ projectId, onImageUploaded }: FloorPlanUploadP
                     or click to browse
                   </p>
                 </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="gap-2 mt-1 md:hidden"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    document.getElementById('floor-plan-camera-input')?.click();
+                  }}
+                >
+                  <Camera className="w-4 h-4" />
+                  Take Photo
+                </Button>
                 <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <ImageIcon className="w-3.5 h-3.5" />
