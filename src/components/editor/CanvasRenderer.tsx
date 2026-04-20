@@ -63,6 +63,20 @@ interface CanvasRendererProps {
   transitionHoverEdge?: { roomId: string; edgeIndex: number; percent: number; projectedPoint: CanvasPoint } | null;
   // Polyline auto-close indicator (glowing ring around start vertex)
   isCloseSnapping?: boolean;
+  // Inline edge-length editing: receives bounding rects of dimension labels (canvas coords)
+  onDimensionLabelsRendered?: (rects: DimensionLabelRect[]) => void;
+}
+
+export interface DimensionLabelRect {
+  roomId: string;
+  edgeIndex: number;
+  // Canvas-space center & half-extents along the edge (axis-aligned bbox in canvas coords)
+  cx: number;
+  cy: number;
+  halfWidth: number;
+  halfHeight: number;
+  pixelLength: number;
+  realLengthMm: number | null;
 }
 
 // Cache for loaded images
