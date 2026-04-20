@@ -1063,7 +1063,8 @@ function drawRoom(
   isMergeable: boolean = false,
   isMergeTarget: boolean = false,
   isMergeDimmed: boolean = false,
-  projectMaterials: ProjectMaterial[] = []
+  projectMaterials: ProjectMaterial[] = [],
+  labelCollector?: DimensionLabelRect[]
 ) {
   if (room.points.length < 3) return;
 
