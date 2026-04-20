@@ -317,7 +317,6 @@ export function CanvasRenderer({
         const stripPlan = stripPlans.get(room.id)!;
         drawSeamLines(ctx, room, stripPlan, state.scale, zoom, state.selectedRoomId === room.id);
       }
-      
       // Draw hole vertices for selected room (for interactive editing)
       if (room.id === state.selectedRoomId && room.holes.length > 0) {
         room.holes.forEach(hole => {
