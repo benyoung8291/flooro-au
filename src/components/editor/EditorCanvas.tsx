@@ -643,7 +643,88 @@ export function EditorCanvas({
     };
   }, []);
 
-  // Handle merge rooms
+  // Room template picker — listens for events from toolbar
+  useEffect(() => {
+    const handleTemplate = (e: Event) => {
+      const id = (e as CustomEvent).detail as 'l-shape' | 'u-shape' | 'rect-notch';
+
+      // Default size in real-world mm
+      const widthMm = 5000;
+      const heightMm = 4000;
+      // Convert to pixels via current scale (fallback to 300x240 px)
+      const pxPerMm = state.scale?.pixelsPerMm ?? 0.06; // ~300px / 5000mm
+      const w = widthMm * pxPerMm;
+      const h = heightMm * pxPerMm;
+
+      // Anchor at viewport center in canvas coords
+      const cx = (canvasSize.width / 2 - state.viewTransform.x) / state.viewTransform.zoom;
+      const cy = (canvasSize.height / 2 - state.viewTransform.y) / state.viewTransform.zoom;
+      const x0 = cx - w / 2;
+      const y0 = cy - h / 2;
+
+      let points: CanvasPoint[] = [];
+      if (id === 'l-shape') {
+        // Bottom-left corner cut: rectangle minus top-right notch (3/5 width, 2/4 height notch)
+        const nw = w * 0.4;
+        const nh = h * 0.5;
+        points = [
+          { x: x0, y: y0 },
+          { x: x0 + w - nw, y: y0 },
+          { x: x0 + w - nw, y: y0 + nh },
+          { x: x0 + w, y: y0 + nh },
+          { x: x0 + w, y: y0 + h },
+          { x: x0, y: y0 + h },
+        ];
+      } else if (id === 'u-shape') {
+        // U-shape: rectangle with a top-center notch
+        const nw = w * 0.34;
+        const nh = h * 0.55;
+        const nx = x0 + (w - nw) / 2;
+        points = [
+          { x: x0, y: y0 },
+          { x: nx, y: y0 },
+          { x: nx, y: y0 + nh },
+          { x: nx + nw, y: y0 + nh },
+          { x: nx + nw, y: y0 },
+          { x: x0 + w, y: y0 },
+          { x: x0 + w, y: y0 + h },
+          { x: x0, y: y0 + h },
+        ];
+      } else {
+        // Rectangle with side notch (right side)
+        const nw = w * 0.25;
+        const nh = h * 0.4;
+        const ny = y0 + (h - nh) / 2;
+        points = [
+          { x: x0, y: y0 },
+          { x: x0 + w, y: y0 },
+          { x: x0 + w, y: ny },
+          { x: x0 + w - nw, y: ny },
+          { x: x0 + w - nw, y: ny + nh },
+          { x: x0 + w, y: ny + nh },
+          { x: x0 + w, y: y0 + h },
+          { x: x0, y: y0 + h },
+        ];
+      }
+
+      const newRoom: Room = {
+        id: generateRoomId(),
+        name: `Room ${state.rooms.length + 1}`,
+        points,
+        holes: [],
+        doors: [],
+        materialId: null,
+        color: DEFAULT_ROOM_COLOR,
+        edgeTransitions: [],
+      };
+      dispatch({ type: 'ADD_ROOM', room: newRoom });
+      dispatch({ type: 'SELECT_ROOM', roomId: newRoom.id });
+      toast.success(`${id === 'l-shape' ? 'L-shape' : id === 'u-shape' ? 'U-shape' : 'Rectangle + notch'} added — drag corners to resize`);
+    };
+
+    window.addEventListener('room-template-pick', handleTemplate);
+    return () => window.removeEventListener('room-template-pick', handleTemplate);
+  }, [state.scale, state.rooms.length, state.viewTransform, canvasSize, dispatch]);
   const handleMergeRooms = useCallback((room1: Room, room2: Room) => {
     // Find shared edge
     const sharedEdge = findSharedEdgeBetweenRooms(room1, room2);
