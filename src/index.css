@@ -7,7 +7,7 @@
    Claude-inspired warm, elegant aesthetic
    ============================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Figtree:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -80,6 +80,15 @@
     --status-pending: 38 92% 50%;
     --status-progress: 20 65% 58%;
     --status-completed: 142 55% 45%;
+
+    /* Marketing site warm tokens (Front Run inspired) */
+    --cream: 40 33% 97%;
+    --cream-2: 40 22% 93%;
+    --fr-coral-bg: 20 60% 92%;
+    --fr-orange-bg: 30 60% 92%;
+    --fr-warm-bg: 38 50% 92%;
+    --fr-rose-bg: 12 50% 93%;
+    --fr-amber-bg: 25 70% 91%;
   }
 
   .dark {
