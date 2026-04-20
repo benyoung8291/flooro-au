@@ -1110,6 +1110,16 @@ export default function ProjectEditor() {
             />
           )}
 
+          {/* Empty-state onboarding card */}
+          {!is3DMode && rooms.length === 0 && (
+            <CanvasEmptyState
+              hasBackground={!!backgroundImage}
+              hasScale={!!scale}
+              hasRooms={rooms.length > 0}
+              isMobile={isMobile}
+            />
+          )}
+
           {/* Status Bar - Bottom of canvas */}
           {!isMobile && !is3DMode && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
