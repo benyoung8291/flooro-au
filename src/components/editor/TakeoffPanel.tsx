@@ -322,6 +322,13 @@ export function TakeoffPanel({
 
           {/* Room List */}
           <ScrollArea className="flex-1">
+            <MaterialEfficiencyCard
+              rooms={rooms}
+              scale={scale}
+              allMaterialsMap={allMaterialsMap}
+              projectMaterials={projectMaterials}
+              onOpenReport={onOpenReport}
+            />
             <div className="p-2 space-y-1">
               {rooms.length === 0 ? (
                 <div className="text-center py-8 px-4">
