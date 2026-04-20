@@ -303,7 +303,8 @@ export function CanvasRenderer({
         isMergeable,
         isMergeTarget,
         isMergeDimmed,
-        projectMaterials
+        projectMaterials,
+        labelRects
       );
       
       // Draw fill direction arrow for rooms with roll materials
