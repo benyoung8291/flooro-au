@@ -147,6 +147,7 @@ export function CanvasRenderer({
   transitionDrawStart,
   transitionHoverEdge,
   isCloseSnapping = false,
+  onDimensionLabelsRendered,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
