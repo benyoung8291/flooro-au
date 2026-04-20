@@ -1114,6 +1114,9 @@ export default function ProjectEditor() {
                 scale={scale}
                 selectedRoom={rooms.find(r => r.id === selectedRoomId) || null}
                 dimensionUnit={dimensionUnit}
+                isSnapEnabled={snapSettings.enabled}
+                isGridEnabled={snapSettings.gridEnabled}
+                isRightAngleLocked={!!snapSettings.enforceRightAngles}
               />
             </div>
           )}
@@ -1121,7 +1124,7 @@ export default function ProjectEditor() {
 
         {/* Desktop Right Sidebar - TakeoffPanel */}
         {!isMobile && (
-          <TakeoffPanel 
+          <TakeoffPanel
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             rooms={rooms}
@@ -1137,6 +1140,7 @@ export default function ProjectEditor() {
             projectAddress={project.address || undefined}
             stripPlans={stripPlans}
             onOpenFinishesSchedule={() => setFinishesScheduleOpen(true)}
+            onOpenReport={() => setReportPreviewOpen(true)}
             projectMaterials={projectMaterials}
           />
         )}
