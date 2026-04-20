@@ -17,6 +17,8 @@ import { MobileRoomActionBar } from '@/components/editor/MobileRoomActionBar';
 import { MobileTakeoffSheet } from '@/components/editor/MobileTakeoffSheet';
 import { ThreeDViewer } from '@/components/editor/ThreeDViewer';
 import { KeyboardShortcutsPanel } from '@/components/editor/KeyboardShortcutsPanel';
+import { CanvasEmptyState } from '@/components/editor/CanvasEmptyState';
+import { FirstRunTour } from '@/components/editor/FirstRunTour';
 import { PageTabs } from '@/components/editor/PageTabs';
 import { ProjectProgressBar } from '@/components/editor/ProjectProgressBar';
 import { RoomsOverviewDialog } from '@/components/editor/RoomsOverviewDialog';
