@@ -798,7 +798,7 @@ export function CanvasRenderer({
       ctx.font = '12px Inter, sans-serif';
       ctx.fillText('ORTHO', 10, height - 10);
     }
-  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall, transitionDrawStart, transitionHoverEdge]);
+  }, [state, drawingPoints, cursorPosition, isDrawing, orthoLocked, snapPoint, snapType, axisSnapLines, getRoomColor, loadedImage, hoveredVertex, hoveredWall, hoveredCurveControl, hoveredRoomId, isDragging, isDraggingMaterial, dragTargetRoomId, showDimensionLabels, dimensionUnit, materialTypes, onFillDirectionClick, stripPlans, showSeamLines, showSharedEdgeIndicators, sharedEdges, mergeFirstRoomId, mergeableRoomIds, isMergeMode, splitRoomId, splitStartPoint, splitPreviewEnd, isSplitMode, showGrid, gridSizePx, rectangleStart, activeTool, projectMaterials, scaleStart, holeRectStart, hoveredHoleVertex, hoveredHoleWall, transitionDrawStart, transitionHoverEdge, isCloseSnapping]);
 
   useEffect(() => {
     render();
