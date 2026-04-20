@@ -1030,14 +1030,19 @@ export function EditorCanvas({
 
     switch (activeTool) {
       case 'select': {
-        // Inline edge-length editing: hit-test dimension labels first
+        // Inline edge-length editing: hit-test dimension labels first.
+        // On touch devices, expand the hit area to compensate for fat-finger input.
         {
           const rects = dimensionLabelRectsRef.current;
+          const isTouch = e.pointerType === 'touch';
+          // 22px finger pad in canvas units
+          const touchPadX = isTouch ? 22 / state.viewTransform.zoom : 0;
+          const touchPadY = isTouch ? 22 / state.viewTransform.zoom : 0;
           for (const r of rects) {
             if (r.realLengthMm == null) continue;
             if (
-              Math.abs(point.x - r.cx) <= r.halfWidth &&
-              Math.abs(point.y - r.cy) <= r.halfHeight
+              Math.abs(point.x - r.cx) <= r.halfWidth + touchPadX &&
+              Math.abs(point.y - r.cy) <= r.halfHeight + touchPadY
             ) {
               const screenX = r.cx * state.viewTransform.zoom + state.viewTransform.offsetX;
               const screenY = r.cy * state.viewTransform.zoom + state.viewTransform.offsetY;
