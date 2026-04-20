@@ -1114,9 +1114,13 @@ export default function ProjectEditor() {
                 scale={scale}
                 selectedRoom={rooms.find(r => r.id === selectedRoomId) || null}
                 dimensionUnit={dimensionUnit}
-                isSnapEnabled={snapSettings.enabled}
-                isGridEnabled={snapSettings.gridEnabled}
-                isRightAngleLocked={!!snapSettings.enforceRightAngles}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* spacer */}
+        <div style={{ display: 'none' }} />
               />
             </div>
           )}
