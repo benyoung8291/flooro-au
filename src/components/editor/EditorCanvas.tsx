@@ -1903,7 +1903,15 @@ export function EditorCanvas({
         hoveredHoleWall={hoveredHoleWall}
         transitionDrawStart={transitionDrawStart}
         transitionHoverEdge={transitionHoverEdge}
+        isCloseSnapping={isCloseSnapping}
       />
+
+      {/* Auto-close preview badge */}
+      {isCloseSnapping && livePreviewArea !== null && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-sm font-semibold shadow-lg animate-pulse z-30">
+          Click to close • {livePreviewArea.toFixed(2)} m²
+        </div>
+      )}
 
       {/* Material drag indicator */}
       {isDraggingMaterial && (
