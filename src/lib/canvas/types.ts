@@ -245,6 +245,7 @@ export interface SnapSettings {
   gridSize: number;           // Grid size in mm (when scale is set) or pixels
   vertexSnapEnabled: boolean; // Snap to existing room corners
   axisSnapEnabled: boolean;   // Snap to axis-aligned lines
+  enforceRightAngles?: boolean; // Snap each new segment to 0/45/90° relative to previous segment
 }
 
 export const DEFAULT_SNAP_SETTINGS: SnapSettings = {
@@ -253,6 +254,7 @@ export const DEFAULT_SNAP_SETTINGS: SnapSettings = {
   gridSize: 100, // 100mm = 10cm grid
   vertexSnapEnabled: true,
   axisSnapEnabled: true,
+  enforceRightAngles: false,
 };
 
 // Snap result with type info
