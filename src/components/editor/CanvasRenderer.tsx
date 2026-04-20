@@ -1404,7 +1404,7 @@ function drawRoom(
 
   // Draw dimension labels on each wall (if enabled)
   if (showDimensionLabels) {
-    drawDimensionLabels(ctx, room.points, room.edgeCurves, zoom, scale, dimensionUnit);
+    drawDimensionLabels(ctx, room.points, room.edgeCurves, zoom, scale, dimensionUnit, room.id, labelCollector);
   }
 
   // Draw hole outlines with curve support
