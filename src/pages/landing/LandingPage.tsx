@@ -1,4 +1,4 @@
-import { useNavigate, Link, Navigate, useParams } from "react-router-dom";
+import { useNavigate, Link, Navigate, useLocation } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,8 @@ const RELATED_LABELS: Record<string, string> = {
 };
 
 export default function LandingPage() {
-  const { slug } = useParams<{ slug: string }>();
+  const { pathname } = useLocation();
+  const slug = pathname.replace(/^\/+/, "").replace(/\/+$/, "");
   const config = slug ? LANDING_CONFIGS[slug] : undefined;
   if (!config) return <Navigate to="/" replace />;
   return <LandingPageInner config={config} />;
