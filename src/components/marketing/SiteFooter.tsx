@@ -13,7 +13,20 @@ export default function SiteFooter() {
         <a href="#pricing" className="text-[13px] text-foreground/40 font-semibold hover:text-foreground/70 transition-colors">Pricing</a>
         <a href="#faq" className="text-[13px] text-foreground/40 font-semibold hover:text-foreground/70 transition-colors">FAQ</a>
       </div>
-      <div className="text-xs text-foreground/30 font-medium">© 2026 Flooro · flooro.com.au</div>
+      <div className="flex flex-col md:items-end gap-1 text-xs text-foreground/30 font-medium">
+        <div>© 2026 Flooro · flooro.com.au</div>
+        <div>
+          Site built by{" "}
+          <a
+            href="https://fromtheoffice.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-foreground/50 hover:text-foreground/80 transition-colors underline-offset-2 hover:underline"
+          >
+            fromtheoffice.io
+          </a>
+        </div>
+      </div>
     </footer>
   );
 }
