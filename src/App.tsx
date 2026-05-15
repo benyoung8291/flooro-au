@@ -23,6 +23,8 @@ import QuotesList from "./pages/QuotesList";
 import QuoteEditor from "./pages/QuoteEditor";
 // QuotePreview is now inline via QuotePdfSidebar
 import NotFound from "./pages/NotFound";
+import LandingPage from "./pages/landing/LandingPage";
+import { LANDING_SLUGS } from "./pages/landing/landingConfigs";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +39,9 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              {LANDING_SLUGS.map((slug) => (
+                <Route key={slug} path={`/${slug}`} element={<LandingPage />} />
+              ))}
               
               {/* Protected Routes */}
               <Route element={<ProtectedRoute />}>
