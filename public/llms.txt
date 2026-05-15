@@ -1,0 +1,12 @@
+# Flooro
+
+> Flooring measurement and estimation platform for contractors. Draw floor plans, optimise material cuts, and generate client-ready quotes from phone or laptop.
+
+## Pages
+
+- [Home](/): Product overview, features, pricing, and FAQ.
+- [Sign in / Sign up](/auth): Account access for contractors.
+
+## Optional
+
+- [Sitemap](/sitemap.xml)
