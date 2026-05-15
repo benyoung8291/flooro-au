@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,7 +104,15 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <main className="min-h-screen flex items-center justify-center bg-background p-4">
+      <Helmet>
+        <title>Sign in to Flooro — Flooring takeoff platform</title>
+        <meta name="description" content="Sign in or create your Flooro account to start measuring floor plans and generating quotes." />
+        <link rel="canonical" href="https://flooro.com.au/auth" />
+        <meta property="og:title" content="Sign in to Flooro" />
+        <meta property="og:description" content="Access your Flooro account to manage takeoffs and quotes." />
+        <meta property="og:url" content="https://flooro.com.au/auth" />
+      </Helmet>
       <div className="w-full max-w-md animate-slide-up">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
@@ -237,6 +246,6 @@ export default function Auth() {
           Professional flooring estimation made simple.
         </p>
       </div>
-    </div>
+    </main>
   );
 }
